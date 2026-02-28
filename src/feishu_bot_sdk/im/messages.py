@@ -16,6 +16,27 @@ class MessageService:
             content={"text": text},
         )
 
+    def reply_markdown(
+        self,
+        message_id: str,
+        markdown: str,
+        *,
+        locale: str = "zh_cn",
+        title: Optional[str] = None,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        post = MessageContent.post_locale(
+            locale=locale,
+            title=title,
+            content=[[MessageContent.post_md(markdown)]],
+        )
+        return self.reply(
+            message_id,
+            msg_type="post",
+            content=post,
+            uuid=uuid,
+        )
+
     def send_text(
         self,
         *,
@@ -632,6 +653,27 @@ class AsyncMessageService:
             message_id,
             msg_type="text",
             content={"text": text},
+        )
+
+    async def reply_markdown(
+        self,
+        message_id: str,
+        markdown: str,
+        *,
+        locale: str = "zh_cn",
+        title: Optional[str] = None,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        post = MessageContent.post_locale(
+            locale=locale,
+            title=title,
+            content=[[MessageContent.post_md(markdown)]],
+        )
+        return await self.reply(
+            message_id,
+            msg_type="post",
+            content=post,
+            uuid=uuid,
         )
 
     async def send_text(

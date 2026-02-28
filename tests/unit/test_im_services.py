@@ -193,6 +193,26 @@ def test_message_send_markdown_convenience_method():
     )
 
 
+def test_message_reply_markdown_convenience_method():
+    stub = _SyncClientStub()
+    service = MessageService(cast(FeishuClient, stub))
+
+    service.reply_markdown(
+        "om_1",
+        "### reply md",
+        locale="zh_cn",
+        title="回复",
+    )
+
+    assert len(stub.calls) == 1
+    call = stub.calls[0]
+    assert call["path"] == "/im/v1/messages/om_1/reply"
+    assert call["payload"]["msg_type"] == "post"
+    assert call["payload"]["content"] == (
+        '{"zh_cn": {"content": [[{"tag": "md", "text": "### reply md"}]], "title": "回复"}}'
+    )
+
+
 def test_message_merge_forward_builds_params():
     stub = _SyncClientStub()
     service = MessageService(cast(FeishuClient, stub))
@@ -470,6 +490,27 @@ def test_async_message_send_markdown_convenience_method():
         assert stub.calls[0]["payload"]["msg_type"] == "post"
         assert stub.calls[0]["payload"]["content"] == (
             '{"zh_cn": {"content": [[{"tag": "md", "text": "**hello**"}]]}}'
+        )
+
+    asyncio.run(run())
+
+
+def test_async_message_reply_markdown_convenience_method():
+    async def run() -> None:
+        stub = _AsyncClientStub()
+        service = AsyncMessageService(cast(AsyncFeishuClient, stub))
+
+        await service.reply_markdown(
+            "om_1",
+            "**reply**",
+        )
+
+        assert len(stub.calls) == 1
+        call = stub.calls[0]
+        assert call["path"] == "/im/v1/messages/om_1/reply"
+        assert call["payload"]["msg_type"] == "post"
+        assert call["payload"]["content"] == (
+            '{"zh_cn": {"content": [[{"tag": "md", "text": "**reply**"}]]}}'
         )
 
     asyncio.run(run())
