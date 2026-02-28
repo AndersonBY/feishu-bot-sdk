@@ -23,6 +23,70 @@ pip install feishu-bot-sdk
 
 # uv
 uv add feishu-bot-sdk
+
+# Install as a global CLI tool (recommended for Agent workflows)
+uv tool install feishu-bot-sdk
+feishu --help
+```
+
+## CLI Usage (`feishu`)
+
+- Command name: `feishu`
+- Default output: human-friendly
+- Machine-readable output: add `--format json`
+- Auth priority: environment variables first, then global flags
+  - Env: `FEISHU_APP_ID`, `FEISHU_APP_SECRET` (also supports `APP_ID`, `APP_SECRET`)
+  - Flags: `--app-id`, `--app-secret`
+
+Examples:
+
+```bash
+# 1) Get tenant token (JSON output)
+feishu auth token --format json
+
+# 2) Send text message (human output by default)
+feishu im send-text --receive-id ou_xxx --text "hello from cli"
+
+# 3) Send markdown from file
+feishu im send-markdown --receive-id ou_xxx --markdown-file ./msg.md
+
+# 4) Reply markdown (JSON output)
+feishu im reply-markdown om_xxx --markdown "### received" --format json
+
+# 5) Upload image
+feishu media upload-image ./demo.png
+
+# 6) Create Bitable from CSV and grant access
+feishu bitable create-from-csv ./final.csv --app-name "Task Result" --table-name "Result" --grant-member-id ou_xxx
+
+# 7) Create and append markdown to Docx
+feishu docx create-from-markdown --title "Daily Report" --markdown-file ./report.md
+
+# 8) Upload file to Drive
+feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx
+
+# 9) Search wiki nodes
+feishu wiki search-nodes --query "weekly report" --format json
+
+# 10) Parse webhook envelope
+feishu webhook parse --body-file ./webhook.json --format json
+
+# 11) Fetch long-connection endpoint
+feishu ws endpoint --format json
+
+# 12) Run long-connection server and print events
+feishu server run --print-payload
+
+# 13) Run local webhook server (auto-stop after 10 requests)
+feishu webhook serve --host 127.0.0.1 --port 8000 --path /webhook/feishu --max-requests 10
+
+# 14) Start / check / stop long-connection service in background
+feishu server start --pid-file ./.feishu_server.pid --log-file ./feishu-server.log
+feishu server status --pid-file ./.feishu_server.pid --format json
+feishu server stop --pid-file ./.feishu_server.pid
+
+# 15) Agent pipeline input (stdin)
+cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --format json
 ```
 
 ## Module Docs
@@ -38,6 +102,7 @@ uv add feishu-bot-sdk
 - Event system (Events/Webhook/WS): [`docs/en/07-events-webhook-ws.md`](./docs/en/07-events-webhook-ws.md)
 - FeishuBotServer long-connection service: [`docs/en/08-bot-server.md`](./docs/en/08-bot-server.md)
 - Types, errors, and rate limit: [`docs/en/09-types-errors-rate-limit.md`](./docs/en/09-types-errors-rate-limit.md)
+- CLI tool: [`docs/en/10-cli.md`](./docs/en/10-cli.md)
 
 ## Quick Start (Sync)
 

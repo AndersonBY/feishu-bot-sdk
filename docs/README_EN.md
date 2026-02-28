@@ -15,6 +15,7 @@ This directory contains module-based SDK documentation. Each module has a standa
 - [07 Event System (Events/Webhook/WS)](./en/07-events-webhook-ws.md)
 - [08 FeishuBotServer (Long Connection Service)](./en/08-bot-server.md)
 - [09 Types, Errors, and Rate Limit](./en/09-types-errors-rate-limit.md)
+- [10 CLI Tool](./en/10-cli.md)
 
 ## Suggested Reading Path
 

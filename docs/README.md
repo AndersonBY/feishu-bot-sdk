@@ -15,6 +15,7 @@
 - [07 事件系统（Events/Webhook/WS）](./zh/07-events-webhook-ws.md)
 - [08 FeishuBotServer 长连接服务](./zh/08-bot-server.md)
 - [09 类型、异常与限流](./zh/09-types-errors-rate-limit.md)
+- [10 CLI 命令行工具](./zh/10-cli.md)
 
 ## 阅读建议
 

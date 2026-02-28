@@ -23,6 +23,70 @@ pip install feishu-bot-sdk
 
 # uv
 uv add feishu-bot-sdk
+
+# 安装为全局命令行工具（推荐给 Agent 场景）
+uv tool install feishu-bot-sdk
+feishu --help
+```
+
+## CLI 用法（`feishu`）
+
+- 命令名：`feishu`
+- 默认输出：人类友好格式
+- 机器可读输出：追加 `--format json`
+- 认证优先级：环境变量优先，其次命令行全局参数
+  - 环境变量：`FEISHU_APP_ID`、`FEISHU_APP_SECRET`（兼容 `APP_ID`、`APP_SECRET`）
+  - 全局参数：`--app-id`、`--app-secret`
+
+示例：
+
+```bash
+# 1) 获取 tenant token（JSON 输出）
+feishu auth token --format json
+
+# 2) 发送文本消息（默认人类友好输出）
+feishu im send-text --receive-id ou_xxx --text "hello from cli"
+
+# 3) 发送 Markdown 消息（从文件读取）
+feishu im send-markdown --receive-id ou_xxx --markdown-file ./msg.md
+
+# 4) 回复 Markdown（JSON 输出）
+feishu im reply-markdown om_xxx --markdown "### 已收到" --format json
+
+# 5) 上传图片
+feishu media upload-image ./demo.png
+
+# 6) CSV 创建多维表格并授权
+feishu bitable create-from-csv ./final.csv --app-name "任务结果" --table-name "结果表" --grant-member-id ou_xxx
+
+# 7) 创建并写入 Docx
+feishu docx create-from-markdown --title "日报" --markdown-file ./report.md
+
+# 8) 上传云空间文件
+feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx
+
+# 9) 搜索 Wiki 节点
+feishu wiki search-nodes --query "项目周报" --format json
+
+# 10) 解析 webhook 事件信封
+feishu webhook parse --body-file ./webhook.json --format json
+
+# 11) 获取长连接 endpoint
+feishu ws endpoint --format json
+
+# 12) 启动长连接服务并打印事件
+feishu server run --print-payload
+
+# 13) 本地启动 webhook 回调服务（处理 10 个请求后自动退出）
+feishu webhook serve --host 127.0.0.1 --port 8000 --path /webhook/feishu --max-requests 10
+
+# 14) 后台启动 / 查询 / 停止长连接服务
+feishu server start --pid-file ./.feishu_server.pid --log-file ./feishu-server.log
+feishu server status --pid-file ./.feishu_server.pid --format json
+feishu server stop --pid-file ./.feishu_server.pid
+
+# 15) Agent 管道输入（stdin）
+cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --format json
 ```
 
 ## 模块文档
@@ -38,6 +102,7 @@ uv add feishu-bot-sdk
 - 事件系统（Events/Webhook/WS）：[`docs/zh/07-events-webhook-ws.md`](./docs/zh/07-events-webhook-ws.md)
 - FeishuBotServer 长连接服务：[`docs/zh/08-bot-server.md`](./docs/zh/08-bot-server.md)
 - 类型、异常与限流：[`docs/zh/09-types-errors-rate-limit.md`](./docs/zh/09-types-errors-rate-limit.md)
+- CLI 命令行工具：[`docs/zh/10-cli.md`](./docs/zh/10-cli.md)
 
 ## 1 分钟上手（同步）
 
