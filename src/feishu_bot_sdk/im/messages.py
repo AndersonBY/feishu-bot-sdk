@@ -2,6 +2,7 @@ import json
 from typing import Any, Mapping, Optional, Sequence
 
 from ..feishu import AsyncFeishuClient, FeishuClient
+from .content import MessageContent
 
 
 class MessageService:
@@ -28,6 +29,211 @@ class MessageService:
             receive_id=receive_id,
             msg_type="text",
             content={"text": text},
+            uuid=uuid,
+        )
+
+    def send_post(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        post: Mapping[str, Any],
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="post",
+            content=post,
+            uuid=uuid,
+        )
+
+    def send_markdown(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        markdown: str,
+        locale: str = "zh_cn",
+        title: Optional[str] = None,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        post = MessageContent.post_locale(
+            locale=locale,
+            title=title,
+            content=[[MessageContent.post_md(markdown)]],
+        )
+        return self.send_post(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            post=post,
+            uuid=uuid,
+        )
+
+    def send_image(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        image_key: str,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="image",
+            content=MessageContent.image(image_key),
+            uuid=uuid,
+        )
+
+    def send_interactive(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        interactive: Mapping[str, Any],
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="interactive",
+            content=interactive,
+            uuid=uuid,
+        )
+
+    def send_share_chat(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        chat_id: str,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="share_chat",
+            content=MessageContent.share_chat(chat_id),
+            uuid=uuid,
+        )
+
+    def send_share_user(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        user_open_id: str,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="share_user",
+            content=MessageContent.share_user(user_open_id),
+            uuid=uuid,
+        )
+
+    def send_audio(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        file_key: str,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="audio",
+            content=MessageContent.audio(file_key),
+            uuid=uuid,
+        )
+
+    def send_media(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        file_key: str,
+        image_key: Optional[str] = None,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="media",
+            content=MessageContent.media(file_key, image_key=image_key),
+            uuid=uuid,
+        )
+
+    def send_file(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        file_key: str,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="file",
+            content=MessageContent.file(file_key),
+            uuid=uuid,
+        )
+
+    def send_sticker(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        file_key: str,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="sticker",
+            content=MessageContent.sticker(file_key),
+            uuid=uuid,
+        )
+
+    def send_system(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        system: Mapping[str, Any],
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="system",
+            content=system,
+            uuid=uuid,
+        )
+
+    def send_system_divider(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        text: str,
+        i18n_text: Optional[Mapping[str, str]] = None,
+        need_rollup: Optional[bool] = None,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="system",
+            content=MessageContent.system_divider(
+                text=text,
+                i18n_text=i18n_text,
+                need_rollup=need_rollup,
+            ),
             uuid=uuid,
         )
 
@@ -441,6 +647,211 @@ class AsyncMessageService:
             receive_id=receive_id,
             msg_type="text",
             content={"text": text},
+            uuid=uuid,
+        )
+
+    async def send_post(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        post: Mapping[str, Any],
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="post",
+            content=post,
+            uuid=uuid,
+        )
+
+    async def send_markdown(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        markdown: str,
+        locale: str = "zh_cn",
+        title: Optional[str] = None,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        post = MessageContent.post_locale(
+            locale=locale,
+            title=title,
+            content=[[MessageContent.post_md(markdown)]],
+        )
+        return await self.send_post(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            post=post,
+            uuid=uuid,
+        )
+
+    async def send_image(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        image_key: str,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="image",
+            content=MessageContent.image(image_key),
+            uuid=uuid,
+        )
+
+    async def send_interactive(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        interactive: Mapping[str, Any],
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="interactive",
+            content=interactive,
+            uuid=uuid,
+        )
+
+    async def send_share_chat(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        chat_id: str,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="share_chat",
+            content=MessageContent.share_chat(chat_id),
+            uuid=uuid,
+        )
+
+    async def send_share_user(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        user_open_id: str,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="share_user",
+            content=MessageContent.share_user(user_open_id),
+            uuid=uuid,
+        )
+
+    async def send_audio(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        file_key: str,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="audio",
+            content=MessageContent.audio(file_key),
+            uuid=uuid,
+        )
+
+    async def send_media(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        file_key: str,
+        image_key: Optional[str] = None,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="media",
+            content=MessageContent.media(file_key, image_key=image_key),
+            uuid=uuid,
+        )
+
+    async def send_file(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        file_key: str,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="file",
+            content=MessageContent.file(file_key),
+            uuid=uuid,
+        )
+
+    async def send_sticker(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        file_key: str,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="sticker",
+            content=MessageContent.sticker(file_key),
+            uuid=uuid,
+        )
+
+    async def send_system(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        system: Mapping[str, Any],
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="system",
+            content=system,
+            uuid=uuid,
+        )
+
+    async def send_system_divider(
+        self,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        text: str,
+        i18n_text: Optional[Mapping[str, str]] = None,
+        need_rollup: Optional[bool] = None,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self.send(
+            receive_id_type=receive_id_type,
+            receive_id=receive_id,
+            msg_type="system",
+            content=MessageContent.system_divider(
+                text=text,
+                i18n_text=i18n_text,
+                need_rollup=need_rollup,
+            ),
             uuid=uuid,
         )
 

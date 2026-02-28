@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from typing import Any, Mapping, Optional, cast
 
 from feishu_bot_sdk.feishu import AsyncFeishuClient, FeishuClient
+from feishu_bot_sdk.im.content import MessageContent
 from feishu_bot_sdk.im.media import AsyncMediaService, MediaService
 from feishu_bot_sdk.im.messages import AsyncMessageService, MessageService
 
@@ -96,6 +97,100 @@ def test_message_send_builds_payload():
     assert call["payload"]["msg_type"] == "text"
     assert call["payload"]["content"] == '{"text": "hello"}'
     assert call["payload"]["uuid"] == "u1"
+
+
+def test_message_content_builders():
+    post_payload = MessageContent.post_locale(
+        locale="zh_cn",
+        title="标题",
+        content=[
+            [MessageContent.post_text("hello"), MessageContent.post_at("ou_1")],
+            [MessageContent.post_hr()],
+        ],
+    )
+    interactive_payload = MessageContent.interactive_template(
+        "ctp_1",
+        template_version_name="1.0.0",
+        template_variable={"name": "Tom"},
+    )
+    system_payload = MessageContent.system_divider(
+        text="新会话",
+        i18n_text={"zh_CN": "新会话", "en_US": "New Session"},
+        need_rollup=True,
+    )
+
+    assert post_payload["zh_cn"]["title"] == "标题"
+    assert post_payload["zh_cn"]["content"][0][0]["tag"] == "text"
+    assert interactive_payload == {
+        "type": "template",
+        "data": {
+            "template_id": "ctp_1",
+            "template_version_name": "1.0.0",
+            "template_variable": {"name": "Tom"},
+        },
+    }
+    assert system_payload == {
+        "type": "divider",
+        "params": {
+            "divider_text": {
+                "text": "新会话",
+                "i18n_text": {"zh_CN": "新会话", "en_US": "New Session"},
+            }
+        },
+        "options": {"need_rollup": True},
+    }
+
+
+def test_message_send_convenience_methods_for_multiple_types():
+    stub = _SyncClientStub()
+    service = MessageService(cast(FeishuClient, stub))
+
+    service.send_image(receive_id_type="open_id", receive_id="ou_1", image_key="img_1")
+    service.send_file(receive_id_type="open_id", receive_id="ou_1", file_key="file_1")
+    service.send_media(
+        receive_id_type="open_id",
+        receive_id="ou_1",
+        file_key="file_video",
+        image_key="img_cover",
+    )
+    service.send_system_divider(
+        receive_id_type="open_id",
+        receive_id="ou_1",
+        text="新会话",
+        need_rollup=True,
+    )
+
+    assert len(stub.calls) == 4
+    assert stub.calls[0]["payload"]["msg_type"] == "image"
+    assert stub.calls[0]["payload"]["content"] == '{"image_key": "img_1"}'
+    assert stub.calls[1]["payload"]["msg_type"] == "file"
+    assert stub.calls[1]["payload"]["content"] == '{"file_key": "file_1"}'
+    assert stub.calls[2]["payload"]["msg_type"] == "media"
+    assert stub.calls[2]["payload"]["content"] == '{"file_key": "file_video", "image_key": "img_cover"}'
+    assert stub.calls[3]["payload"]["msg_type"] == "system"
+    assert stub.calls[3]["payload"]["content"] == (
+        '{"type": "divider", "params": {"divider_text": {"text": "新会话"}}, "options": {"need_rollup": true}}'
+    )
+
+
+def test_message_send_markdown_convenience_method():
+    stub = _SyncClientStub()
+    service = MessageService(cast(FeishuClient, stub))
+
+    service.send_markdown(
+        receive_id_type="open_id",
+        receive_id="ou_1",
+        markdown="### hello",
+        locale="zh_cn",
+        title="日报",
+    )
+
+    assert len(stub.calls) == 1
+    call = stub.calls[0]
+    assert call["payload"]["msg_type"] == "post"
+    assert call["payload"]["content"] == (
+        '{"zh_cn": {"content": [[{"tag": "md", "text": "### hello"}]], "title": "日报"}}'
+    )
 
 
 def test_message_merge_forward_builds_params():
@@ -326,6 +421,56 @@ def test_async_message_advanced_methods():
         assert stub.calls[1]["path"] == "/im/v1/messages/om_1/urgent_app"
         assert stub.calls[2]["path"] == "/ephemeral/v1/send"
         assert stub.calls[3]["path"] == "/interactive/v1/card/update"
+
+    asyncio.run(run())
+
+
+def test_async_message_send_convenience_methods():
+    async def run() -> None:
+        stub = _AsyncClientStub()
+        service = AsyncMessageService(cast(AsyncFeishuClient, stub))
+
+        await service.send_post(
+            receive_id_type="open_id",
+            receive_id="ou_1",
+            post=MessageContent.post_locale(
+                locale="zh_cn",
+                content=[[MessageContent.post_text("hello")]],
+            ),
+        )
+        await service.send_interactive(
+            receive_id_type="open_id",
+            receive_id="ou_1",
+            interactive=MessageContent.interactive_card("card_1"),
+        )
+
+        assert len(stub.calls) == 2
+        assert stub.calls[0]["payload"]["msg_type"] == "post"
+        assert stub.calls[0]["payload"]["content"] == (
+            '{"zh_cn": {"content": [[{"tag": "text", "text": "hello"}]]}}'
+        )
+        assert stub.calls[1]["payload"]["msg_type"] == "interactive"
+        assert stub.calls[1]["payload"]["content"] == '{"type": "card", "data": {"card_id": "card_1"}}'
+
+    asyncio.run(run())
+
+
+def test_async_message_send_markdown_convenience_method():
+    async def run() -> None:
+        stub = _AsyncClientStub()
+        service = AsyncMessageService(cast(AsyncFeishuClient, stub))
+
+        await service.send_markdown(
+            receive_id_type="open_id",
+            receive_id="ou_1",
+            markdown="**hello**",
+        )
+
+        assert len(stub.calls) == 1
+        assert stub.calls[0]["payload"]["msg_type"] == "post"
+        assert stub.calls[0]["payload"]["content"] == (
+            '{"zh_cn": {"content": [[{"tag": "md", "text": "**hello**"}]]}}'
+        )
 
     asyncio.run(run())
 

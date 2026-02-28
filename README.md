@@ -105,11 +105,16 @@ media = MediaService(client)
 
 sent = message.send_text(receive_id_type="open_id", receive_id="ou_xxx", text="你好")
 image = media.upload_image("demo.png", image_type="message")
-message.send(
+message.send_image(
     receive_id_type="open_id",
     receive_id="ou_xxx",
-    msg_type="image",
-    content={"image_key": image["image_key"]},
+    image_key=image["image_key"],
+)
+
+message.send_markdown(
+    receive_id_type="open_id",
+    receive_id="ou_xxx",
+    markdown="### 日报\n\n任务完成",
 )
 ```
 

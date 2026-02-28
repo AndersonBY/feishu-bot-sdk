@@ -32,7 +32,7 @@ from .events import (
 )
 from .feishu import AsyncFeishuClient, FeishuClient
 from .http_client import AsyncJsonHttpClient, JsonHttpClient
-from .im import AsyncMediaService, AsyncMessageService, MediaService, MessageService
+from .im import AsyncMediaService, AsyncMessageService, MediaService, MessageContent, MessageService
 from .rate_limit import (
     AdaptiveRateLimiter,
     AsyncAdaptiveRateLimiter,
@@ -93,6 +93,7 @@ __all__ = [
     "HTTPRequestError",
     "JsonHttpClient",
     "LongConnectionClient",
+    "MessageContent",
     "MediaService",
     "MemoryIdempotencyStore",
     "MessageService",
