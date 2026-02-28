@@ -1,6 +1,6 @@
 [project]
 name = "feishu-bot-sdk"
-version = "0.1.0"
+version = "0.1.1"
 description = "Reusable SDK for Feishu bot messaging, Bitable, Docx, and Drive permissions."
 readme = "README.md"
 authors = [
