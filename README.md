@@ -104,6 +104,25 @@ cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --fo
 - 类型、异常与限流：[`docs/zh/09-types-errors-rate-limit.md`](./docs/zh/09-types-errors-rate-limit.md)
 - CLI 命令行工具：[`docs/zh/10-cli.md`](./docs/zh/10-cli.md)
 
+## 响应模型（重要）
+
+- 大多数接口返回 `DataResponse`，支持：
+  - `resp.ok`：是否成功（`code == 0`）
+  - `resp.code` / `resp.msg`
+  - `resp.data.xxx` 或 `resp.xxx` 访问数据字段
+  - `resp.to_dict()` 转回普通 `dict`
+- 典型强类型响应：
+  - `BotService.get_info()` -> `BotInfoResponse`（`resp.bot.app_name`）
+  - `MessageService.send_*()/reply_*()/get()` -> `MessageResponse`（`resp.message_id`、`resp.message.chat_id`）
+
+```python
+info = client.bot.get_info()
+print(info.ok, info.bot.app_name)
+
+spaces = wiki.list_spaces(page_size=10)
+print(spaces.items)   # 等价于 spaces.data.items
+```
+
 ## 1 分钟上手（同步）
 
 ```python
@@ -132,9 +151,9 @@ print(app_url)
 
 # 2.1) 通用记录 CRUD
 record = bitable.create_record(app_token, "tbl_xxx", {"任务名称": "跟进客户"})
-bitable.update_record(app_token, "tbl_xxx", record["record"]["record_id"], {"任务名称": "已完成"})
+bitable.update_record(app_token, "tbl_xxx", record.record.record_id, {"任务名称": "已完成"})
 for item in bitable.iter_records(app_token, "tbl_xxx", page_size=100):
-    print(item.get("record_id"))
+    print(item.record_id)
 
 # 3) Markdown -> Docx
 docx = DocxService(client)
@@ -173,7 +192,7 @@ image = media.upload_image("demo.png", image_type="message")
 message.send_image(
     receive_id_type="open_id",
     receive_id="ou_xxx",
-    image_key=image["image_key"],
+    image_key=image.image_key,
 )
 
 message.send_markdown(
@@ -197,7 +216,7 @@ batch = message.send_batch_message(
     content={"text": "批量通知"},
     open_ids=["ou_xxx", "ou_yyy"],
 )
-print(batch.get("message_id"))
+print(batch.message_id)
 ```
 
 ## 事件模型（Webhook / WS）
@@ -245,17 +264,19 @@ drive = DriveFileService(client)
 perm = DrivePermissionService(client)
 
 uploaded = drive.upload_file("final.csv", parent_type="explorer", parent_node="fld_xxx")
+print(uploaded.file_token)
 task = drive.create_import_task(
     {
         "file_extension": "csv",
-        "file_token": uploaded["file_token"],
+        "file_token": uploaded.file_token,
         "type": "bitable",
         "file_name": "导入结果",
         "point": {"mount_type": 1, "mount_key": "fld_xxx"},
     }
 )
+# 一般先通过 get_import_task(task.ticket) 轮询完成，再取导入结果资源 token 进行授权
 perm.add_member(
-    task["token"],
+    task.token,
     resource_type="bitable",
     member_id="ou_xxx",
     member_id_type="open_id",
@@ -272,10 +293,10 @@ wiki = WikiService(client)
 docs = DocContentService(client)
 
 spaces = wiki.list_spaces(page_size=10)
-print(spaces.get("items", []))
+print(spaces.items)
 
 results = wiki.search_nodes("项目周报", page_size=10)
-print(results.get("items", []))
+print(results.items)
 
 markdown = docs.get_markdown("doccn_xxx")
 print(markdown[:200])

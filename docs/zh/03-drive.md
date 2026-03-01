@@ -21,19 +21,21 @@ uploaded = drive.upload_file(
     parent_type="explorer",
     parent_node="fld_xxx",
 )
+print(uploaded.file_token)
 
 task = drive.create_import_task(
     {
         "file_extension": "csv",
-        "file_token": uploaded["file_token"],
+        "file_token": uploaded.file_token,
         "type": "bitable",
         "file_name": "导入结果",
         "point": {"mount_type": 1, "mount_key": "fld_xxx"},
     }
 )
 
+# 一般先通过 get_import_task(task.ticket) 轮询完成，再取导入结果资源 token 进行授权
 perm.add_member(
-    task["token"],
+    task.token,
     resource_type="bitable",
     member_id="ou_xxx",
     member_id_type="open_id",

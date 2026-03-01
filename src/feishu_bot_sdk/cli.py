@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import argparse
 import contextlib
+import dataclasses
 import json
 import os
 import signal
@@ -716,12 +717,12 @@ def _cmd_auth_request(args: argparse.Namespace) -> Mapping[str, Any]:
     )
 
 
-def _cmd_bot_info(args: argparse.Namespace) -> Mapping[str, Any]:
+def _cmd_bot_info(args: argparse.Namespace) -> Any:
     service = BotService(_build_client(args))
     return service.get_info()
 
 
-def _cmd_im_send_text(args: argparse.Namespace) -> Mapping[str, Any]:
+def _cmd_im_send_text(args: argparse.Namespace) -> Any:
     service = MessageService(_build_client(args))
     return service.send_text(
         receive_id_type=str(args.receive_id_type),
@@ -731,7 +732,7 @@ def _cmd_im_send_text(args: argparse.Namespace) -> Mapping[str, Any]:
     )
 
 
-def _cmd_im_send_markdown(args: argparse.Namespace) -> Mapping[str, Any]:
+def _cmd_im_send_markdown(args: argparse.Namespace) -> Any:
     markdown = _resolve_text_input(
         text=getattr(args, "markdown", None),
         file_path=getattr(args, "markdown_file", None),
@@ -749,7 +750,7 @@ def _cmd_im_send_markdown(args: argparse.Namespace) -> Mapping[str, Any]:
     )
 
 
-def _cmd_im_reply_markdown(args: argparse.Namespace) -> Mapping[str, Any]:
+def _cmd_im_reply_markdown(args: argparse.Namespace) -> Any:
     markdown = _resolve_text_input(
         text=getattr(args, "markdown", None),
         file_path=getattr(args, "markdown_file", None),
@@ -766,7 +767,7 @@ def _cmd_im_reply_markdown(args: argparse.Namespace) -> Mapping[str, Any]:
     )
 
 
-def _cmd_im_send_generic(args: argparse.Namespace) -> Mapping[str, Any]:
+def _cmd_im_send_generic(args: argparse.Namespace) -> Any:
     content = _parse_json_object(
         json_text=getattr(args, "content_json", None),
         file_path=getattr(args, "content_file", None),
@@ -784,7 +785,7 @@ def _cmd_im_send_generic(args: argparse.Namespace) -> Mapping[str, Any]:
     )
 
 
-def _cmd_im_reply_generic(args: argparse.Namespace) -> Mapping[str, Any]:
+def _cmd_im_reply_generic(args: argparse.Namespace) -> Any:
     content = _parse_json_object(
         json_text=getattr(args, "content_json", None),
         file_path=getattr(args, "content_file", None),
@@ -801,7 +802,7 @@ def _cmd_im_reply_generic(args: argparse.Namespace) -> Mapping[str, Any]:
     )
 
 
-def _cmd_im_get(args: argparse.Namespace) -> Mapping[str, Any]:
+def _cmd_im_get(args: argparse.Namespace) -> Any:
     service = MessageService(_build_client(args))
     return service.get(str(args.message_id))
 
@@ -1780,10 +1781,11 @@ def _read_request_body(headers: Any, stream: Any) -> bytes:
 
 
 def _print_result(result: Any, *, output_format: str) -> None:
+    normalized = _to_jsonable(result)
     if output_format == "json":
-        print(json.dumps(_to_jsonable(result), ensure_ascii=False, indent=2))
+        print(json.dumps(normalized, ensure_ascii=False, indent=2))
         return
-    _print_human(result)
+    _print_human(normalized)
 
 
 def _print_human(result: Any) -> None:
@@ -1932,6 +1934,11 @@ def _is_flat_mapping(mapping: Mapping[str, Any]) -> bool:
 
 
 def _to_jsonable(value: Any) -> Any:
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        return _to_jsonable(to_dict())
+    if dataclasses.is_dataclass(value):
+        return _to_jsonable(dataclasses.asdict(value))
     if isinstance(value, Mapping):
         return {str(k): _to_jsonable(v) for k, v in value.items()}
     if isinstance(value, list):

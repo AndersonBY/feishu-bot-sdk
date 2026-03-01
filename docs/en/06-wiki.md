@@ -15,10 +15,10 @@ client = FeishuClient(FeishuConfig(app_id="cli_xxx", app_secret="xxx"))
 wiki = WikiService(client)
 
 spaces = wiki.list_spaces(page_size=10)
-print(spaces.get("items", []))
+print(spaces.items)
 
 results = wiki.search_nodes("weekly report", page_size=10)
-print(results.get("items", []))
+print(results.items)
 ```
 
 ## API Summary

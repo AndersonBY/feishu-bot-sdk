@@ -7,6 +7,24 @@
 - `feishu_bot_sdk.types`
 - `feishu_bot_sdk.exceptions`
 - `feishu_bot_sdk.rate_limit`
+- `feishu_bot_sdk.response`
+
+## 响应结构（`response`）
+
+- 通用返回：`DataResponse`
+  - 元信息：`code`、`msg`、`ok`
+  - 数据访问：`resp.data.xxx` 或 `resp.xxx`
+  - 转字典：`resp.to_dict()`
+- 数据容器：`Struct`
+  - 支持属性访问（`item.record_id`）和 Mapping 用法（`item["record_id"]`）
+
+示例：
+
+```python
+spaces = wiki.list_spaces(page_size=10)
+if spaces.ok:
+    print(spaces.items)
+```
 
 ## 常用枚举（`types`）
 

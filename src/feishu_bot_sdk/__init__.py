@@ -1,5 +1,5 @@
 from .bitable import AsyncBitableService, BitableService
-from .bot import AsyncBotService, BotService
+from .bot import AsyncBotService, BotInfo, BotInfoResponse, BotService
 from .config import FeishuConfig
 from .docs_content import AsyncDocContentService, DocContentService
 from .docx_blocks import AsyncDocxBlockService, DocxBlockService
@@ -33,13 +33,22 @@ from .events import (
 )
 from .feishu import AsyncFeishuClient, FeishuClient
 from .http_client import AsyncJsonHttpClient, JsonHttpClient
-from .im import AsyncMediaService, AsyncMessageService, MediaService, MessageContent, MessageService
+from .im import (
+    AsyncMediaService,
+    AsyncMessageService,
+    MediaService,
+    Message,
+    MessageContent,
+    MessageResponse,
+    MessageService,
+)
 from .rate_limit import (
     AdaptiveRateLimiter,
     AsyncAdaptiveRateLimiter,
     RateLimitTuning,
     build_rate_limit_key,
 )
+from .response import DataResponse, Struct
 from .server import FeishuBotServer, FeishuBotServerStatus
 from .wiki import AsyncWikiService, WikiService
 from .webhook import (
@@ -78,11 +87,14 @@ __all__ = [
     "AdaptiveRateLimiter",
     "BitableService",
     "BotService",
+    "BotInfo",
+    "BotInfoResponse",
     "ConfigurationError",
     "DocContentService",
     "DocxService",
     "DocxBlockService",
     "DocxDocumentService",
+    "DataResponse",
     "DriveFileService",
     "DrivePermissionService",
     "EventContext",
@@ -98,8 +110,10 @@ __all__ = [
     "LongConnectionClient",
     "MessageContent",
     "MediaService",
+    "Message",
     "MemoryIdempotencyStore",
     "MessageService",
+    "MessageResponse",
     "P1CustomizedEvent",
     "P2ApplicationBotMenuV6",
     "P2CardActionTrigger",
@@ -110,6 +124,7 @@ __all__ = [
     "RateLimitTuning",
     "ReconnectPolicy",
     "SDKError",
+    "Struct",
     "FeishuBotServer",
     "FeishuBotServerStatus",
     "WSDispatcher",

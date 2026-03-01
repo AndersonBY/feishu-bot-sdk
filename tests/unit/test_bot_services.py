@@ -66,7 +66,11 @@ def test_bot_service_get_info():
     service = BotService(cast(FeishuClient, stub))
     info = service.get_info()
 
-    assert info == {"app_name": "SDK Bot", "open_id": "ou_bot_1"}
+    assert info.ok is True
+    assert info.code == 0
+    assert info.bot is not None
+    assert info.bot.app_name == "SDK Bot"
+    assert info.bot.open_id == "ou_bot_1"
     assert stub.calls == [
         {
             "method": "GET",
@@ -84,7 +88,9 @@ def test_bot_service_get_info_missing_bot_returns_empty():
     stub = _SyncClientStub(resolver)
     service = BotService(cast(FeishuClient, stub))
 
-    assert service.get_info() == {}
+    info = service.get_info()
+    assert info.ok is True
+    assert info.bot is None
 
 
 def test_async_bot_service_get_info():
@@ -103,7 +109,10 @@ def test_async_bot_service_get_info():
 
     async def run() -> None:
         info = await service.get_info()
-        assert info == {"app_name": "Async SDK Bot", "open_id": "ou_bot_async"}
+        assert info.ok is True
+        assert info.bot is not None
+        assert info.bot.app_name == "Async SDK Bot"
+        assert info.bot.open_id == "ou_bot_async"
 
     asyncio.run(run())
     assert stub.calls == [

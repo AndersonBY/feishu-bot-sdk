@@ -6,6 +6,7 @@ import httpx
 
 from ..exceptions import FeishuError, HTTPRequestError
 from ..feishu import AsyncFeishuClient, FeishuClient
+from ..response import DataResponse
 
 
 class MediaService:
@@ -341,8 +342,5 @@ def _build_file_part(
     return (filename, content, guessed or "application/octet-stream")
 
 
-def _unwrap_data(response: Mapping[str, Any]) -> Mapping[str, Any]:
-    data = response.get("data")
-    if isinstance(data, Mapping):
-        return data
-    return {}
+def _unwrap_data(response: Mapping[str, Any]) -> DataResponse:
+    return DataResponse.from_raw(response)

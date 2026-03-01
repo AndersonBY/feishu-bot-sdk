@@ -2,6 +2,7 @@ from typing import Any, Mapping, Optional
 
 from .exceptions import FeishuError
 from .feishu import AsyncFeishuClient, FeishuClient
+from .response import DataResponse
 from .types import DriveResourceType, MemberIdType
 
 
@@ -16,11 +17,8 @@ def _drop_none(params: Mapping[str, object]) -> dict[str, object]:
     return {key: value for key, value in params.items() if value is not None}
 
 
-def _unwrap_data(response: Mapping[str, Any]) -> Mapping[str, Any]:
-    data = response.get("data")
-    if isinstance(data, Mapping):
-        return data
-    return {}
+def _unwrap_data(response: Mapping[str, Any]) -> DataResponse:
+    return DataResponse.from_raw(response)
 
 
 def _member_type(member_id_type: str) -> str:

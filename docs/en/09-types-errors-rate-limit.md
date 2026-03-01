@@ -7,6 +7,24 @@
 - `feishu_bot_sdk.types`
 - `feishu_bot_sdk.exceptions`
 - `feishu_bot_sdk.rate_limit`
+- `feishu_bot_sdk.response`
+
+## Response Structures (`response`)
+
+- Generic response: `DataResponse`
+  - Meta fields: `code`, `msg`, `ok`
+  - Data access: `resp.data.xxx` or direct `resp.xxx`
+  - Convert to dict: `resp.to_dict()`
+- Data container: `Struct`
+  - Supports both attribute access (`item.record_id`) and mapping access (`item["record_id"]`)
+
+Example:
+
+```python
+spaces = wiki.list_spaces(page_size=10)
+if spaces.ok:
+    print(spaces.items)
+```
 
 ## Enums (`types`)
 

@@ -44,7 +44,7 @@ def main() -> None:
         receive_id=args.receive_id,
         text=args.text,
     )
-    print(f"text sent: {sent.get('message_id')}")
+    print(f"text sent: {sent.message_id}")
 
     if args.image:
         image_path = Path(args.image).resolve()
@@ -57,7 +57,7 @@ def main() -> None:
                 msg_type="image",
                 content={"image_key": image_key},
             )
-            print(f"image sent: {sent_image.get('message_id')}")
+            print(f"image sent: {sent_image.message_id}")
 
     if args.file:
         file_path = Path(args.file).resolve()
@@ -73,7 +73,7 @@ def main() -> None:
                 msg_type="file",
                 content={"file_key": file_key},
             )
-            print(f"file sent: {sent_file.get('message_id')}")
+            print(f"file sent: {sent_file.message_id}")
 
 
 if __name__ == "__main__":

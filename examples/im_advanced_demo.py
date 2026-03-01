@@ -36,7 +36,7 @@ def main() -> None:
             receive_id=args.receive_id,
             text="Advanced IM demo message",
         )
-        message_id = str(sent.get("message_id", ""))
+        message_id = str(sent.message_id or "")
         print(f"sent message: {message_id}")
 
     if message_id:

@@ -20,7 +20,7 @@ print(app_token, app_url)
 bitable.grant_edit_permission(app_token, "ou_xxx", "open_id")
 
 record = bitable.create_record(app_token, "tbl_xxx", {"Task": "Follow up"})
-record_id = record["record"]["record_id"]
+record_id = record.record.record_id
 bitable.update_record(app_token, "tbl_xxx", record_id, {"Task": "Done"})
 loaded = bitable.get_record(app_token, "tbl_xxx", record_id)
 print(loaded)

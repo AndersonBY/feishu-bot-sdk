@@ -336,9 +336,39 @@ def test_message_get_unwraps_first_item():
     stub = _SyncClientStub(resolver=resolver)
     service = MessageService(cast(FeishuClient, stub))
 
-    data = service.get("om_1")
+    response = service.get("om_1")
 
-    assert data == {"message_id": "om_1", "chat_id": "oc_1"}
+    assert response.ok is True
+    assert response.message is not None
+    assert response.message.message_id == "om_1"
+    assert response.message.chat_id == "oc_1"
+
+
+def test_message_send_returns_typed_response():
+    def resolver(_call: Mapping[str, Any]) -> Mapping[str, Any]:
+        return {
+            "code": 0,
+            "msg": "ok",
+            "data": {
+                "message_id": "om_send_1",
+                "chat_id": "oc_1",
+                "msg_type": "text",
+            },
+        }
+
+    stub = _SyncClientStub(resolver=resolver)
+    service = MessageService(cast(FeishuClient, stub))
+
+    response = service.send_text(
+        receive_id_type="open_id",
+        receive_id="ou_1",
+        text="hello",
+    )
+
+    assert response.ok is True
+    assert response.message is not None
+    assert response.message.message_id == "om_send_1"
+    assert response.message.msg_type == "text"
 
 
 def test_media_upload_image_builds_multipart(monkeypatch: Any):

@@ -23,7 +23,7 @@ bitable.grant_edit_permission(app_token, "ou_xxx", "open_id")
 
 # 记录 CRUD
 record = bitable.create_record(app_token, "tbl_xxx", {"任务": "回访客户"})
-record_id = record["record"]["record_id"]
+record_id = record.record.record_id
 bitable.update_record(app_token, "tbl_xxx", record_id, {"任务": "已完成"})
 loaded = bitable.get_record(app_token, "tbl_xxx", record_id)
 print(loaded)

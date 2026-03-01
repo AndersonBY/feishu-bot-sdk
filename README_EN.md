@@ -104,6 +104,25 @@ cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --fo
 - Types, errors, and rate limit: [`docs/en/09-types-errors-rate-limit.md`](./docs/en/09-types-errors-rate-limit.md)
 - CLI tool: [`docs/en/10-cli.md`](./docs/en/10-cli.md)
 
+## Response Model (Important)
+
+- Most APIs return `DataResponse`, with:
+  - `resp.ok` (success when `code == 0`)
+  - `resp.code` / `resp.msg`
+  - `resp.data.xxx` or direct `resp.xxx` field access
+  - `resp.to_dict()` to convert back to plain `dict`
+- Strongly typed responses:
+  - `BotService.get_info()` -> `BotInfoResponse` (`resp.bot.app_name`)
+  - `MessageService.send_*()/reply_*()/get()` -> `MessageResponse` (`resp.message_id`, `resp.message.chat_id`)
+
+```python
+info = client.bot.get_info()
+print(info.ok, info.bot.app_name)
+
+spaces = wiki.list_spaces(page_size=10)
+print(spaces.items)   # same as spaces.data.items
+```
+
 ## Quick Start (Sync)
 
 ```python
@@ -132,9 +151,9 @@ print(app_url)
 
 # 2.1) Generic record CRUD
 record = bitable.create_record(app_token, "tbl_xxx", {"Task": "Follow up"})
-bitable.update_record(app_token, "tbl_xxx", record["record"]["record_id"], {"Task": "Done"})
+bitable.update_record(app_token, "tbl_xxx", record.record.record_id, {"Task": "Done"})
 for item in bitable.iter_records(app_token, "tbl_xxx", page_size=100):
-    print(item.get("record_id"))
+    print(item.record_id)
 
 # 3) Markdown -> Docx
 docx = DocxService(client)
@@ -173,7 +192,7 @@ image = media.upload_image("demo.png", image_type="message")
 message.send_image(
     receive_id_type="open_id",
     receive_id="ou_xxx",
-    image_key=image["image_key"],
+    image_key=image.image_key,
 )
 
 message.send_markdown(
@@ -197,7 +216,7 @@ batch = message.send_batch_message(
     content={"text": "batch notification"},
     open_ids=["ou_xxx", "ou_yyy"],
 )
-print(batch.get("message_id"))
+print(batch.message_id)
 ```
 
 ## Event Models (Webhook / WS)
@@ -245,17 +264,19 @@ drive = DriveFileService(client)
 perm = DrivePermissionService(client)
 
 uploaded = drive.upload_file("final.csv", parent_type="explorer", parent_node="fld_xxx")
+print(uploaded.file_token)
 task = drive.create_import_task(
     {
         "file_extension": "csv",
-        "file_token": uploaded["file_token"],
+        "file_token": uploaded.file_token,
         "type": "bitable",
         "file_name": "Import Result",
         "point": {"mount_type": 1, "mount_key": "fld_xxx"},
     }
 )
+# Usually poll by get_import_task(task.ticket), then grant with the imported resource token.
 perm.add_member(
-    task["token"],
+    task.token,
     resource_type="bitable",
     member_id="ou_xxx",
     member_id_type="open_id",
@@ -272,10 +293,10 @@ wiki = WikiService(client)
 docs = DocContentService(client)
 
 spaces = wiki.list_spaces(page_size=10)
-print(spaces.get("items", []))
+print(spaces.items)
 
 results = wiki.search_nodes("weekly report", page_size=10)
-print(results.get("items", []))
+print(results.items)
 
 markdown = docs.get_markdown("doccn_xxx")
 print(markdown[:200])

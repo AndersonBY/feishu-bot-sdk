@@ -1,17 +1,15 @@
 from typing import Any, AsyncIterator, Iterator, Mapping, Optional
 
 from .feishu import AsyncFeishuClient, FeishuClient
+from .response import DataResponse
 
 
 def _drop_none(params: Mapping[str, object]) -> dict[str, object]:
     return {key: value for key, value in params.items() if value is not None}
 
 
-def _unwrap_data(response: Mapping[str, Any]) -> Mapping[str, Any]:
-    data = response.get("data")
-    if isinstance(data, Mapping):
-        return data
-    return {}
+def _unwrap_data(response: Mapping[str, Any]) -> DataResponse:
+    return DataResponse.from_raw(response)
 
 
 def _iter_page_items(data: Mapping[str, Any], key: str = "items") -> Iterator[Mapping[str, Any]]:

@@ -1,15 +1,102 @@
 import json
+from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional, Sequence
 
 from ..feishu import AsyncFeishuClient, FeishuClient
+from ..response import DataResponse
 from .content import MessageContent
+
+
+def _as_mapping(value: Any) -> Mapping[str, Any]:
+    if isinstance(value, Mapping):
+        return value
+    return {}
+
+
+def _as_optional_str(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
+def _as_optional_bool(value: Any) -> Optional[bool]:
+    if isinstance(value, bool):
+        return value
+    return None
+
+
+@dataclass(frozen=True)
+class Message:
+    message_id: Optional[str]
+    chat_id: Optional[str]
+    root_id: Optional[str]
+    parent_id: Optional[str]
+    thread_id: Optional[str]
+    msg_type: Optional[str]
+    create_time: Optional[str]
+    update_time: Optional[str]
+    deleted: Optional[bool]
+    updated: Optional[bool]
+    raw: Mapping[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_raw(cls, payload: Mapping[str, Any]) -> "Message":
+        return cls(
+            message_id=_as_optional_str(payload.get("message_id")),
+            chat_id=_as_optional_str(payload.get("chat_id")),
+            root_id=_as_optional_str(payload.get("root_id")),
+            parent_id=_as_optional_str(payload.get("parent_id")),
+            thread_id=_as_optional_str(payload.get("thread_id")),
+            msg_type=_as_optional_str(payload.get("msg_type")),
+            create_time=_as_optional_str(payload.get("create_time")),
+            update_time=_as_optional_str(payload.get("update_time")),
+            deleted=_as_optional_bool(payload.get("deleted")),
+            updated=_as_optional_bool(payload.get("updated")),
+            raw=dict(payload),
+        )
+
+
+@dataclass(frozen=True)
+class MessageResponse:
+    code: int
+    msg: Optional[str]
+    message: Optional[Message]
+    raw: Mapping[str, Any] = field(default_factory=dict)
+
+    @property
+    def ok(self) -> bool:
+        return self.code == 0
+
+    @property
+    def message_id(self) -> Optional[str]:
+        return self.message.message_id if self.message is not None else None
+
+    @classmethod
+    def from_raw(
+        cls,
+        payload: Mapping[str, Any],
+        *,
+        use_first_item: bool = False,
+    ) -> "MessageResponse":
+        message_payload = _extract_message_payload(payload, use_first_item=use_first_item)
+        message = Message.from_raw(message_payload) if message_payload else None
+        code_raw = payload.get("code")
+        code = code_raw if isinstance(code_raw, int) else 0
+        return cls(
+            code=code,
+            msg=_as_optional_str(payload.get("msg")),
+            message=message,
+            raw=dict(payload),
+        )
 
 
 class MessageService:
     def __init__(self, feishu_client: FeishuClient) -> None:
         self._client = feishu_client
 
-    def reply_text(self, message_id: str, text: str) -> Mapping[str, Any]:
+    def reply_text(self, message_id: str, text: str) -> MessageResponse:
         return self.reply(
             message_id,
             msg_type="text",
@@ -24,7 +111,7 @@ class MessageService:
         locale: str = "zh_cn",
         title: Optional[str] = None,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         post = MessageContent.post_locale(
             locale=locale,
             title=title,
@@ -44,7 +131,7 @@ class MessageService:
         receive_id: str,
         text: str,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -60,7 +147,7 @@ class MessageService:
         receive_id: str,
         post: Mapping[str, Any],
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -78,7 +165,7 @@ class MessageService:
         locale: str = "zh_cn",
         title: Optional[str] = None,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         post = MessageContent.post_locale(
             locale=locale,
             title=title,
@@ -98,7 +185,7 @@ class MessageService:
         receive_id: str,
         image_key: str,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -114,7 +201,7 @@ class MessageService:
         receive_id: str,
         interactive: Mapping[str, Any],
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -130,7 +217,7 @@ class MessageService:
         receive_id: str,
         chat_id: str,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -146,7 +233,7 @@ class MessageService:
         receive_id: str,
         user_open_id: str,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -162,7 +249,7 @@ class MessageService:
         receive_id: str,
         file_key: str,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -179,7 +266,7 @@ class MessageService:
         file_key: str,
         image_key: Optional[str] = None,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -195,7 +282,7 @@ class MessageService:
         receive_id: str,
         file_key: str,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -211,7 +298,7 @@ class MessageService:
         receive_id: str,
         file_key: str,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -227,7 +314,7 @@ class MessageService:
         receive_id: str,
         system: Mapping[str, Any],
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -245,7 +332,7 @@ class MessageService:
         i18n_text: Optional[Mapping[str, str]] = None,
         need_rollup: Optional[bool] = None,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -266,7 +353,7 @@ class MessageService:
         msg_type: str,
         content: Mapping[str, Any],
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         payload: dict[str, Any] = {
             "receive_id": receive_id,
             "msg_type": msg_type,
@@ -280,7 +367,7 @@ class MessageService:
             payload=payload,
             params={"receive_id_type": receive_id_type},
         )
-        return _unwrap_data(response)
+        return MessageResponse.from_raw(response)
 
     def reply(
         self,
@@ -289,7 +376,7 @@ class MessageService:
         msg_type: str,
         content: Mapping[str, Any],
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         payload: dict[str, Any] = {
             "msg_type": msg_type,
             "content": _serialize_content(content),
@@ -301,7 +388,7 @@ class MessageService:
             f"/im/v1/messages/{message_id}/reply",
             payload=payload,
         )
-        return _unwrap_data(response)
+        return MessageResponse.from_raw(response)
 
     def edit(
         self,
@@ -309,7 +396,7 @@ class MessageService:
         *,
         msg_type: str = "text",
         content: Mapping[str, Any],
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         response = self._client.request_json(
             "PUT",
             f"/im/v1/messages/{message_id}",
@@ -318,17 +405,17 @@ class MessageService:
                 "content": _serialize_content(content),
             },
         )
-        return _unwrap_data(response)
+        return MessageResponse.from_raw(response)
 
     def recall(self, message_id: str) -> None:
         self._client.request_json("DELETE", f"/im/v1/messages/{message_id}")
 
-    def get(self, message_id: str) -> Mapping[str, Any]:
+    def get(self, message_id: str) -> MessageResponse:
         response = self._client.request_json(
             "GET",
             f"/im/v1/messages/{message_id}",
         )
-        return _unwrap_single_item(response)
+        return MessageResponse.from_raw(response, use_first_item=True)
 
     def list_history(
         self,
@@ -648,7 +735,7 @@ class AsyncMessageService:
     def __init__(self, feishu_client: AsyncFeishuClient) -> None:
         self._client = feishu_client
 
-    async def reply_text(self, message_id: str, text: str) -> Mapping[str, Any]:
+    async def reply_text(self, message_id: str, text: str) -> MessageResponse:
         return await self.reply(
             message_id,
             msg_type="text",
@@ -663,7 +750,7 @@ class AsyncMessageService:
         locale: str = "zh_cn",
         title: Optional[str] = None,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         post = MessageContent.post_locale(
             locale=locale,
             title=title,
@@ -683,7 +770,7 @@ class AsyncMessageService:
         receive_id: str,
         text: str,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return await self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -699,7 +786,7 @@ class AsyncMessageService:
         receive_id: str,
         post: Mapping[str, Any],
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return await self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -717,7 +804,7 @@ class AsyncMessageService:
         locale: str = "zh_cn",
         title: Optional[str] = None,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         post = MessageContent.post_locale(
             locale=locale,
             title=title,
@@ -737,7 +824,7 @@ class AsyncMessageService:
         receive_id: str,
         image_key: str,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return await self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -753,7 +840,7 @@ class AsyncMessageService:
         receive_id: str,
         interactive: Mapping[str, Any],
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return await self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -769,7 +856,7 @@ class AsyncMessageService:
         receive_id: str,
         chat_id: str,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return await self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -785,7 +872,7 @@ class AsyncMessageService:
         receive_id: str,
         user_open_id: str,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return await self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -801,7 +888,7 @@ class AsyncMessageService:
         receive_id: str,
         file_key: str,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return await self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -818,7 +905,7 @@ class AsyncMessageService:
         file_key: str,
         image_key: Optional[str] = None,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return await self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -834,7 +921,7 @@ class AsyncMessageService:
         receive_id: str,
         file_key: str,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return await self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -850,7 +937,7 @@ class AsyncMessageService:
         receive_id: str,
         file_key: str,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return await self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -866,7 +953,7 @@ class AsyncMessageService:
         receive_id: str,
         system: Mapping[str, Any],
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return await self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -884,7 +971,7 @@ class AsyncMessageService:
         i18n_text: Optional[Mapping[str, str]] = None,
         need_rollup: Optional[bool] = None,
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         return await self.send(
             receive_id_type=receive_id_type,
             receive_id=receive_id,
@@ -905,7 +992,7 @@ class AsyncMessageService:
         msg_type: str,
         content: Mapping[str, Any],
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         payload: dict[str, Any] = {
             "receive_id": receive_id,
             "msg_type": msg_type,
@@ -919,7 +1006,7 @@ class AsyncMessageService:
             payload=payload,
             params={"receive_id_type": receive_id_type},
         )
-        return _unwrap_data(response)
+        return MessageResponse.from_raw(response)
 
     async def reply(
         self,
@@ -928,7 +1015,7 @@ class AsyncMessageService:
         msg_type: str,
         content: Mapping[str, Any],
         uuid: Optional[str] = None,
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         payload: dict[str, Any] = {
             "msg_type": msg_type,
             "content": _serialize_content(content),
@@ -940,7 +1027,7 @@ class AsyncMessageService:
             f"/im/v1/messages/{message_id}/reply",
             payload=payload,
         )
-        return _unwrap_data(response)
+        return MessageResponse.from_raw(response)
 
     async def edit(
         self,
@@ -948,7 +1035,7 @@ class AsyncMessageService:
         *,
         msg_type: str = "text",
         content: Mapping[str, Any],
-    ) -> Mapping[str, Any]:
+    ) -> MessageResponse:
         response = await self._client.request_json(
             "PUT",
             f"/im/v1/messages/{message_id}",
@@ -957,17 +1044,17 @@ class AsyncMessageService:
                 "content": _serialize_content(content),
             },
         )
-        return _unwrap_data(response)
+        return MessageResponse.from_raw(response)
 
     async def recall(self, message_id: str) -> None:
         await self._client.request_json("DELETE", f"/im/v1/messages/{message_id}")
 
-    async def get(self, message_id: str) -> Mapping[str, Any]:
+    async def get(self, message_id: str) -> MessageResponse:
         response = await self._client.request_json(
             "GET",
             f"/im/v1/messages/{message_id}",
         )
-        return _unwrap_single_item(response)
+        return MessageResponse.from_raw(response, use_first_item=True)
 
     async def list_history(
         self,
@@ -1291,18 +1378,20 @@ def _drop_none(params: Mapping[str, object]) -> dict[str, object]:
     return {key: value for key, value in params.items() if value is not None}
 
 
-def _unwrap_data(response: Mapping[str, Any]) -> Mapping[str, Any]:
-    data = response.get("data")
-    if isinstance(data, Mapping):
-        return data
-    return {}
+def _unwrap_data(response: Mapping[str, Any]) -> DataResponse:
+    return DataResponse.from_raw(response)
 
 
-def _unwrap_single_item(response: Mapping[str, Any]) -> Mapping[str, Any]:
+def _extract_message_payload(
+    response: Mapping[str, Any],
+    *,
+    use_first_item: bool,
+) -> Mapping[str, Any]:
     data = _unwrap_data(response)
-    items = data.get("items")
-    if isinstance(items, list) and items:
-        first = items[0]
-        if isinstance(first, Mapping):
-            return dict(first)
+    if use_first_item:
+        items = data.get("items")
+        if isinstance(items, list) and items:
+            first = items[0]
+            if isinstance(first, Mapping):
+                return dict(first)
     return data
