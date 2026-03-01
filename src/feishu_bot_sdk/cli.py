@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from .bitable import BitableService
+from .bot import BotService
 from .config import FeishuConfig
 from .docs_content import DocContentService
 from .docx import DocxService
@@ -50,6 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.required = True
 
     _build_auth_commands(subparsers, shared)
+    _build_bot_commands(subparsers, shared)
     _build_im_commands(subparsers, shared)
     _build_media_commands(subparsers, shared)
     _build_bitable_commands(subparsers, shared)
@@ -125,6 +127,18 @@ def _build_auth_commands(
     request_parser.add_argument("--payload-file", help="Request body JSON file path")
     request_parser.add_argument("--payload-stdin", action="store_true", help="Read request body JSON from stdin")
     request_parser.set_defaults(handler=_cmd_auth_request)
+
+
+def _build_bot_commands(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    shared: argparse.ArgumentParser,
+) -> None:
+    bot_parser = subparsers.add_parser("bot", help="Bot profile operations")
+    bot_sub = bot_parser.add_subparsers(dest="bot_command")
+    bot_sub.required = True
+
+    info = bot_sub.add_parser("info", help="Get bot profile", parents=[shared])
+    info.set_defaults(handler=_cmd_bot_info)
 
 
 def _build_im_commands(
@@ -700,6 +714,11 @@ def _cmd_auth_request(args: argparse.Namespace) -> Mapping[str, Any]:
         params=params or None,
         payload=payload or None,
     )
+
+
+def _cmd_bot_info(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = BotService(_build_client(args))
+    return service.get_info()
 
 
 def _cmd_im_send_text(args: argparse.Namespace) -> Mapping[str, Any]:

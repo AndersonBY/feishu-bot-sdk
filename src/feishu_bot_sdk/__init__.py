@@ -1,4 +1,5 @@
 from .bitable import AsyncBitableService, BitableService
+from .bot import AsyncBotService, BotService
 from .config import FeishuConfig
 from .docs_content import AsyncDocContentService, DocContentService
 from .docx_blocks import AsyncDocxBlockService, DocxBlockService
@@ -60,6 +61,7 @@ from .ws import (
 __all__ = [
     "AsyncMemoryIdempotencyStore",
     "AsyncBitableService",
+    "AsyncBotService",
     "AsyncDocxService",
     "AsyncDocxBlockService",
     "AsyncDocContentService",
@@ -75,6 +77,7 @@ __all__ = [
     "AsyncWikiService",
     "AdaptiveRateLimiter",
     "BitableService",
+    "BotService",
     "ConfigurationError",
     "DocContentService",
     "DocxService",

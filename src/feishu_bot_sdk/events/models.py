@@ -108,15 +108,19 @@ class P2ApplicationBotMenuV6:
     def from_context(cls, context: EventContext) -> "P2ApplicationBotMenuV6":
         event = _as_mapping(context.event)
         operator = _as_mapping(event.get("operator"))
+        operator_id = _as_mapping(operator.get("operator_id"))
         return cls(
             event_id=context.envelope.event_id,
             create_time=context.envelope.create_time,
             tenant_key=context.envelope.tenant_key,
             app_id=context.envelope.app_id,
             event_key=_as_optional_str(event.get("event_key")),
-            operator_open_id=_as_optional_str(operator.get("open_id")),
-            operator_user_id=_as_optional_str(operator.get("user_id")),
-            operator_union_id=_as_optional_str(operator.get("union_id")),
+            operator_open_id=_as_optional_str(operator.get("open_id"))
+            or _as_optional_str(operator_id.get("open_id")),
+            operator_user_id=_as_optional_str(operator.get("user_id"))
+            or _as_optional_str(operator_id.get("user_id")),
+            operator_union_id=_as_optional_str(operator.get("union_id"))
+            or _as_optional_str(operator_id.get("union_id")),
             raw=dict(context.payload),
         )
 

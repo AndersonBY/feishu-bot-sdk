@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from feishu_bot_sdk import cli
+from feishu_bot_sdk.bot import BotService
 from feishu_bot_sdk.bitable import BitableService
 from feishu_bot_sdk.config import FeishuConfig
 from feishu_bot_sdk.drive_permissions import DrivePermissionService
@@ -86,6 +87,26 @@ def test_auth_request_payload_from_stdin(monkeypatch: Any, capsys: Any) -> None:
     assert captured["payload"] == {"x": 1}
     payload = json.loads(capsys.readouterr().out)
     assert payload["echo"] == {"x": 1}
+
+
+def test_bot_info_json_output(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    def _fake_get_info(_self: BotService) -> dict[str, Any]:
+        return {
+            "app_name": "CLI Bot",
+            "open_id": "ou_cli_bot_1",
+        }
+
+    monkeypatch.setattr("feishu_bot_sdk.bot.BotService.get_info", _fake_get_info)
+
+    code = cli.main(["bot", "info", "--format", "json"])
+    assert code == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["app_name"] == "CLI Bot"
+    assert payload["open_id"] == "ou_cli_bot_1"
 
 
 def test_im_send_markdown_reads_file(monkeypatch: Any, tmp_path: Path, capsys: Any) -> None:

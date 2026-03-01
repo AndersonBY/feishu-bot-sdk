@@ -2,6 +2,7 @@ import asyncio
 
 from feishu_bot_sdk import FeishuEventRegistry, build_event_context
 from feishu_bot_sdk.events import (
+    P2ApplicationBotMenuV6,
     P2DriveFileBitableFieldChangedV1,
     P2DriveFileBitableRecordChangedV1,
 )
@@ -166,3 +167,65 @@ def test_registry_adispatches_bitable_event():
         assert result == "base_async"
 
     asyncio.run(run())
+
+
+def test_bot_menu_model_reads_operator_ids_from_operator_id():
+    payload = {
+        "schema": "2.0",
+        "header": {
+            "event_id": "evt_menu_1",
+            "event_type": "application.bot.menu_v6",
+            "create_time": "1717040603000",
+            "tenant_key": "tenant_1",
+            "app_id": "cli_1",
+        },
+        "event": {
+            "operator": {
+                "operator_id": {
+                    "open_id": "ou_menu_1",
+                    "user_id": "ouser_menu_1",
+                    "union_id": "on_menu_1",
+                }
+            },
+            "event_key": "help",
+        },
+    }
+    context = build_event_context(payload)
+
+    model = P2ApplicationBotMenuV6.from_context(context)
+
+    assert model.event_id == "evt_menu_1"
+    assert model.event_key == "help"
+    assert model.operator_open_id == "ou_menu_1"
+    assert model.operator_user_id == "ouser_menu_1"
+    assert model.operator_union_id == "on_menu_1"
+
+
+def test_bot_menu_model_prefers_direct_operator_ids_when_present():
+    payload = {
+        "schema": "2.0",
+        "header": {
+            "event_id": "evt_menu_2",
+            "event_type": "application.bot.menu_v6",
+        },
+        "event": {
+            "operator": {
+                "open_id": "ou_direct",
+                "user_id": "ouser_direct",
+                "union_id": "on_direct",
+                "operator_id": {
+                    "open_id": "ou_nested",
+                    "user_id": "ouser_nested",
+                    "union_id": "on_nested",
+                },
+            },
+            "event_key": "menu-key",
+        },
+    }
+    context = build_event_context(payload)
+
+    model = P2ApplicationBotMenuV6.from_context(context)
+
+    assert model.operator_open_id == "ou_direct"
+    assert model.operator_user_id == "ouser_direct"
+    assert model.operator_union_id == "on_direct"
