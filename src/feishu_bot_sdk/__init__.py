@@ -2,6 +2,7 @@ from .bitable import AsyncBitableService, BitableService
 from .bot import AsyncBotService, BotInfo, BotInfoResponse, BotService
 from .calendar import AsyncCalendarService, CalendarService
 from .config import FeishuConfig
+from .contact import AsyncContactService, ContactService
 from .docs_content import AsyncDocContentService, DocContentService
 from .docx_blocks import AsyncDocxBlockService, DocxBlockService
 from .docx_document import AsyncDocxDocumentService, DocxDocumentService
@@ -92,6 +93,7 @@ __all__ = [
     "AsyncBitableService",
     "AsyncBotService",
     "AsyncCalendarService",
+    "AsyncContactService",
     "AsyncDocxService",
     "AsyncDocxBlockService",
     "AsyncDocContentService",
@@ -112,6 +114,7 @@ __all__ = [
     "BotInfo",
     "BotInfoResponse",
     "CalendarService",
+    "ContactService",
     "ConfigurationError",
     "DocContentService",
     "DocxService",

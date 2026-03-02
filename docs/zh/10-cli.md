@@ -54,6 +54,12 @@ feishu docx create-from-markdown --title "日报" --markdown-file ./report.md
 # Wiki
 feishu wiki search-nodes --query "项目周报" --format json
 
+# 通讯录
+feishu contact user get --user-id ou_xxx --user-id-type open_id --format json
+feishu contact user by-department --department-id od_xxx --page-size 20 --format json
+feishu contact department search --query "研发" --format json
+feishu contact scope get --page-size 100 --format json
+
 # 日历
 feishu calendar list-calendars --page-size 50 --format json
 feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json

@@ -17,6 +17,7 @@ This directory contains module-based SDK documentation. Each module has a standa
 - [09 Types, Errors, and Rate Limit](./en/09-types-errors-rate-limit.md)
 - [10 CLI Tool](./en/10-cli.md)
 - [11 Calendar](./en/11-calendar.md)
+- [12 Contact](./en/12-contact.md)
 
 ## Suggested Reading Path
 
@@ -24,3 +25,4 @@ This directory contains module-based SDK documentation. Each module has a standa
 - For bot conversations, read [02 IM Messaging and Media](./en/02-im.md) and [08 FeishuBotServer](./en/08-bot-server.md).
 - For result delivery workflows, focus on [03 Drive](./en/03-drive.md), [04 Bitable](./en/04-bitable.md), and [05 Docx/Docs Content](./en/05-docx-and-docs.md).
 - For scheduling workflows, focus on [11 Calendar](./en/11-calendar.md).
+- For org-structure and user lookup workflows, focus on [12 Contact](./en/12-contact.md).

@@ -54,6 +54,12 @@ feishu docx create-from-markdown --title "Daily Report" --markdown-file ./report
 # wiki
 feishu wiki search-nodes --query "weekly report" --format json
 
+# contact
+feishu contact user get --user-id ou_xxx --user-id-type open_id --format json
+feishu contact user by-department --department-id od_xxx --page-size 20 --format json
+feishu contact department search --query "engineering" --format json
+feishu contact scope get --page-size 100 --format json
+
 # calendar
 feishu calendar list-calendars --page-size 50 --format json
 feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json

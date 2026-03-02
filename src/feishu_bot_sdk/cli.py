@@ -18,6 +18,7 @@ from .bitable import BitableService
 from .bot import BotService
 from .calendar import CalendarService
 from .config import FeishuConfig
+from .contact import ContactService
 from .docs_content import DocContentService
 from .docx import DocxService
 from .drive_files import DriveFileService
@@ -62,6 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
     _build_drive_commands(subparsers, shared)
     _build_wiki_commands(subparsers, shared)
     _build_calendar_commands(subparsers, shared)
+    _build_contact_commands(subparsers, shared)
     _build_webhook_commands(subparsers, shared)
     _build_ws_commands(subparsers, shared)
     _build_server_commands(subparsers, shared)
@@ -684,6 +686,140 @@ def _build_calendar_commands(
     caldav.add_argument("--request-file", help="Request JSON file path")
     caldav.add_argument("--request-stdin", action="store_true", help="Read request JSON from stdin")
     caldav.set_defaults(handler=_cmd_calendar_generate_caldav_conf)
+
+
+def _build_contact_commands(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    shared: argparse.ArgumentParser,
+) -> None:
+    contact_parser = subparsers.add_parser("contact", help="Contact (address-book) operations")
+    contact_sub = contact_parser.add_subparsers(dest="contact_command")
+    contact_sub.required = True
+
+    user_parser = contact_sub.add_parser("user", help="User operations")
+    user_sub = user_parser.add_subparsers(dest="contact_user_command")
+    user_sub.required = True
+
+    user_get = user_sub.add_parser("get", help="Get user by id", parents=[shared])
+    user_get.add_argument("--user-id", required=True, help="User id")
+    user_get.add_argument("--user-id-type", help="Optional user_id_type")
+    user_get.add_argument("--department-id-type", help="Optional department_id_type")
+    user_get.set_defaults(handler=_cmd_contact_user_get)
+
+    user_batch_get = user_sub.add_parser("batch-get", help="Batch get users by ids", parents=[shared])
+    user_batch_get.add_argument(
+        "--user-id",
+        action="append",
+        dest="user_ids",
+        required=True,
+        help="User id, repeatable",
+    )
+    user_batch_get.add_argument("--user-id-type", help="Optional user_id_type")
+    user_batch_get.add_argument("--department-id-type", help="Optional department_id_type")
+    user_batch_get.set_defaults(handler=_cmd_contact_user_batch_get)
+
+    user_get_id = user_sub.add_parser(
+        "get-id",
+        help="Batch get user ids by emails/mobiles",
+        parents=[shared],
+    )
+    user_get_id.add_argument("--email", action="append", dest="emails", help="Email, repeatable")
+    user_get_id.add_argument("--mobile", action="append", dest="mobiles", help="Mobile, repeatable")
+    user_get_id.add_argument(
+        "--include-resigned",
+        choices=("true", "false"),
+        help="Include resigned users",
+    )
+    user_get_id.add_argument("--user-id-type", help="Optional user_id_type")
+    user_get_id.set_defaults(handler=_cmd_contact_user_get_id)
+
+    user_by_department = user_sub.add_parser(
+        "by-department",
+        help="List direct users in department",
+        parents=[shared],
+    )
+    user_by_department.add_argument("--department-id", required=True, help="Department id")
+    user_by_department.add_argument("--user-id-type", help="Optional user_id_type")
+    user_by_department.add_argument("--department-id-type", help="Optional department_id_type")
+    user_by_department.add_argument("--page-size", type=int, help="Page size")
+    user_by_department.add_argument("--page-token", help="Page token")
+    user_by_department.set_defaults(handler=_cmd_contact_user_by_department)
+
+    user_search = user_sub.add_parser(
+        "search",
+        help="Search users (requires user access token)",
+        parents=[shared],
+    )
+    user_search.add_argument("--query", required=True, help="Search query")
+    user_search.add_argument("--page-size", type=int, help="Page size")
+    user_search.add_argument("--page-token", help="Page token")
+    user_search.set_defaults(handler=_cmd_contact_user_search)
+
+    department_parser = contact_sub.add_parser("department", help="Department operations")
+    department_sub = department_parser.add_subparsers(dest="contact_department_command")
+    department_sub.required = True
+
+    department_get = department_sub.add_parser("get", help="Get department by id", parents=[shared])
+    department_get.add_argument("--department-id", required=True, help="Department id")
+    department_get.add_argument("--user-id-type", help="Optional user_id_type")
+    department_get.add_argument("--department-id-type", help="Optional department_id_type")
+    department_get.set_defaults(handler=_cmd_contact_department_get)
+
+    department_children = department_sub.add_parser("children", help="List child departments", parents=[shared])
+    department_children.add_argument("--department-id", required=True, help="Department id")
+    department_children.add_argument("--user-id-type", help="Optional user_id_type")
+    department_children.add_argument("--department-id-type", help="Optional department_id_type")
+    department_children.add_argument("--fetch-child", choices=("true", "false"), help="Recursive fetch")
+    department_children.add_argument("--page-size", type=int, help="Page size")
+    department_children.add_argument("--page-token", help="Page token")
+    department_children.set_defaults(handler=_cmd_contact_department_children)
+
+    department_batch_get = department_sub.add_parser(
+        "batch-get",
+        help="Batch get departments by ids",
+        parents=[shared],
+    )
+    department_batch_get.add_argument(
+        "--department-id",
+        action="append",
+        dest="department_ids",
+        required=True,
+        help="Department id, repeatable",
+    )
+    department_batch_get.add_argument("--user-id-type", help="Optional user_id_type")
+    department_batch_get.add_argument("--department-id-type", help="Optional department_id_type")
+    department_batch_get.set_defaults(handler=_cmd_contact_department_batch_get)
+
+    department_parent = department_sub.add_parser("parent", help="List parent departments", parents=[shared])
+    department_parent.add_argument("--department-id", required=True, help="Department id")
+    department_parent.add_argument("--user-id-type", help="Optional user_id_type")
+    department_parent.add_argument("--department-id-type", help="Optional department_id_type")
+    department_parent.add_argument("--page-size", type=int, help="Page size")
+    department_parent.add_argument("--page-token", help="Page token")
+    department_parent.set_defaults(handler=_cmd_contact_department_parent)
+
+    department_search = department_sub.add_parser(
+        "search",
+        help="Search departments",
+        parents=[shared],
+    )
+    department_search.add_argument("--query", required=True, help="Search query")
+    department_search.add_argument("--user-id-type", help="Optional user_id_type")
+    department_search.add_argument("--department-id-type", help="Optional department_id_type")
+    department_search.add_argument("--page-size", type=int, help="Page size")
+    department_search.add_argument("--page-token", help="Page token")
+    department_search.set_defaults(handler=_cmd_contact_department_search)
+
+    scope_parser = contact_sub.add_parser("scope", help="Contact scope operations")
+    scope_sub = scope_parser.add_subparsers(dest="contact_scope_command")
+    scope_sub.required = True
+
+    scope_get = scope_sub.add_parser("get", help="List authorized contact scope", parents=[shared])
+    scope_get.add_argument("--user-id-type", help="Optional user_id_type")
+    scope_get.add_argument("--department-id-type", help="Optional department_id_type")
+    scope_get.add_argument("--page-size", type=int, help="Page size")
+    scope_get.add_argument("--page-token", help="Page token")
+    scope_get.set_defaults(handler=_cmd_contact_scope_get)
 
 
 def _build_webhook_commands(
@@ -1660,6 +1796,134 @@ def _cmd_calendar_generate_caldav_conf(args: argparse.Namespace) -> Mapping[str,
     )
     service = CalendarService(_build_client(args))
     return service.generate_caldav_conf(request)
+
+
+def _cmd_contact_user_get(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = ContactService(_build_client(args))
+    return service.get_user(
+        str(args.user_id),
+        user_id_type=getattr(args, "user_id_type", None),
+        department_id_type=getattr(args, "department_id_type", None),
+    )
+
+
+def _cmd_contact_user_batch_get(args: argparse.Namespace) -> Mapping[str, Any]:
+    user_ids = list(getattr(args, "user_ids", []) or [])
+    service = ContactService(_build_client(args))
+    return service.batch_get_users(
+        user_ids,
+        user_id_type=getattr(args, "user_id_type", None),
+        department_id_type=getattr(args, "department_id_type", None),
+    )
+
+
+def _cmd_contact_user_get_id(args: argparse.Namespace) -> Mapping[str, Any]:
+    emails = list(getattr(args, "emails", []) or [])
+    mobiles = list(getattr(args, "mobiles", []) or [])
+    if not emails and not mobiles:
+        raise ValueError("at least one of --email or --mobile is required")
+    raw_include_resigned = getattr(args, "include_resigned", None)
+    include_resigned: Optional[bool]
+    if raw_include_resigned is None:
+        include_resigned = None
+    else:
+        include_resigned = str(raw_include_resigned).lower() == "true"
+    service = ContactService(_build_client(args))
+    return service.batch_get_user_ids(
+        emails=emails or None,
+        mobiles=mobiles or None,
+        include_resigned=include_resigned,
+        user_id_type=getattr(args, "user_id_type", None),
+    )
+
+
+def _cmd_contact_user_by_department(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = ContactService(_build_client(args))
+    return service.find_users_by_department(
+        str(args.department_id),
+        user_id_type=getattr(args, "user_id_type", None),
+        department_id_type=getattr(args, "department_id_type", None),
+        page_size=getattr(args, "page_size", None),
+        page_token=getattr(args, "page_token", None),
+    )
+
+
+def _cmd_contact_user_search(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = ContactService(_build_client(args))
+    return service.search_users(
+        str(args.query),
+        page_size=getattr(args, "page_size", None),
+        page_token=getattr(args, "page_token", None),
+    )
+
+
+def _cmd_contact_department_get(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = ContactService(_build_client(args))
+    return service.get_department(
+        str(args.department_id),
+        user_id_type=getattr(args, "user_id_type", None),
+        department_id_type=getattr(args, "department_id_type", None),
+    )
+
+
+def _cmd_contact_department_children(args: argparse.Namespace) -> Mapping[str, Any]:
+    raw_fetch_child = getattr(args, "fetch_child", None)
+    fetch_child: Optional[bool]
+    if raw_fetch_child is None:
+        fetch_child = None
+    else:
+        fetch_child = str(raw_fetch_child).lower() == "true"
+    service = ContactService(_build_client(args))
+    return service.list_department_children(
+        str(args.department_id),
+        user_id_type=getattr(args, "user_id_type", None),
+        department_id_type=getattr(args, "department_id_type", None),
+        fetch_child=fetch_child,
+        page_size=getattr(args, "page_size", None),
+        page_token=getattr(args, "page_token", None),
+    )
+
+
+def _cmd_contact_department_batch_get(args: argparse.Namespace) -> Mapping[str, Any]:
+    department_ids = list(getattr(args, "department_ids", []) or [])
+    service = ContactService(_build_client(args))
+    return service.batch_get_departments(
+        department_ids,
+        user_id_type=getattr(args, "user_id_type", None),
+        department_id_type=getattr(args, "department_id_type", None),
+    )
+
+
+def _cmd_contact_department_parent(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = ContactService(_build_client(args))
+    return service.list_parent_departments(
+        str(args.department_id),
+        user_id_type=getattr(args, "user_id_type", None),
+        department_id_type=getattr(args, "department_id_type", None),
+        page_size=getattr(args, "page_size", None),
+        page_token=getattr(args, "page_token", None),
+    )
+
+
+def _cmd_contact_department_search(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = ContactService(_build_client(args))
+    return service.search_departments(
+        str(args.query),
+        user_id_type=getattr(args, "user_id_type", None),
+        department_id_type=getattr(args, "department_id_type", None),
+        page_size=getattr(args, "page_size", None),
+        page_token=getattr(args, "page_token", None),
+    )
+
+
+def _cmd_contact_scope_get(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = ContactService(_build_client(args))
+    return service.list_scopes(
+        user_id_type=getattr(args, "user_id_type", None),
+        department_id_type=getattr(args, "department_id_type", None),
+        page_size=getattr(args, "page_size", None),
+        page_token=getattr(args, "page_token", None),
+    )
 
 
 def _cmd_webhook_decode(args: argparse.Namespace) -> Mapping[str, Any]:

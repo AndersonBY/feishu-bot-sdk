@@ -9,6 +9,7 @@
 - Drive 权限管理（成员、公开设置、密码、owner transfer）
 - 多维表格能力（CSV 导入 + 表/字段/记录 CRUD + batch + 分页迭代）
 - Wiki 知识库（space/node/member/search/task）与云文档内容导出（`docs/v1/content`）
+- 通讯录能力（用户/部门/授权范围查询 + 分页迭代）
 - 日历能力（日历 CRUD、日程 CRUD、忙闲查询、CalDAV 配置）
 - Markdown 追加写入 Docx
 - 事件回调（Webhook）与长连接（WebSocket）
@@ -81,29 +82,34 @@ feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xx
 # 9) 搜索 Wiki 节点
 feishu wiki search-nodes --query "项目周报" --format json
 
-# 10) 日历查询与创建日程
+# 10) 通讯录查询
+feishu contact user get --user-id ou_xxx --user-id-type open_id --format json
+feishu contact department search --query "研发" --format json
+feishu contact scope get --page-size 100 --format json
+
+# 11) 日历查询与创建日程
 feishu calendar list-calendars --page-size 50 --format json
 feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json
 feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
 
-# 11) 解析 webhook 事件信封
+# 12) 解析 webhook 事件信封
 feishu webhook parse --body-file ./webhook.json --format json
 
-# 12) 获取长连接 endpoint
+# 13) 获取长连接 endpoint
 feishu ws endpoint --format json
 
-# 13) 启动长连接服务并打印事件
+# 14) 启动长连接服务并打印事件
 feishu server run --print-payload
 
-# 14) 本地启动 webhook 回调服务（处理 10 个请求后自动退出）
+# 15) 本地启动 webhook 回调服务（处理 10 个请求后自动退出）
 feishu webhook serve --host 127.0.0.1 --port 8000 --path /webhook/feishu --max-requests 10
 
-# 15) 后台启动 / 查询 / 停止长连接服务
+# 16) 后台启动 / 查询 / 停止长连接服务
 feishu server start --pid-file ./.feishu_server.pid --log-file ./feishu-server.log
 feishu server status --pid-file ./.feishu_server.pid --format json
 feishu server stop --pid-file ./.feishu_server.pid
 
-# 16) Agent 管道输入（stdin）
+# 17) Agent 管道输入（stdin）
 cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --format json
 ```
 
@@ -122,6 +128,7 @@ cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --fo
 - 类型、异常与限流：[`docs/zh/09-types-errors-rate-limit.md`](./docs/zh/09-types-errors-rate-limit.md)
 - CLI 命令行工具：[`docs/zh/10-cli.md`](./docs/zh/10-cli.md)
 - 日历（Calendar）：[`docs/zh/11-calendar.md`](./docs/zh/11-calendar.md)
+- 通讯录（Contact）：[`docs/zh/12-contact.md`](./docs/zh/12-contact.md)
 
 ## 响应模型（重要）
 
@@ -334,6 +341,19 @@ events = calendar.list_events(primary.calendar.calendar_id, page_size=10)
 print(events.items)
 ```
 
+## 通讯录（Contact）
+
+```python
+from feishu_bot_sdk import ContactService
+
+contact = ContactService(client)
+profile = contact.get_user("ou_xxx", user_id_type="open_id")
+print(profile.user.name)
+
+for item in contact.iter_users_by_department("od_xxx", page_size=50):
+    print(item.get("open_id"))
+```
+
 ## 核心对象
 
 - `FeishuClient` / `AsyncFeishuClient`：飞书 API 基础客户端
@@ -344,6 +364,7 @@ print(events.items)
 - `DriveFileService` / `AsyncDriveFileService`：云空间文件、导入导出、素材接口
 - `DrivePermissionService` / `AsyncDrivePermissionService`：成员、公开设置、密码与 owner transfer
 - `CalendarService` / `AsyncCalendarService`：日历、日程、忙闲和 CalDAV 配置
+- `ContactService` / `AsyncContactService`：通讯录用户、部门、授权范围
 - `MessageService` / `AsyncMessageService`：消息管理
 - `MediaService` / `AsyncMediaService`：媒体资源
 - `FeishuBotServer`：长连接服务封装（回调注册 + 启停 + 状态管理）
