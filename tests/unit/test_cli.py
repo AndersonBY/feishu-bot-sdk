@@ -9,7 +9,9 @@ from typing import Any
 from feishu_bot_sdk import cli
 from feishu_bot_sdk.bot import BotService
 from feishu_bot_sdk.bitable import BitableService
+from feishu_bot_sdk.calendar import CalendarService
 from feishu_bot_sdk.config import FeishuConfig
+from feishu_bot_sdk.drive_files import DriveFileService
 from feishu_bot_sdk.drive_permissions import DrivePermissionService
 from feishu_bot_sdk.events import build_event_context
 from feishu_bot_sdk.im.messages import MessageService
@@ -22,7 +24,11 @@ def _base_args(**overrides: Any) -> argparse.Namespace:
     data: dict[str, Any] = {
         "app_id": None,
         "app_secret": None,
-        "tenant_access_token": None,
+        "auth_mode": None,
+        "access_token": None,
+        "app_access_token": None,
+        "user_access_token": None,
+        "user_refresh_token": None,
         "base_url": None,
         "timeout": None,
     }
@@ -46,7 +52,7 @@ def test_auth_token_json_output(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
 
     monkeypatch.setattr(
-        "feishu_bot_sdk.feishu.FeishuClient.get_tenant_access_token",
+        "feishu_bot_sdk.feishu.FeishuClient.get_access_token",
         lambda _self: "t-env",
     )
 
@@ -54,7 +60,7 @@ def test_auth_token_json_output(monkeypatch: Any, capsys: Any) -> None:
     assert code == 0
 
     payload = json.loads(capsys.readouterr().out)
-    assert payload["tenant_access_token"] == "t-env"
+    assert payload["access_token"] == "t-env"
 
 
 def test_auth_request_payload_from_stdin(monkeypatch: Any, capsys: Any) -> None:
@@ -366,6 +372,280 @@ def test_wiki_search_nodes(monkeypatch: Any, capsys: Any) -> None:
     assert payload["space_id"] == "sp_1"
     assert payload["page_size"] == 10
     assert payload["items"][0]["query"] == "weekly"
+
+
+def test_calendar_list_calendars(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    captured: dict[str, Any] = {}
+
+    def _fake_list_calendars(
+        _self: CalendarService,
+        *,
+        page_size: int | None = None,
+        page_token: str | None = None,
+        sync_token: str | None = None,
+    ) -> dict[str, Any]:
+        captured["page_size"] = page_size
+        captured["page_token"] = page_token
+        captured["sync_token"] = sync_token
+        return {"items": [{"calendar_id": "cal_1"}], "has_more": False}
+
+    monkeypatch.setattr("feishu_bot_sdk.calendar.CalendarService.list_calendars", _fake_list_calendars)
+
+    code = cli.main(
+        [
+            "calendar",
+            "list-calendars",
+            "--page-size",
+            "10",
+            "--sync-token",
+            "sync_1",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert captured["page_size"] == 10
+    assert captured["sync_token"] == "sync_1"
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["items"][0]["calendar_id"] == "cal_1"
+
+
+def test_calendar_create_event_from_stdin(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+    monkeypatch.setattr("sys.stdin", io.StringIO('{"summary":"Kickoff"}'))
+
+    captured: dict[str, Any] = {}
+
+    def _fake_create_event(
+        _self: CalendarService,
+        calendar_id: str,
+        event: dict[str, Any],
+        *,
+        user_id_type: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        captured["calendar_id"] = calendar_id
+        captured["event"] = event
+        captured["user_id_type"] = user_id_type
+        captured["idempotency_key"] = idempotency_key
+        return {"event_id": "evt_1"}
+
+    monkeypatch.setattr("feishu_bot_sdk.calendar.CalendarService.create_event", _fake_create_event)
+
+    code = cli.main(
+        [
+            "calendar",
+            "create-event",
+            "--calendar-id",
+            "cal_1",
+            "--event-stdin",
+            "--user-id-type",
+            "open_id",
+            "--idempotency-key",
+            "idem_1",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert captured["calendar_id"] == "cal_1"
+    assert captured["event"] == {"summary": "Kickoff"}
+    assert captured["user_id_type"] == "open_id"
+    assert captured["idempotency_key"] == "idem_1"
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["event_id"] == "evt_1"
+
+
+def test_calendar_delete_event_with_need_notification(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    captured: dict[str, Any] = {}
+
+    def _fake_delete_event(
+        _self: CalendarService,
+        calendar_id: str,
+        event_id: str,
+        *,
+        need_notification: bool | None = None,
+    ) -> dict[str, Any]:
+        captured["calendar_id"] = calendar_id
+        captured["event_id"] = event_id
+        captured["need_notification"] = need_notification
+        return {"ok": True}
+
+    monkeypatch.setattr("feishu_bot_sdk.calendar.CalendarService.delete_event", _fake_delete_event)
+
+    code = cli.main(
+        [
+            "calendar",
+            "delete-event",
+            "--calendar-id",
+            "cal_1",
+            "--event-id",
+            "evt_1",
+            "--need-notification",
+            "true",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert captured["calendar_id"] == "cal_1"
+    assert captured["event_id"] == "evt_1"
+    assert captured["need_notification"] is True
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True
+
+
+def test_calendar_attach_material_append(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    captured: dict[str, Any] = {}
+
+    def _fake_upload_media(
+        _self: DriveFileService,
+        path: str,
+        *,
+        parent_type: str,
+        parent_node: str,
+        file_name: str | None = None,
+        extra: str | None = None,
+        checksum: str | None = None,
+        content_type: str | None = None,
+    ) -> dict[str, Any]:
+        captured["upload"] = {
+            "path": path,
+            "parent_type": parent_type,
+            "parent_node": parent_node,
+            "file_name": file_name,
+            "content_type": content_type,
+        }
+        return {"file_token": "file_new_1", "name": "brief.md"}
+
+    def _fake_get_event(
+        _self: CalendarService,
+        calendar_id: str,
+        event_id: str,
+        *,
+        need_meeting_settings: bool | None = None,
+        need_attendee: bool | None = None,
+        max_attendee_num: int | None = None,
+        user_id_type: str | None = None,
+    ) -> dict[str, Any]:
+        captured["get"] = {
+            "calendar_id": calendar_id,
+            "event_id": event_id,
+            "user_id_type": user_id_type,
+        }
+        return {"event": {"attachments": [{"file_token": "file_old_1", "name": "old.txt"}]}}
+
+    def _fake_update_event(
+        _self: CalendarService,
+        calendar_id: str,
+        event_id: str,
+        event: dict[str, Any],
+        *,
+        user_id_type: str | None = None,
+    ) -> dict[str, Any]:
+        captured["update"] = {
+            "calendar_id": calendar_id,
+            "event_id": event_id,
+            "event": event,
+            "user_id_type": user_id_type,
+        }
+        return {"event": {"event_id": event_id, "attachments": event.get("attachments", [])}}
+
+    monkeypatch.setattr("feishu_bot_sdk.drive_files.DriveFileService.upload_media", _fake_upload_media)
+    monkeypatch.setattr("feishu_bot_sdk.calendar.CalendarService.get_event", _fake_get_event)
+    monkeypatch.setattr("feishu_bot_sdk.calendar.CalendarService.update_event", _fake_update_event)
+
+    code = cli.main(
+        [
+            "calendar",
+            "attach-material",
+            "--calendar-id",
+            "cal_1",
+            "--event-id",
+            "evt_1",
+            "--path",
+            "./brief.md",
+            "--mode",
+            "append",
+            "--need-notification",
+            "false",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert captured["upload"]["parent_type"] == "calendar"
+    assert captured["upload"]["parent_node"] == "cal_1"
+    assert captured["update"]["event"]["need_notification"] is False
+    assert captured["update"]["event"]["attachments"] == [
+        {"file_token": "file_old_1", "name": "old.txt"},
+        {"file_token": "file_new_1", "name": "brief.md"},
+    ]
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["file_token"] == "file_new_1"
+    assert payload["attachments_count"] == 2
+
+
+def test_oauth_authorize_url(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+
+    code = cli.main(
+        [
+            "oauth",
+            "authorize-url",
+            "--redirect-uri",
+            "https://example.com/callback",
+            "--state",
+            "state-1",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert "authen/v1/authorize" in payload["authorize_url"]
+    assert "app_id=cli_test_app" in payload["authorize_url"]
+
+
+def test_oauth_exchange_code(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    def _fake_exchange(
+        _self: Any,
+        code: str,
+        *,
+        grant_type: str = "authorization_code",
+    ) -> dict[str, Any]:
+        assert code == "code_123"
+        assert grant_type == "authorization_code"
+        return {"access_token": "u_token_1", "refresh_token": "u_refresh_1"}
+
+    monkeypatch.setattr("feishu_bot_sdk.feishu.FeishuClient.exchange_authorization_code", _fake_exchange)
+
+    code = cli.main(
+        [
+            "oauth",
+            "exchange-code",
+            "--code",
+            "code_123",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["access_token"] == "u_token_1"
 
 
 def test_webhook_verify_signature(monkeypatch: Any, capsys: Any) -> None:

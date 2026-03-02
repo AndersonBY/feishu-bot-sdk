@@ -48,7 +48,7 @@ class _SyncClientStub:
             return self._resolver(self.calls[-1])
         return {"code": 0, "data": {"ok": True}}
 
-    def get_tenant_access_token(self) -> str:
+    def get_access_token(self) -> str:
         return "token"
 
 
@@ -78,7 +78,7 @@ class _AsyncClientStub:
             return self._resolver(self.calls[-1])
         return {"code": 0, "data": {"ok": True}}
 
-    async def get_tenant_access_token(self) -> str:
+    async def get_access_token(self) -> str:
         return "token"
 
 

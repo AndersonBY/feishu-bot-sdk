@@ -15,13 +15,18 @@ feishu --help
 
 - `--format human|json`：默认 `human`，机器调用建议 `json`
 - `--app-id` / `--app-secret`：飞书应用凭证
-- `--tenant-access-token`：直传租户 token（可选）
+- `--auth-mode tenant|user`：认证模式，默认 `tenant`
+- `--access-token`：当前认证模式的静态 access token（可选）
+- `--app-access-token`：OAuth code/refresh 交换使用（可选）
+- `--user-access-token` / `--user-refresh-token`：用户态 token（`auth_mode=user` 常用）
 - `--base-url`：默认 `https://open.feishu.cn/open-apis`
 - `--timeout`：请求超时秒数
 
 认证优先级：环境变量优先，其次命令行参数。
 
-- 环境变量：`FEISHU_APP_ID` / `FEISHU_APP_SECRET`
+- 环境变量：`FEISHU_APP_ID` / `FEISHU_APP_SECRET` / `FEISHU_AUTH_MODE` / `FEISHU_ACCESS_TOKEN`
+- 用户态环境变量：`FEISHU_USER_ACCESS_TOKEN` / `FEISHU_USER_REFRESH_TOKEN`
+- OAuth 交换环境变量：`FEISHU_APP_ACCESS_TOKEN`
 - 兼容变量：`APP_ID` / `APP_SECRET`
 
 ## 常用命令
@@ -29,6 +34,9 @@ feishu --help
 ```bash
 # 鉴权
 feishu auth token --format json
+feishu oauth authorize-url --redirect-uri https://example.com/callback --format json
+feishu oauth exchange-code --code CODE --format json
+feishu oauth user-info --auth-mode user --user-access-token u-xxx --format json
 
 # 发消息
 feishu im send-text --receive-id ou_xxx --text "hello"
@@ -41,7 +49,28 @@ feishu docx create-from-markdown --title "日报" --markdown-file ./report.md
 
 # Wiki
 feishu wiki search-nodes --query "项目周报" --format json
+
+# 日历
+feishu calendar list-calendars --page-size 50 --format json
+feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json
+feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
 ```
+
+## 日历附件（Agent 强烈建议）
+
+为避免 `193107 no permission to access attachment file token`，不要手动先传错误上传点再更新日程。
+
+直接使用：
+
+```bash
+feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
+```
+
+该命令会自动：
+
+- 上传素材时使用 `parent_type=calendar`
+- 上传素材时使用 `parent_node=<calendar_id>`
+- 更新日程 `attachments`（默认追加模式，可通过 `--mode replace` 覆盖）
 
 ## Stdin（Agent 推荐）
 

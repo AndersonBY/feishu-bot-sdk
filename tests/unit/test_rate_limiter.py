@@ -128,7 +128,7 @@ def test_feishu_client_calls_rate_limiter_hooks():
         FeishuConfig(
             app_id="cli_1",
             app_secret="secret_1",
-            tenant_access_token="t-1",
+            access_token="t-1",
             rate_limit_enabled=False,
         ),
         http_client=cast(JsonHttpClient, http),
@@ -158,7 +158,7 @@ def test_feishu_client_throttles_on_http_429():
         FeishuConfig(
             app_id="cli_1",
             app_secret="secret_1",
-            tenant_access_token="t-1",
+            access_token="t-1",
             rate_limit_enabled=False,
         ),
         http_client=cast(JsonHttpClient, http),
@@ -181,7 +181,7 @@ def test_async_feishu_client_calls_rate_limiter_hooks():
             FeishuConfig(
                 app_id="cli_1",
                 app_secret="secret_1",
-                tenant_access_token="t-1",
+                access_token="t-1",
                 rate_limit_enabled=False,
             ),
             http_client=cast(AsyncJsonHttpClient, http),

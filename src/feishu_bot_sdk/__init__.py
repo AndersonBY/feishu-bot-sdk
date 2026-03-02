@@ -1,5 +1,6 @@
 from .bitable import AsyncBitableService, BitableService
 from .bot import AsyncBotService, BotInfo, BotInfoResponse, BotService
+from .calendar import AsyncCalendarService, CalendarService
 from .config import FeishuConfig
 from .docs_content import AsyncDocContentService, DocContentService
 from .docx_blocks import AsyncDocxBlockService, DocxBlockService
@@ -31,7 +32,7 @@ from .events import (
     build_idempotency_key,
     parse_event_envelope,
 )
-from .feishu import AsyncFeishuClient, FeishuClient
+from .feishu import AsyncFeishuClient, FeishuClient, OAuthUserInfo, OAuthUserToken
 from .http_client import AsyncJsonHttpClient, JsonHttpClient
 from .im import (
     AsyncMediaService,
@@ -71,6 +72,7 @@ __all__ = [
     "AsyncMemoryIdempotencyStore",
     "AsyncBitableService",
     "AsyncBotService",
+    "AsyncCalendarService",
     "AsyncDocxService",
     "AsyncDocxBlockService",
     "AsyncDocContentService",
@@ -89,6 +91,7 @@ __all__ = [
     "BotService",
     "BotInfo",
     "BotInfoResponse",
+    "CalendarService",
     "ConfigurationError",
     "DocContentService",
     "DocxService",
@@ -114,6 +117,8 @@ __all__ = [
     "MemoryIdempotencyStore",
     "MessageService",
     "MessageResponse",
+    "OAuthUserInfo",
+    "OAuthUserToken",
     "P1CustomizedEvent",
     "P2ApplicationBotMenuV6",
     "P2CardActionTrigger",

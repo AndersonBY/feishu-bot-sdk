@@ -2,13 +2,14 @@
 
 A lightweight Python SDK for Feishu bot integrations, including:
 
-- Tenant access token retrieval and caching
+- Access token retrieval and caching for both `tenant` and `user` modes
 - IM messaging (send/reply/edit/recall/forward/merge-forward/reaction/pin/batch/urgent/cards)
 - Image/file/message-resource upload and download
 - Drive file/media upload & download with import/export tasks
 - Drive permissions (members, public settings, password, owner transfer)
 - Bitable features (CSV import + table/field/record CRUD + batch + pagination iterators)
 - Wiki APIs (space/node/member/search/task) and Docs content export (`docs/v1/content`)
+- Calendar APIs (calendar/event CRUD, freebusy, CalDAV config)
 - Markdown append to Docx
 - Webhook callbacks and long connections (WebSocket)
 - Typed event models (IM/card/URL preview/Bitable record & field changed)
@@ -35,14 +36,20 @@ feishu --help
 - Default output: human-friendly
 - Machine-readable output: add `--format json`
 - Auth priority: environment variables first, then global flags
-  - Env: `FEISHU_APP_ID`, `FEISHU_APP_SECRET` (also supports `APP_ID`, `APP_SECRET`)
-  - Flags: `--app-id`, `--app-secret`
+  - Env: `FEISHU_APP_ID`, `FEISHU_APP_SECRET`, `FEISHU_AUTH_MODE`, `FEISHU_ACCESS_TOKEN`
+  - User env: `FEISHU_USER_ACCESS_TOKEN`, `FEISHU_USER_REFRESH_TOKEN`
+  - OAuth exchange env: `FEISHU_APP_ACCESS_TOKEN`
+  - Flags: `--app-id`, `--app-secret`, `--auth-mode`, `--access-token`
 
 Examples:
 
 ```bash
-# 1) Get tenant token (JSON output)
+# 1) Get token for current auth mode (JSON output)
 feishu auth token --format json
+
+# 1.1) OAuth authorize + token exchange
+feishu oauth authorize-url --redirect-uri https://example.com/callback --format json
+feishu oauth exchange-code --code CODE --format json
 
 # 2) Send text message (human output by default)
 feishu im send-text --receive-id ou_xxx --text "hello from cli"
@@ -68,24 +75,29 @@ feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xx
 # 9) Search wiki nodes
 feishu wiki search-nodes --query "weekly report" --format json
 
-# 10) Parse webhook envelope
+# 10) Calendar query and create event
+feishu calendar list-calendars --page-size 50 --format json
+feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json
+feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
+
+# 11) Parse webhook envelope
 feishu webhook parse --body-file ./webhook.json --format json
 
-# 11) Fetch long-connection endpoint
+# 12) Fetch long-connection endpoint
 feishu ws endpoint --format json
 
-# 12) Run long-connection server and print events
+# 13) Run long-connection server and print events
 feishu server run --print-payload
 
-# 13) Run local webhook server (auto-stop after 10 requests)
+# 14) Run local webhook server (auto-stop after 10 requests)
 feishu webhook serve --host 127.0.0.1 --port 8000 --path /webhook/feishu --max-requests 10
 
-# 14) Start / check / stop long-connection service in background
+# 15) Start / check / stop long-connection service in background
 feishu server start --pid-file ./.feishu_server.pid --log-file ./feishu-server.log
 feishu server status --pid-file ./.feishu_server.pid --format json
 feishu server stop --pid-file ./.feishu_server.pid
 
-# 15) Agent pipeline input (stdin)
+# 16) Agent pipeline input (stdin)
 cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --format json
 ```
 
@@ -103,6 +115,7 @@ cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --fo
 - FeishuBotServer long-connection service: [`docs/en/08-bot-server.md`](./docs/en/08-bot-server.md)
 - Types, errors, and rate limit: [`docs/en/09-types-errors-rate-limit.md`](./docs/en/09-types-errors-rate-limit.md)
 - CLI tool: [`docs/en/10-cli.md`](./docs/en/10-cli.md)
+- Calendar: [`docs/en/11-calendar.md`](./docs/en/11-calendar.md)
 
 ## Response Model (Important)
 
@@ -302,6 +315,19 @@ markdown = docs.get_markdown("doccn_xxx")
 print(markdown[:200])
 ```
 
+## Calendar
+
+```python
+from feishu_bot_sdk import CalendarService
+
+calendar = CalendarService(client)
+primary = calendar.primary_calendar()
+print(primary.calendar.calendar_id)
+
+events = calendar.list_events(primary.calendar.calendar_id, page_size=10)
+print(events.items)
+```
+
 ## Main Objects
 
 - `FeishuClient` / `AsyncFeishuClient`: base Feishu API client
@@ -311,6 +337,7 @@ print(markdown[:200])
 - `DocxBlockService` / `AsyncDocxBlockService`: block CRUD, batch update, and content convert
 - `DriveFileService` / `AsyncDriveFileService`: drive files, import/export, and media APIs
 - `DrivePermissionService` / `AsyncDrivePermissionService`: members, public settings, password, and owner transfer
+- `CalendarService` / `AsyncCalendarService`: calendars, events, freebusy, and CalDAV config
 - `MessageService` / `AsyncMessageService`: message management
 - `MediaService` / `AsyncMediaService`: media resources
 - `FeishuBotServer`: long-connection server wrapper (handlers + lifecycle + status)

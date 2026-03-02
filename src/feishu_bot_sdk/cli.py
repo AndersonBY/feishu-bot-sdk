@@ -12,10 +12,11 @@ import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 from .bitable import BitableService
 from .bot import BotService
+from .calendar import CalendarService
 from .config import FeishuConfig
 from .docs_content import DocContentService
 from .docx import DocxService
@@ -52,6 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.required = True
 
     _build_auth_commands(subparsers, shared)
+    _build_oauth_commands(subparsers, shared)
     _build_bot_commands(subparsers, shared)
     _build_im_commands(subparsers, shared)
     _build_media_commands(subparsers, shared)
@@ -59,6 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     _build_docx_commands(subparsers, shared)
     _build_drive_commands(subparsers, shared)
     _build_wiki_commands(subparsers, shared)
+    _build_calendar_commands(subparsers, shared)
     _build_webhook_commands(subparsers, shared)
     _build_ws_commands(subparsers, shared)
     _build_server_commands(subparsers, shared)
@@ -102,7 +105,15 @@ def _add_global_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--app-id", help="Feishu app_id")
     parser.add_argument("--app-secret", help="Feishu app_secret")
-    parser.add_argument("--tenant-access-token", help="Use an existing tenant access token directly")
+    parser.add_argument(
+        "--auth-mode",
+        choices=("tenant", "user"),
+        help="Auth mode for API calls. Default: tenant",
+    )
+    parser.add_argument("--access-token", help="Static access token for selected auth mode")
+    parser.add_argument("--app-access-token", help="Static app_access_token for OAuth token exchange")
+    parser.add_argument("--user-access-token", help="Static user_access_token")
+    parser.add_argument("--user-refresh-token", help="User refresh_token for auto refresh")
     parser.add_argument("--base-url", help=f"Feishu OpenAPI base url. Default: {_DEFAULT_BASE_URL}")
     parser.add_argument("--timeout", type=float, help=f"HTTP timeout seconds. Default: {_DEFAULT_TIMEOUT_SECONDS}")
 
@@ -115,7 +126,7 @@ def _build_auth_commands(
     auth_sub = auth_parser.add_subparsers(dest="auth_command")
     auth_sub.required = True
 
-    token_parser = auth_sub.add_parser("token", help="Get tenant access token", parents=[shared])
+    token_parser = auth_sub.add_parser("token", help="Get access token for current auth mode", parents=[shared])
     token_parser.set_defaults(handler=_cmd_auth_token)
 
     request_parser = auth_sub.add_parser("request", help="Send a raw Feishu OpenAPI request", parents=[shared])
@@ -128,6 +139,33 @@ def _build_auth_commands(
     request_parser.add_argument("--payload-file", help="Request body JSON file path")
     request_parser.add_argument("--payload-stdin", action="store_true", help="Read request body JSON from stdin")
     request_parser.set_defaults(handler=_cmd_auth_request)
+
+
+def _build_oauth_commands(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    shared: argparse.ArgumentParser,
+) -> None:
+    oauth_parser = subparsers.add_parser("oauth", help="OAuth user token operations")
+    oauth_sub = oauth_parser.add_subparsers(dest="oauth_command")
+    oauth_sub.required = True
+
+    authorize_url = oauth_sub.add_parser("authorize-url", help="Build OAuth authorize URL", parents=[shared])
+    authorize_url.add_argument("--redirect-uri", required=True, help="OAuth redirect URI")
+    authorize_url.add_argument("--scope", help="OAuth scope string")
+    authorize_url.add_argument("--state", help="OAuth state value")
+    authorize_url.set_defaults(handler=_cmd_oauth_authorize_url)
+
+    exchange_code = oauth_sub.add_parser("exchange-code", help="Exchange authorization code", parents=[shared])
+    exchange_code.add_argument("--code", required=True, help="OAuth authorization code")
+    exchange_code.add_argument("--grant-type", default="authorization_code", help="Grant type")
+    exchange_code.set_defaults(handler=_cmd_oauth_exchange_code)
+
+    refresh_token = oauth_sub.add_parser("refresh-token", help="Refresh user access token", parents=[shared])
+    refresh_token.add_argument("--refresh-token", help="OAuth refresh token")
+    refresh_token.set_defaults(handler=_cmd_oauth_refresh_token)
+
+    user_info = oauth_sub.add_parser("user-info", help="Get user profile via user_access_token", parents=[shared])
+    user_info.set_defaults(handler=_cmd_oauth_user_info)
 
 
 def _build_bot_commands(
@@ -436,6 +474,176 @@ def _build_wiki_commands(
     list_nodes.set_defaults(handler=_cmd_wiki_list_nodes)
 
 
+def _build_calendar_commands(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    shared: argparse.ArgumentParser,
+) -> None:
+    calendar_parser = subparsers.add_parser(
+        "calendar",
+        help="Calendar operations",
+        description=(
+            "Calendar operations.\n"
+            "Tip: for event attachments, prefer `calendar attach-material` "
+            "to avoid attachment token permission issues."
+        ),
+    )
+    calendar_sub = calendar_parser.add_subparsers(dest="calendar_command")
+    calendar_sub.required = True
+
+    primary = calendar_sub.add_parser("primary", help="Get primary calendar", parents=[shared])
+    primary.add_argument("--user-id-type", help="Optional user_id_type")
+    primary.set_defaults(handler=_cmd_calendar_primary)
+
+    list_calendars = calendar_sub.add_parser("list-calendars", help="List calendars", parents=[shared])
+    list_calendars.add_argument("--page-size", type=int, help="Page size")
+    list_calendars.add_argument("--page-token", help="Page token")
+    list_calendars.add_argument("--sync-token", help="Sync token")
+    list_calendars.set_defaults(handler=_cmd_calendar_list_calendars)
+
+    get_calendar = calendar_sub.add_parser("get-calendar", help="Get calendar by id", parents=[shared])
+    get_calendar.add_argument("--calendar-id", required=True, help="Calendar id")
+    get_calendar.set_defaults(handler=_cmd_calendar_get_calendar)
+
+    create_calendar = calendar_sub.add_parser("create-calendar", help="Create calendar", parents=[shared])
+    create_calendar.add_argument("--calendar-json", help="Calendar JSON object string")
+    create_calendar.add_argument("--calendar-file", help="Calendar JSON file path")
+    create_calendar.add_argument("--calendar-stdin", action="store_true", help="Read calendar JSON from stdin")
+    create_calendar.set_defaults(handler=_cmd_calendar_create_calendar)
+
+    update_calendar = calendar_sub.add_parser("update-calendar", help="Update calendar", parents=[shared])
+    update_calendar.add_argument("--calendar-id", required=True, help="Calendar id")
+    update_calendar.add_argument("--calendar-json", help="Calendar JSON object string")
+    update_calendar.add_argument("--calendar-file", help="Calendar JSON file path")
+    update_calendar.add_argument("--calendar-stdin", action="store_true", help="Read calendar JSON from stdin")
+    update_calendar.set_defaults(handler=_cmd_calendar_update_calendar)
+
+    delete_calendar = calendar_sub.add_parser("delete-calendar", help="Delete calendar", parents=[shared])
+    delete_calendar.add_argument("--calendar-id", required=True, help="Calendar id")
+    delete_calendar.set_defaults(handler=_cmd_calendar_delete_calendar)
+
+    search_calendars = calendar_sub.add_parser("search-calendars", help="Search calendars", parents=[shared])
+    search_calendars.add_argument("--query", required=True, help="Search query")
+    search_calendars.add_argument("--page-size", type=int, help="Page size")
+    search_calendars.add_argument("--page-token", help="Page token")
+    search_calendars.set_defaults(handler=_cmd_calendar_search_calendars)
+
+    list_events = calendar_sub.add_parser("list-events", help="List events in a calendar", parents=[shared])
+    list_events.add_argument("--calendar-id", required=True, help="Calendar id")
+    list_events.add_argument("--page-size", type=int, help="Page size")
+    list_events.add_argument("--page-token", help="Page token")
+    list_events.add_argument("--sync-token", help="Sync token")
+    list_events.add_argument("--start-time", help="Start time (unix seconds)")
+    list_events.add_argument("--end-time", help="End time (unix seconds)")
+    list_events.add_argument("--anchor-time", help="Anchor time (unix seconds)")
+    list_events.add_argument("--user-id-type", help="Optional user_id_type")
+    list_events.set_defaults(handler=_cmd_calendar_list_events)
+
+    get_event = calendar_sub.add_parser("get-event", help="Get event by id", parents=[shared])
+    get_event.add_argument("--calendar-id", required=True, help="Calendar id")
+    get_event.add_argument("--event-id", required=True, help="Event id")
+    get_event.add_argument("--need-attendee", action="store_true", help="Include attendees")
+    get_event.add_argument("--need-meeting-settings", action="store_true", help="Include meeting settings")
+    get_event.add_argument("--max-attendee-num", type=int, help="Max attendee count")
+    get_event.add_argument("--user-id-type", help="Optional user_id_type")
+    get_event.set_defaults(handler=_cmd_calendar_get_event)
+
+    create_event = calendar_sub.add_parser("create-event", help="Create event", parents=[shared])
+    create_event.add_argument("--calendar-id", required=True, help="Calendar id")
+    create_event.add_argument("--event-json", help="Event JSON object string")
+    create_event.add_argument("--event-file", help="Event JSON file path")
+    create_event.add_argument("--event-stdin", action="store_true", help="Read event JSON from stdin")
+    create_event.add_argument("--user-id-type", help="Optional user_id_type")
+    create_event.add_argument("--idempotency-key", help="Optional idempotency key")
+    create_event.set_defaults(handler=_cmd_calendar_create_event)
+
+    update_event = calendar_sub.add_parser("update-event", help="Update event", parents=[shared])
+    update_event.add_argument("--calendar-id", required=True, help="Calendar id")
+    update_event.add_argument("--event-id", required=True, help="Event id")
+    update_event.add_argument("--event-json", help="Event JSON object string")
+    update_event.add_argument("--event-file", help="Event JSON file path")
+    update_event.add_argument("--event-stdin", action="store_true", help="Read event JSON from stdin")
+    update_event.add_argument("--user-id-type", help="Optional user_id_type")
+    update_event.set_defaults(handler=_cmd_calendar_update_event)
+
+    attach_material = calendar_sub.add_parser(
+        "attach-material",
+        help="Upload a file as calendar material and attach to event",
+        parents=[shared],
+        description=(
+            "Upload material for a calendar event and update event attachments.\n"
+            "This command auto uses `parent_type=calendar` and `parent_node=<calendar_id>` "
+            "when uploading media."
+        ),
+    )
+    attach_material.add_argument("--calendar-id", required=True, help="Calendar id")
+    attach_material.add_argument("--event-id", required=True, help="Event id")
+    attach_material.add_argument("--path", required=True, help="Local file path to upload")
+    attach_material.add_argument("--file-name", help="Override uploaded file name")
+    attach_material.add_argument("--content-type", help="Override file content type")
+    attach_material.add_argument(
+        "--mode",
+        choices=("append", "replace"),
+        default="append",
+        help="append keeps existing attachments; replace overwrites all (default: append)",
+    )
+    attach_material.add_argument(
+        "--need-notification",
+        choices=("true", "false"),
+        help="Whether to notify attendees on update",
+    )
+    attach_material.add_argument("--user-id-type", help="Optional user_id_type")
+    attach_material.set_defaults(handler=_cmd_calendar_attach_material)
+
+    delete_event = calendar_sub.add_parser("delete-event", help="Delete event", parents=[shared])
+    delete_event.add_argument("--calendar-id", required=True, help="Calendar id")
+    delete_event.add_argument("--event-id", required=True, help="Event id")
+    delete_event.add_argument(
+        "--need-notification",
+        choices=("true", "false"),
+        help="Whether to notify attendees",
+    )
+    delete_event.set_defaults(handler=_cmd_calendar_delete_event)
+
+    search_events = calendar_sub.add_parser("search-events", help="Search events in a calendar", parents=[shared])
+    search_events.add_argument("--calendar-id", required=True, help="Calendar id")
+    search_events.add_argument("--query", required=True, help="Search query")
+    search_events.add_argument("--filter-json", help="Search filter JSON object string")
+    search_events.add_argument("--filter-file", help="Search filter JSON file path")
+    search_events.add_argument("--filter-stdin", action="store_true", help="Read search filter JSON from stdin")
+    search_events.add_argument("--page-size", type=int, help="Page size")
+    search_events.add_argument("--page-token", help="Page token")
+    search_events.add_argument("--user-id-type", help="Optional user_id_type")
+    search_events.set_defaults(handler=_cmd_calendar_search_events)
+
+    reply_event = calendar_sub.add_parser("reply-event", help="Reply to an event", parents=[shared])
+    reply_event.add_argument("--calendar-id", required=True, help="Calendar id")
+    reply_event.add_argument("--event-id", required=True, help="Event id")
+    reply_event.add_argument("--reply-json", help="Reply JSON object string")
+    reply_event.add_argument("--reply-file", help="Reply JSON file path")
+    reply_event.add_argument("--reply-stdin", action="store_true", help="Read reply JSON from stdin")
+    reply_event.set_defaults(handler=_cmd_calendar_reply_event)
+
+    freebusy = calendar_sub.add_parser("list-freebusy", help="Query freebusy", parents=[shared])
+    freebusy.add_argument("--request-json", help="Request JSON object string")
+    freebusy.add_argument("--request-file", help="Request JSON file path")
+    freebusy.add_argument("--request-stdin", action="store_true", help="Read request JSON from stdin")
+    freebusy.add_argument("--user-id-type", help="Optional user_id_type")
+    freebusy.set_defaults(handler=_cmd_calendar_list_freebusy)
+
+    batch_freebusy = calendar_sub.add_parser("batch-freebusy", help="Query freebusy in batch", parents=[shared])
+    batch_freebusy.add_argument("--request-json", help="Request JSON object string")
+    batch_freebusy.add_argument("--request-file", help="Request JSON file path")
+    batch_freebusy.add_argument("--request-stdin", action="store_true", help="Read request JSON from stdin")
+    batch_freebusy.add_argument("--user-id-type", help="Optional user_id_type")
+    batch_freebusy.set_defaults(handler=_cmd_calendar_batch_freebusy)
+
+    caldav = calendar_sub.add_parser("generate-caldav-conf", help="Generate CalDAV config", parents=[shared])
+    caldav.add_argument("--request-json", help="Request JSON object string")
+    caldav.add_argument("--request-file", help="Request JSON file path")
+    caldav.add_argument("--request-stdin", action="store_true", help="Read request JSON from stdin")
+    caldav.set_defaults(handler=_cmd_calendar_generate_caldav_conf)
+
+
 def _build_webhook_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
     shared: argparse.ArgumentParser,
@@ -688,7 +896,10 @@ def _add_webhook_body_args(parser: argparse.ArgumentParser) -> None:
 
 def _cmd_auth_token(args: argparse.Namespace) -> Mapping[str, Any]:
     client = _build_client(args)
-    return {"tenant_access_token": client.get_tenant_access_token()}
+    return {
+        "auth_mode": client.config.auth_mode,
+        "access_token": client.get_access_token(),
+    }
 
 
 def _cmd_auth_request(args: argparse.Namespace) -> Mapping[str, Any]:
@@ -715,6 +926,34 @@ def _cmd_auth_request(args: argparse.Namespace) -> Mapping[str, Any]:
         params=params or None,
         payload=payload or None,
     )
+
+
+def _cmd_oauth_authorize_url(args: argparse.Namespace) -> Mapping[str, Any]:
+    client = _build_client(args)
+    url = client.build_authorize_url(
+        redirect_uri=str(args.redirect_uri),
+        scope=getattr(args, "scope", None),
+        state=getattr(args, "state", None),
+    )
+    return {"authorize_url": url}
+
+
+def _cmd_oauth_exchange_code(args: argparse.Namespace) -> Any:
+    client = _build_client(args)
+    return client.exchange_authorization_code(
+        str(args.code),
+        grant_type=str(args.grant_type),
+    )
+
+
+def _cmd_oauth_refresh_token(args: argparse.Namespace) -> Any:
+    client = _build_client(args)
+    return client.refresh_user_access_token(refresh_token=getattr(args, "refresh_token", None))
+
+
+def _cmd_oauth_user_info(args: argparse.Namespace) -> Any:
+    client = _build_client(args)
+    return client.get_user_info(user_access_token=getattr(args, "user_access_token", None))
 
 
 def _cmd_bot_info(args: argparse.Namespace) -> Any:
@@ -1050,6 +1289,284 @@ def _cmd_wiki_list_nodes(args: argparse.Namespace) -> Mapping[str, Any]:
         page_size=getattr(args, "page_size", None),
         page_token=getattr(args, "page_token", None),
     )
+
+
+def _cmd_calendar_primary(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = CalendarService(_build_client(args))
+    return service.primary_calendar(user_id_type=getattr(args, "user_id_type", None))
+
+
+def _cmd_calendar_list_calendars(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = CalendarService(_build_client(args))
+    return service.list_calendars(
+        page_size=getattr(args, "page_size", None),
+        page_token=getattr(args, "page_token", None),
+        sync_token=getattr(args, "sync_token", None),
+    )
+
+
+def _cmd_calendar_get_calendar(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = CalendarService(_build_client(args))
+    return service.get_calendar(str(args.calendar_id))
+
+
+def _cmd_calendar_create_calendar(args: argparse.Namespace) -> Mapping[str, Any]:
+    calendar = _parse_json_object(
+        json_text=getattr(args, "calendar_json", None),
+        file_path=getattr(args, "calendar_file", None),
+        stdin_enabled=bool(getattr(args, "calendar_stdin", False)),
+        name="calendar",
+        required=True,
+    )
+    service = CalendarService(_build_client(args))
+    return service.create_calendar(calendar)
+
+
+def _cmd_calendar_update_calendar(args: argparse.Namespace) -> Mapping[str, Any]:
+    calendar = _parse_json_object(
+        json_text=getattr(args, "calendar_json", None),
+        file_path=getattr(args, "calendar_file", None),
+        stdin_enabled=bool(getattr(args, "calendar_stdin", False)),
+        name="calendar",
+        required=True,
+    )
+    service = CalendarService(_build_client(args))
+    return service.update_calendar(str(args.calendar_id), calendar)
+
+
+def _cmd_calendar_delete_calendar(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = CalendarService(_build_client(args))
+    return service.delete_calendar(str(args.calendar_id))
+
+
+def _cmd_calendar_search_calendars(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = CalendarService(_build_client(args))
+    return service.search_calendars(
+        str(args.query),
+        page_size=getattr(args, "page_size", None),
+        page_token=getattr(args, "page_token", None),
+    )
+
+
+def _cmd_calendar_list_events(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = CalendarService(_build_client(args))
+    return service.list_events(
+        str(args.calendar_id),
+        page_size=getattr(args, "page_size", None),
+        page_token=getattr(args, "page_token", None),
+        sync_token=getattr(args, "sync_token", None),
+        start_time=getattr(args, "start_time", None),
+        end_time=getattr(args, "end_time", None),
+        anchor_time=getattr(args, "anchor_time", None),
+        user_id_type=getattr(args, "user_id_type", None),
+    )
+
+
+def _cmd_calendar_get_event(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = CalendarService(_build_client(args))
+    return service.get_event(
+        str(args.calendar_id),
+        str(args.event_id),
+        need_meeting_settings=True if bool(getattr(args, "need_meeting_settings", False)) else None,
+        need_attendee=True if bool(getattr(args, "need_attendee", False)) else None,
+        max_attendee_num=getattr(args, "max_attendee_num", None),
+        user_id_type=getattr(args, "user_id_type", None),
+    )
+
+
+def _cmd_calendar_create_event(args: argparse.Namespace) -> Mapping[str, Any]:
+    event = _parse_json_object(
+        json_text=getattr(args, "event_json", None),
+        file_path=getattr(args, "event_file", None),
+        stdin_enabled=bool(getattr(args, "event_stdin", False)),
+        name="event",
+        required=True,
+    )
+    service = CalendarService(_build_client(args))
+    return service.create_event(
+        str(args.calendar_id),
+        event,
+        user_id_type=getattr(args, "user_id_type", None),
+        idempotency_key=getattr(args, "idempotency_key", None),
+    )
+
+
+def _cmd_calendar_update_event(args: argparse.Namespace) -> Mapping[str, Any]:
+    event = _parse_json_object(
+        json_text=getattr(args, "event_json", None),
+        file_path=getattr(args, "event_file", None),
+        stdin_enabled=bool(getattr(args, "event_stdin", False)),
+        name="event",
+        required=True,
+    )
+    service = CalendarService(_build_client(args))
+    return service.update_event(
+        str(args.calendar_id),
+        str(args.event_id),
+        event,
+        user_id_type=getattr(args, "user_id_type", None),
+    )
+
+
+def _cmd_calendar_attach_material(args: argparse.Namespace) -> Mapping[str, Any]:
+    calendar_id = str(args.calendar_id)
+    event_id = str(args.event_id)
+    mode = str(getattr(args, "mode", "append")).strip().lower()
+    need_notification_raw = getattr(args, "need_notification", None)
+    need_notification: Optional[bool]
+    if need_notification_raw is None:
+        need_notification = None
+    else:
+        need_notification = str(need_notification_raw).lower() == "true"
+
+    client = _build_client(args)
+    drive = DriveFileService(client)
+    calendar = CalendarService(client)
+
+    upload_result = drive.upload_media(
+        str(args.path),
+        parent_type="calendar",
+        parent_node=calendar_id,
+        file_name=getattr(args, "file_name", None),
+        content_type=getattr(args, "content_type", None),
+    )
+    upload_data = _extract_response_data(upload_result)
+    file_token_value = upload_data.get("file_token")
+    if not isinstance(file_token_value, str) or not file_token_value:
+        raise ValueError("upload material succeeded but file_token is missing in response")
+    file_token = file_token_value
+
+    attachments: list[dict[str, Any]] = []
+    if mode == "append":
+        event_result = calendar.get_event(
+            calendar_id,
+            event_id,
+            user_id_type=getattr(args, "user_id_type", None),
+        )
+        event_data = _extract_response_data(event_result)
+        event_payload = event_data.get("event")
+        if isinstance(event_payload, Mapping):
+            attachments = _normalize_calendar_attachments(event_payload.get("attachments"))
+
+    attachment_name = upload_data.get("name")
+    if not isinstance(attachment_name, str) or not attachment_name:
+        attachment_name = getattr(args, "file_name", None)
+    attachments = _merge_calendar_attachment(
+        attachments,
+        file_token=file_token,
+        name=attachment_name,
+    )
+
+    event_payload: dict[str, object] = {"attachments": attachments}
+    if need_notification is not None:
+        event_payload["need_notification"] = need_notification
+
+    update_result = calendar.update_event(
+        calendar_id,
+        event_id,
+        event_payload,
+        user_id_type=getattr(args, "user_id_type", None),
+    )
+    update_data = _extract_response_data(update_result)
+    update_event_raw = update_data.get("event")
+    updated_event_payload = (
+        {str(key): value for key, value in update_event_raw.items()}
+        if isinstance(update_event_raw, Mapping)
+        else {}
+    )
+
+    return {
+        "calendar_id": calendar_id,
+        "event_id": event_id,
+        "mode": mode,
+        "file_token": file_token,
+        "uploaded_name": attachment_name,
+        "attachments_count": len(attachments),
+        "attachments": attachments,
+        "updated_event": updated_event_payload,
+    }
+
+
+def _cmd_calendar_delete_event(args: argparse.Namespace) -> Mapping[str, Any]:
+    raw_need_notification = getattr(args, "need_notification", None)
+    need_notification: Optional[bool]
+    if raw_need_notification is None:
+        need_notification = None
+    else:
+        need_notification = str(raw_need_notification).lower() == "true"
+    service = CalendarService(_build_client(args))
+    return service.delete_event(
+        str(args.calendar_id),
+        str(args.event_id),
+        need_notification=need_notification,
+    )
+
+
+def _cmd_calendar_search_events(args: argparse.Namespace) -> Mapping[str, Any]:
+    search_filter = _parse_json_object(
+        json_text=getattr(args, "filter_json", None),
+        file_path=getattr(args, "filter_file", None),
+        stdin_enabled=bool(getattr(args, "filter_stdin", False)),
+        name="filter",
+        required=False,
+    )
+    service = CalendarService(_build_client(args))
+    return service.search_events(
+        str(args.calendar_id),
+        str(args.query),
+        page_size=getattr(args, "page_size", None),
+        page_token=getattr(args, "page_token", None),
+        user_id_type=getattr(args, "user_id_type", None),
+        search_filter=search_filter or None,
+    )
+
+
+def _cmd_calendar_reply_event(args: argparse.Namespace) -> Mapping[str, Any]:
+    reply = _parse_json_object(
+        json_text=getattr(args, "reply_json", None),
+        file_path=getattr(args, "reply_file", None),
+        stdin_enabled=bool(getattr(args, "reply_stdin", False)),
+        name="reply",
+        required=True,
+    )
+    service = CalendarService(_build_client(args))
+    return service.reply_event(str(args.calendar_id), str(args.event_id), reply)
+
+
+def _cmd_calendar_list_freebusy(args: argparse.Namespace) -> Mapping[str, Any]:
+    request = _parse_json_object(
+        json_text=getattr(args, "request_json", None),
+        file_path=getattr(args, "request_file", None),
+        stdin_enabled=bool(getattr(args, "request_stdin", False)),
+        name="request",
+        required=True,
+    )
+    service = CalendarService(_build_client(args))
+    return service.list_freebusy(request, user_id_type=getattr(args, "user_id_type", None))
+
+
+def _cmd_calendar_batch_freebusy(args: argparse.Namespace) -> Mapping[str, Any]:
+    request = _parse_json_object(
+        json_text=getattr(args, "request_json", None),
+        file_path=getattr(args, "request_file", None),
+        stdin_enabled=bool(getattr(args, "request_stdin", False)),
+        name="request",
+        required=True,
+    )
+    service = CalendarService(_build_client(args))
+    return service.batch_freebusy(request, user_id_type=getattr(args, "user_id_type", None))
+
+
+def _cmd_calendar_generate_caldav_conf(args: argparse.Namespace) -> Mapping[str, Any]:
+    request = _parse_json_object(
+        json_text=getattr(args, "request_json", None),
+        file_path=getattr(args, "request_file", None),
+        stdin_enabled=bool(getattr(args, "request_stdin", False)),
+        name="request",
+        required=True,
+    )
+    service = CalendarService(_build_client(args))
+    return service.generate_caldav_conf(request)
 
 
 def _cmd_webhook_decode(args: argparse.Namespace) -> Mapping[str, Any]:
@@ -1430,26 +1947,82 @@ def _build_client(args: argparse.Namespace) -> FeishuClient:
 def _build_config(args: argparse.Namespace) -> FeishuConfig:
     env_app_id = os.getenv("FEISHU_APP_ID") or os.getenv("APP_ID")
     env_app_secret = os.getenv("FEISHU_APP_SECRET") or os.getenv("APP_SECRET")
-    env_token = os.getenv("FEISHU_TENANT_ACCESS_TOKEN")
+    env_auth_mode = os.getenv("FEISHU_AUTH_MODE")
+    env_access_token = os.getenv("FEISHU_ACCESS_TOKEN")
+    env_user_access_token = os.getenv("FEISHU_USER_ACCESS_TOKEN")
+    env_user_refresh_token = os.getenv("FEISHU_USER_REFRESH_TOKEN")
+    env_app_access_token = os.getenv("FEISHU_APP_ACCESS_TOKEN")
     env_base_url = os.getenv("FEISHU_BASE_URL")
 
     app_id = env_app_id or getattr(args, "app_id", None)
     app_secret = env_app_secret or getattr(args, "app_secret", None)
-    tenant_access_token = env_token or getattr(args, "tenant_access_token", None)
+    auth_mode = (env_auth_mode or getattr(args, "auth_mode", None) or "tenant").strip().lower()
     base_url = getattr(args, "base_url", None) or env_base_url or _DEFAULT_BASE_URL
+    app_access_token = env_app_access_token or getattr(args, "app_access_token", None)
+    user_access_token = env_user_access_token or getattr(args, "user_access_token", None)
+    user_refresh_token = env_user_refresh_token or getattr(args, "user_refresh_token", None)
+    generic_access_token = env_access_token or getattr(args, "access_token", None)
+    resolved_access_token = generic_access_token
 
     timeout_seconds = _resolve_timeout_seconds(args)
 
-    if not tenant_access_token and (not app_id or not app_secret):
-        raise ConfigurationError(
-            "missing credentials: set FEISHU_APP_ID/FEISHU_APP_SECRET env vars, "
-            "or pass --app-id and --app-secret"
+    if auth_mode not in {"tenant", "user"}:
+        raise ConfigurationError("invalid auth mode: FEISHU_AUTH_MODE/--auth-mode must be 'tenant' or 'user'")
+
+    if getattr(args, "group", None) == "oauth":
+        oauth_command = str(getattr(args, "oauth_command", ""))
+        if oauth_command == "authorize-url":
+            if not app_id:
+                raise ConfigurationError("oauth authorize-url requires app_id")
+        elif oauth_command in {"exchange-code", "refresh-token"}:
+            if not (app_access_token or (app_id and app_secret)):
+                raise ConfigurationError("oauth token exchange requires app_access_token or app_id/app_secret")
+        elif oauth_command == "user-info":
+            if not resolved_access_token and not user_access_token and not user_refresh_token:
+                raise ConfigurationError(
+                    "oauth user-info requires user_access_token/access_token or user_refresh_token"
+                )
+            if user_refresh_token and not (app_access_token or (app_id and app_secret)):
+                raise ConfigurationError(
+                    "refreshing user token requires app_access_token or app_id/app_secret"
+                )
+        return FeishuConfig(
+            app_id=app_id,
+            app_secret=app_secret,
+            auth_mode=auth_mode,
+            access_token=resolved_access_token,
+            app_access_token=app_access_token,
+            user_access_token=user_access_token,
+            user_refresh_token=user_refresh_token,
+            base_url=base_url,
+            timeout_seconds=timeout_seconds,
         )
+
+    if auth_mode == "tenant":
+        if not resolved_access_token and (not app_id or not app_secret):
+            raise ConfigurationError(
+                "tenant mode requires either access_token or app_id/app_secret"
+            )
+    else:
+        if not resolved_access_token:
+            resolved_access_token = user_access_token
+        if not resolved_access_token and not user_refresh_token:
+            raise ConfigurationError(
+                "user mode requires user_access_token/access_token or user_refresh_token"
+            )
+        if user_refresh_token and not (app_access_token or (app_id and app_secret)):
+            raise ConfigurationError(
+                "refreshing user token requires app_access_token or app_id/app_secret"
+            )
 
     return FeishuConfig(
         app_id=app_id,
         app_secret=app_secret,
-        tenant_access_token=tenant_access_token,
+        auth_mode=auth_mode,
+        access_token=resolved_access_token,
+        app_access_token=app_access_token,
+        user_access_token=user_access_token,
+        user_refresh_token=user_refresh_token,
         base_url=base_url,
         timeout_seconds=timeout_seconds,
     )
@@ -1923,6 +2496,13 @@ def _format_http_error(exc: HTTPRequestError) -> str:
         parts.append(f"status_code={exc.status_code}")
     if exc.response_text:
         parts.append(f"response={exc.response_text[:500]}")
+        response_lower = exc.response_text.lower()
+        if '"code":193107' in response_lower or "no permission to access attachment file token" in response_lower:
+            parts.append(
+                "hint=calendar attachments require media upload with "
+                "parent_type='calendar' and parent_node='<calendar_id>'; "
+                "prefer `feishu calendar attach-material`."
+            )
     return "; ".join(parts)
 
 
@@ -1948,6 +2528,61 @@ def _to_jsonable(value: Any) -> Any:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
     return value
+
+
+def _extract_response_data(value: Any) -> dict[str, Any]:
+    payload = _to_jsonable(value)
+    if not isinstance(payload, Mapping):
+        return {}
+    data = payload.get("data")
+    if isinstance(data, Mapping):
+        return {str(key): inner for key, inner in data.items()}
+    return {
+        str(key): inner
+        for key, inner in payload.items()
+        if key not in {"code", "msg"}
+    }
+
+
+def _normalize_calendar_attachments(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    attachments: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            continue
+        file_token_value = item.get("file_token")
+        if not isinstance(file_token_value, str) or not file_token_value:
+            continue
+        attachment: dict[str, Any] = {"file_token": file_token_value}
+        name = item.get("name")
+        if isinstance(name, str) and name:
+            attachment["name"] = name
+        is_deleted = item.get("is_deleted")
+        if isinstance(is_deleted, bool):
+            attachment["is_deleted"] = is_deleted
+        attachments.append(attachment)
+    return attachments
+
+
+def _merge_calendar_attachment(
+    attachments: list[dict[str, Any]],
+    *,
+    file_token: str,
+    name: Optional[str],
+) -> list[dict[str, Any]]:
+    merged = [dict(item) for item in attachments]
+    for item in merged:
+        if item.get("file_token") != file_token:
+            continue
+        if isinstance(name, str) and name:
+            item["name"] = name
+        return merged
+    new_item: dict[str, Any] = {"file_token": file_token}
+    if isinstance(name, str) and name:
+        new_item["name"] = name
+    merged.append(new_item)
+    return merged
 
 
 def _system_exit_code(exc: SystemExit) -> int:

@@ -34,7 +34,11 @@ await client.aclose()
 
 - `app_id` / `app_secret`: app credentials.
 - `base_url`: default is `https://open.feishu.cn/open-apis`.
-- `tenant_access_token`: optional pre-injected token.
+- `auth_mode`: `tenant` or `user` (default: `tenant`).
+- `access_token`: optional static access token for current `auth_mode`.
+- `app_access_token`: optional app token for OAuth token exchange endpoints.
+- `user_access_token`: optional user access token.
+- `user_refresh_token`: optional user refresh token for auto refresh.
 - `doc_url_prefix`: used when generating doc URLs.
 - `doc_folder_token`: default folder for doc creation.
 - `member_permission`: default permission for grant helpers (commonly `edit`).
@@ -46,9 +50,38 @@ await client.aclose()
 
 Both `FeishuClient` and `AsyncFeishuClient` provide:
 
-- `get_tenant_access_token()`
+- `get_access_token()`
+- `get_app_access_token()`
+- `build_authorize_url()`
+- `exchange_authorization_code()`
+- `refresh_user_access_token()`
+- `get_user_info()`
 - `send_text_message(receive_id, receive_id_type, text)`
 - `request_json(method, path, payload=None, params=None)`
+
+## Recommended Auth Modes
+
+Tenant mode (typical bot backend):
+
+```python
+config = FeishuConfig(
+    app_id="cli_xxx",
+    app_secret="xxx",
+    auth_mode="tenant",
+)
+```
+
+User mode (typical OAuth workflow):
+
+```python
+config = FeishuConfig(
+    app_id="cli_xxx",
+    app_secret="xxx",
+    auth_mode="user",
+    user_access_token="u-xxx",
+    user_refresh_token="r-xxx",
+)
+```
 
 ## Generic Request Example
 

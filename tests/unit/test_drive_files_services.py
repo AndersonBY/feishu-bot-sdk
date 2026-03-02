@@ -43,7 +43,7 @@ class _SyncClientStub:
         self.calls.append(call)
         return self._resolver(call)
 
-    def get_tenant_access_token(self) -> str:
+    def get_access_token(self) -> str:
         return "tenant-token"
 
 
@@ -70,7 +70,7 @@ class _AsyncClientStub:
         self.calls.append(call)
         return self._resolver(call)
 
-    async def get_tenant_access_token(self) -> str:
+    async def get_access_token(self) -> str:
         return "tenant-token"
 
 

@@ -592,7 +592,7 @@ def _upload_docx_image(
     image_bytes: bytes,
     file_name: str,
 ) -> str:
-    token = client.get_tenant_access_token()
+    token = client.get_access_token()
     url = f"{client.config.base_url}/drive/v1/medias/upload_all"
     data = {
         "file_name": file_name,
@@ -622,7 +622,7 @@ async def _upload_docx_image_async(
     image_bytes: bytes,
     file_name: str,
 ) -> str:
-    token = await client.get_tenant_access_token()
+    token = await client.get_access_token()
     url = f"{client.config.base_url}/drive/v1/medias/upload_all"
     data = {
         "file_name": file_name,

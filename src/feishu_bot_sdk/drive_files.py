@@ -354,7 +354,7 @@ class DriveFileService:
         files: Optional[Mapping[str, Any]] = None,
         params: Optional[Mapping[str, object]] = None,
     ) -> httpx.Response:
-        token = self._client.get_tenant_access_token()
+        token = self._client.get_access_token()
         headers = {"Authorization": f"Bearer {token}"}
         url = f"{self._client.config.base_url}{path}"
         with httpx.Client(timeout=self._client.config.timeout_seconds) as client:
@@ -691,7 +691,7 @@ class AsyncDriveFileService:
         files: Optional[Mapping[str, Any]] = None,
         params: Optional[Mapping[str, object]] = None,
     ) -> httpx.Response:
-        token = await self._client.get_tenant_access_token()
+        token = await self._client.get_access_token()
         headers = {"Authorization": f"Bearer {token}"}
         url = f"{self._client.config.base_url}{path}"
         async with httpx.AsyncClient(timeout=self._client.config.timeout_seconds) as client:
