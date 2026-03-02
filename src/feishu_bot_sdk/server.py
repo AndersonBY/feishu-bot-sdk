@@ -13,6 +13,10 @@ from .events import (
     P2CardActionTrigger,
     P2DriveFileBitableFieldChangedV1,
     P2DriveFileBitableRecordChangedV1,
+    P2ImMessageReactionCreatedV1,
+    P2ImMessageReactionDeletedV1,
+    P2ImMessageReadV1,
+    P2ImMessageRecalledV1,
     P2ImMessageReceiveV1,
     P2URLPreviewGet,
 )
@@ -108,6 +112,40 @@ class FeishuBotServer:
         handler: TSyncHandler[P2ImMessageReceiveV1] | TAsyncHandler[P2ImMessageReceiveV1],
     ) -> "FeishuBotServer":
         self._registry.on_im_message_receive(self._wrap_handler("im.message.receive_v1", handler))
+        return self
+
+    def on_im_message_read(
+        self,
+        handler: TSyncHandler[P2ImMessageReadV1] | TAsyncHandler[P2ImMessageReadV1],
+    ) -> "FeishuBotServer":
+        self._registry.on_im_message_read(self._wrap_handler("im.message.message_read_v1", handler))
+        return self
+
+    def on_im_message_recalled(
+        self,
+        handler: TSyncHandler[P2ImMessageRecalledV1] | TAsyncHandler[P2ImMessageRecalledV1],
+    ) -> "FeishuBotServer":
+        self._registry.on_im_message_recalled(self._wrap_handler("im.message.recalled_v1", handler))
+        return self
+
+    def on_im_message_reaction_created(
+        self,
+        handler: TSyncHandler[P2ImMessageReactionCreatedV1]
+        | TAsyncHandler[P2ImMessageReactionCreatedV1],
+    ) -> "FeishuBotServer":
+        self._registry.on_im_message_reaction_created(
+            self._wrap_handler("im.message.reaction.created_v1", handler)
+        )
+        return self
+
+    def on_im_message_reaction_deleted(
+        self,
+        handler: TSyncHandler[P2ImMessageReactionDeletedV1]
+        | TAsyncHandler[P2ImMessageReactionDeletedV1],
+    ) -> "FeishuBotServer":
+        self._registry.on_im_message_reaction_deleted(
+            self._wrap_handler("im.message.reaction.deleted_v1", handler)
+        )
         return self
 
     def on_bot_menu(
@@ -337,4 +375,3 @@ def _supported_signals() -> list[int]:
         if isinstance(sig, int):
             supported.append(sig)
     return supported
-

@@ -58,6 +58,11 @@ feishu im send-text --receive-id ou_xxx --text "hello from cli"
 # 3) 发送 Markdown 消息（从文件读取）
 feishu im send-markdown --receive-id ou_xxx --markdown-file ./msg.md
 
+# 3.1) 添加跟随气泡 / 转发话题 / 更新 URL 预览
+feishu im push-follow-up om_xxx --follow-ups-json '[{"content":"继续处理"}]' --format json
+feishu im forward-thread omt_xxx --receive-id-type chat_id --receive-id oc_xxx --format json
+feishu im update-url-previews --preview-token token_1 --preview-token token_2 --open-id ou_xxx --format json
+
 # 4) 回复 Markdown（JSON 输出）
 feishu im reply-markdown om_xxx --markdown "### 已收到" --format json
 

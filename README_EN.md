@@ -58,6 +58,11 @@ feishu im send-text --receive-id ou_xxx --text "hello from cli"
 # 3) Send markdown from file
 feishu im send-markdown --receive-id ou_xxx --markdown-file ./msg.md
 
+# 3.1) Push follow-up / forward thread / update URL previews
+feishu im push-follow-up om_xxx --follow-ups-json '[{"content":"continue"}]' --format json
+feishu im forward-thread omt_xxx --receive-id-type chat_id --receive-id oc_xxx --format json
+feishu im update-url-previews --preview-token token_1 --preview-token token_2 --open-id ou_xxx --format json
+
 # 4) Reply markdown (JSON output)
 feishu im reply-markdown om_xxx --markdown "### received" --format json
 

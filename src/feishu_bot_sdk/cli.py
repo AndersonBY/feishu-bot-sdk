@@ -244,6 +244,43 @@ def _build_im_commands(
     recall.add_argument("message_id", help="message_id")
     recall.set_defaults(handler=_cmd_im_recall)
 
+    push_follow_up = im_sub.add_parser(
+        "push-follow-up",
+        help="Add follow-up bubbles below a message",
+        parents=[shared],
+    )
+    push_follow_up.add_argument("message_id", help="message_id")
+    push_follow_up.add_argument("--follow-ups-json", help="Follow-up list JSON array string")
+    push_follow_up.add_argument("--follow-ups-file", help="Follow-up list JSON file path")
+    push_follow_up.add_argument("--follow-ups-stdin", action="store_true", help="Read follow-up list JSON from stdin")
+    push_follow_up.set_defaults(handler=_cmd_im_push_follow_up)
+
+    forward_thread = im_sub.add_parser("forward-thread", help="Forward thread to target", parents=[shared])
+    forward_thread.add_argument("thread_id", help="thread_id")
+    _add_receive_args(forward_thread)
+    forward_thread.add_argument("--uuid", help="Request uuid for deduplication")
+    forward_thread.set_defaults(handler=_cmd_im_forward_thread)
+
+    update_url_previews = im_sub.add_parser(
+        "update-url-previews",
+        help="Batch update URL previews",
+        parents=[shared],
+    )
+    update_url_previews.add_argument(
+        "--preview-token",
+        action="append",
+        dest="preview_tokens",
+        required=True,
+        help="Preview token from url.preview.get event, repeatable",
+    )
+    update_url_previews.add_argument(
+        "--open-id",
+        action="append",
+        dest="open_ids",
+        help="Optional open_id filter, repeatable",
+    )
+    update_url_previews.set_defaults(handler=_cmd_im_update_url_previews)
+
 
 def _build_media_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
@@ -1055,6 +1092,42 @@ def _cmd_im_recall(args: argparse.Namespace) -> Mapping[str, bool]:
     service = MessageService(_build_client(args))
     service.recall(str(args.message_id))
     return {"ok": True}
+
+
+def _cmd_im_push_follow_up(args: argparse.Namespace) -> Any:
+    follow_ups_raw = _parse_json_array(
+        json_text=getattr(args, "follow_ups_json", None),
+        file_path=getattr(args, "follow_ups_file", None),
+        stdin_enabled=bool(getattr(args, "follow_ups_stdin", False)),
+        name="follow-ups",
+        required=True,
+    )
+    follow_ups: list[Mapping[str, Any]] = []
+    for item in follow_ups_raw:
+        if not isinstance(item, Mapping):
+            raise ValueError("follow-ups must be a JSON array of objects")
+        follow_ups.append({str(key): value for key, value in item.items()})
+    service = MessageService(_build_client(args))
+    return service.push_follow_up(str(args.message_id), follow_ups=follow_ups)
+
+
+def _cmd_im_forward_thread(args: argparse.Namespace) -> Any:
+    service = MessageService(_build_client(args))
+    return service.forward_thread(
+        str(args.thread_id),
+        receive_id_type=str(args.receive_id_type),
+        receive_id=str(args.receive_id),
+        uuid=getattr(args, "uuid", None),
+    )
+
+
+def _cmd_im_update_url_previews(args: argparse.Namespace) -> Any:
+    service = MessageService(_build_client(args))
+    open_ids = list(getattr(args, "open_ids", []) or [])
+    return service.batch_update_url_previews(
+        preview_tokens=list(args.preview_tokens),
+        open_ids=open_ids or None,
+    )
 
 
 def _cmd_media_upload_image(args: argparse.Namespace) -> Mapping[str, Any]:
@@ -2315,6 +2388,41 @@ def _parse_json_object(
     if not isinstance(parsed, Mapping):
         raise ValueError(f"{name} must be a JSON object")
     return {str(key): value for key, value in parsed.items()}
+
+
+def _parse_json_array(
+    *,
+    json_text: str | None,
+    file_path: str | None,
+    stdin_enabled: bool = False,
+    name: str,
+    required: bool,
+) -> list[Any]:
+    source_count = int(bool(json_text)) + int(bool(file_path)) + int(bool(stdin_enabled))
+    if source_count > 1:
+        raise ValueError(
+            f"only one of --{name}-json, --{name}-file or --{name}-stdin can be used"
+        )
+    if source_count == 0:
+        if required:
+            raise ValueError(
+                f"one of --{name}-json, --{name}-file or --{name}-stdin is required"
+            )
+        return []
+
+    if json_text is not None:
+        raw = json_text
+    elif file_path is not None:
+        raw = Path(str(file_path)).read_text(encoding="utf-8")
+    else:
+        raw = _read_stdin_text()
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{name} is not valid JSON: {exc}") from exc
+    if not isinstance(parsed, list):
+        raise ValueError(f"{name} must be a JSON array")
+    return list(parsed)
 
 
 def _resolve_raw_body(

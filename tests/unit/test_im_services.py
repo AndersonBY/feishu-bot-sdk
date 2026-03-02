@@ -231,6 +231,42 @@ def test_message_merge_forward_builds_params():
     assert call["payload"] == {"receive_id": "oc_1", "message_id_list": ["om_1", "om_2"]}
 
 
+def test_message_follow_up_thread_forward_and_url_preview_update():
+    stub = _SyncClientStub()
+    service = MessageService(cast(FeishuClient, stub))
+
+    service.push_follow_up(
+        "om_1",
+        follow_ups=[{"content": "继续处理", "i18n_contents": [{"language": "en_us", "content": "Continue"}]}],
+    )
+    service.forward_thread(
+        "omt_1",
+        receive_id_type="open_id",
+        receive_id="ou_1",
+        uuid="dedup-1",
+    )
+    service.batch_update_url_previews(
+        preview_tokens=["token_1", "token_2"],
+        open_ids=["ou_1"],
+    )
+
+    assert len(stub.calls) == 3
+    assert stub.calls[0]["path"] == "/im/v1/messages/om_1/push_follow_up"
+    assert stub.calls[0]["payload"] == {
+        "follow_ups": [
+            {
+                "content": "继续处理",
+                "i18n_contents": [{"language": "en_us", "content": "Continue"}],
+            }
+        ]
+    }
+    assert stub.calls[1]["path"] == "/im/v1/threads/omt_1/forward"
+    assert stub.calls[1]["params"] == {"receive_id_type": "open_id", "uuid": "dedup-1"}
+    assert stub.calls[1]["payload"] == {"receive_id": "ou_1"}
+    assert stub.calls[2]["path"] == "/im/v2/url_previews/batch_update"
+    assert stub.calls[2]["payload"] == {"preview_tokens": ["token_1", "token_2"], "open_ids": ["ou_1"]}
+
+
 def test_message_reaction_pin_and_batch_methods():
     stub = _SyncClientStub()
     service = MessageService(cast(FeishuClient, stub))
@@ -471,6 +507,32 @@ def test_async_message_advanced_methods():
         assert stub.calls[1]["path"] == "/im/v1/messages/om_1/urgent_app"
         assert stub.calls[2]["path"] == "/ephemeral/v1/send"
         assert stub.calls[3]["path"] == "/interactive/v1/card/update"
+
+    asyncio.run(run())
+
+
+def test_async_message_follow_up_thread_forward_and_url_preview_update():
+    async def run() -> None:
+        stub = _AsyncClientStub()
+        service = AsyncMessageService(cast(AsyncFeishuClient, stub))
+
+        await service.push_follow_up("om_1", follow_ups=[{"content": "继续"}])
+        await service.forward_thread(
+            "omt_1",
+            receive_id_type="chat_id",
+            receive_id="oc_1",
+            uuid="dedup-2",
+        )
+        await service.batch_update_url_previews(preview_tokens=["token_1"])
+
+        assert len(stub.calls) == 3
+        assert stub.calls[0]["path"] == "/im/v1/messages/om_1/push_follow_up"
+        assert stub.calls[0]["payload"] == {"follow_ups": [{"content": "继续"}]}
+        assert stub.calls[1]["path"] == "/im/v1/threads/omt_1/forward"
+        assert stub.calls[1]["params"] == {"receive_id_type": "chat_id", "uuid": "dedup-2"}
+        assert stub.calls[1]["payload"] == {"receive_id": "oc_1"}
+        assert stub.calls[2]["path"] == "/im/v2/url_previews/batch_update"
+        assert stub.calls[2]["payload"] == {"preview_tokens": ["token_1"]}
 
     asyncio.run(run())
 

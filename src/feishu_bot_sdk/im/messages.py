@@ -465,6 +465,22 @@ class MessageService:
         )
         return _unwrap_data(response)
 
+    def push_follow_up(
+        self,
+        message_id: str,
+        *,
+        follow_ups: Sequence[Mapping[str, Any]],
+    ) -> Mapping[str, Any]:
+        payload = {
+            "follow_ups": [dict(item) for item in follow_ups],
+        }
+        response = self._client.request_json(
+            "POST",
+            f"/im/v1/messages/{message_id}/push_follow_up",
+            payload=payload,
+        )
+        return _unwrap_data(response)
+
     def forward(
         self,
         message_id: str,
@@ -477,6 +493,25 @@ class MessageService:
             f"/im/v1/messages/{message_id}/forward",
             payload={"receive_id": receive_id},
             params={"receive_id_type": receive_id_type},
+        )
+        return _unwrap_data(response)
+
+    def forward_thread(
+        self,
+        thread_id: str,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params: dict[str, Any] = {"receive_id_type": receive_id_type}
+        if uuid:
+            params["uuid"] = uuid
+        response = self._client.request_json(
+            "POST",
+            f"/im/v1/threads/{thread_id}/forward",
+            payload={"receive_id": receive_id},
+            params=params,
         )
         return _unwrap_data(response)
 
@@ -713,6 +748,24 @@ class MessageService:
             "/interactive/v1/card/update",
             payload={"token": token, "card": dict(card)},
         )
+
+    def batch_update_url_previews(
+        self,
+        *,
+        preview_tokens: Sequence[str],
+        open_ids: Optional[Sequence[str]] = None,
+    ) -> Mapping[str, Any]:
+        payload: dict[str, Any] = {
+            "preview_tokens": list(preview_tokens),
+        }
+        if open_ids is not None:
+            payload["open_ids"] = list(open_ids)
+        response = self._client.request_json(
+            "POST",
+            "/im/v2/url_previews/batch_update",
+            payload=payload,
+        )
+        return _unwrap_data(response)
 
     def _send_urgent(
         self,
@@ -1104,6 +1157,22 @@ class AsyncMessageService:
         )
         return _unwrap_data(response)
 
+    async def push_follow_up(
+        self,
+        message_id: str,
+        *,
+        follow_ups: Sequence[Mapping[str, Any]],
+    ) -> Mapping[str, Any]:
+        payload = {
+            "follow_ups": [dict(item) for item in follow_ups],
+        }
+        response = await self._client.request_json(
+            "POST",
+            f"/im/v1/messages/{message_id}/push_follow_up",
+            payload=payload,
+        )
+        return _unwrap_data(response)
+
     async def forward(
         self,
         message_id: str,
@@ -1116,6 +1185,25 @@ class AsyncMessageService:
             f"/im/v1/messages/{message_id}/forward",
             payload={"receive_id": receive_id},
             params={"receive_id_type": receive_id_type},
+        )
+        return _unwrap_data(response)
+
+    async def forward_thread(
+        self,
+        thread_id: str,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        uuid: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params: dict[str, Any] = {"receive_id_type": receive_id_type}
+        if uuid:
+            params["uuid"] = uuid
+        response = await self._client.request_json(
+            "POST",
+            f"/im/v1/threads/{thread_id}/forward",
+            payload={"receive_id": receive_id},
+            params=params,
         )
         return _unwrap_data(response)
 
@@ -1352,6 +1440,24 @@ class AsyncMessageService:
             "/interactive/v1/card/update",
             payload={"token": token, "card": dict(card)},
         )
+
+    async def batch_update_url_previews(
+        self,
+        *,
+        preview_tokens: Sequence[str],
+        open_ids: Optional[Sequence[str]] = None,
+    ) -> Mapping[str, Any]:
+        payload: dict[str, Any] = {
+            "preview_tokens": list(preview_tokens),
+        }
+        if open_ids is not None:
+            payload["open_ids"] = list(open_ids)
+        response = await self._client.request_json(
+            "POST",
+            "/im/v2/url_previews/batch_update",
+            payload=payload,
+        )
+        return _unwrap_data(response)
 
     async def _send_urgent(
         self,

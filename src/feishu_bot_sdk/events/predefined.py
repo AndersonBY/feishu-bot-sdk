@@ -8,6 +8,10 @@ from .models import (
     P2CardActionTrigger,
     P2DriveFileBitableFieldChangedV1,
     P2DriveFileBitableRecordChangedV1,
+    P2ImMessageReactionCreatedV1,
+    P2ImMessageReactionDeletedV1,
+    P2ImMessageReadV1,
+    P2ImMessageRecalledV1,
     P2ImMessageReceiveV1,
     P2URLPreviewGet,
 )
@@ -24,6 +28,53 @@ class FeishuEventRegistry(EventHandlerRegistry):
         self._register_typed(
             "im.message.receive_v1",
             P2ImMessageReceiveV1.from_context,
+            handler,
+        )
+        return self
+
+    def on_im_message_read(
+        self,
+        handler: Callable[[P2ImMessageReadV1], Any] | Callable[[P2ImMessageReadV1], Awaitable[Any]],
+    ) -> "FeishuEventRegistry":
+        self._register_typed(
+            "im.message.message_read_v1",
+            P2ImMessageReadV1.from_context,
+            handler,
+        )
+        return self
+
+    def on_im_message_recalled(
+        self,
+        handler: Callable[[P2ImMessageRecalledV1], Any]
+        | Callable[[P2ImMessageRecalledV1], Awaitable[Any]],
+    ) -> "FeishuEventRegistry":
+        self._register_typed(
+            "im.message.recalled_v1",
+            P2ImMessageRecalledV1.from_context,
+            handler,
+        )
+        return self
+
+    def on_im_message_reaction_created(
+        self,
+        handler: Callable[[P2ImMessageReactionCreatedV1], Any]
+        | Callable[[P2ImMessageReactionCreatedV1], Awaitable[Any]],
+    ) -> "FeishuEventRegistry":
+        self._register_typed(
+            "im.message.reaction.created_v1",
+            P2ImMessageReactionCreatedV1.from_context,
+            handler,
+        )
+        return self
+
+    def on_im_message_reaction_deleted(
+        self,
+        handler: Callable[[P2ImMessageReactionDeletedV1], Any]
+        | Callable[[P2ImMessageReactionDeletedV1], Awaitable[Any]],
+    ) -> "FeishuEventRegistry":
+        self._register_typed(
+            "im.message.reaction.deleted_v1",
+            P2ImMessageReactionDeletedV1.from_context,
             handler,
         )
         return self

@@ -41,6 +41,9 @@ feishu oauth user-info --auth-mode user --user-access-token u-xxx --format json
 # messaging
 feishu im send-text --receive-id ou_xxx --text "hello"
 feishu im send-markdown --receive-id ou_xxx --markdown-file ./msg.md --format json
+feishu im push-follow-up om_xxx --follow-ups-json '[{"content":"continue"}]' --format json
+feishu im forward-thread omt_xxx --receive-id-type chat_id --receive-id oc_xxx --format json
+feishu im update-url-previews --preview-token token_1 --preview-token token_2 --open-id ou_xxx --format json
 
 # file and docs
 feishu media upload-file ./final.csv --format json

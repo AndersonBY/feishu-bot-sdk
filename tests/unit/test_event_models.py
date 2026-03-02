@@ -10,6 +10,10 @@ from feishu_bot_sdk.events import (
     P2ApplicationBotMenuV6,
     P2DriveFileBitableFieldChangedV1,
     P2DriveFileBitableRecordChangedV1,
+    P2ImMessageReactionCreatedV1,
+    P2ImMessageReactionDeletedV1,
+    P2ImMessageReadV1,
+    P2ImMessageRecalledV1,
     P2ImMessageReceiveV1,
     TextMessageContent,
     UnknownMessageContent,
@@ -176,6 +180,178 @@ def test_registry_adispatches_bitable_event():
         assert result == "base_async"
 
     asyncio.run(run())
+
+
+def test_im_message_read_model_from_context():
+    payload = {
+        "schema": "2.0",
+        "header": {
+            "event_id": "evt_read_1",
+            "event_type": "im.message.message_read_v1",
+            "create_time": "1717040605000",
+            "tenant_key": "tenant_1",
+            "app_id": "cli_1",
+        },
+        "event": {
+            "reader": {
+                "reader_id": {
+                    "open_id": "ou_read_1",
+                    "user_id": "u_read_1",
+                    "union_id": "on_read_1",
+                },
+                "read_time": "1717040605888",
+                "tenant_key": "tenant_reader_1",
+            },
+            "message_id_list": ["om_1", "om_2"],
+        },
+    }
+
+    model = P2ImMessageReadV1.from_context(build_event_context(payload))
+
+    assert model.event_id == "evt_read_1"
+    assert model.reader_open_id == "ou_read_1"
+    assert model.reader_user_id == "u_read_1"
+    assert model.reader_union_id == "on_read_1"
+    assert model.read_time == "1717040605888"
+    assert model.reader_tenant_key == "tenant_reader_1"
+    assert model.message_id_list == ["om_1", "om_2"]
+
+
+def test_im_message_recalled_model_from_context():
+    payload = {
+        "schema": "2.0",
+        "header": {
+            "event_id": "evt_recall_1",
+            "event_type": "im.message.recalled_v1",
+            "create_time": "1717040606000",
+            "tenant_key": "tenant_1",
+            "app_id": "cli_1",
+        },
+        "event": {
+            "message_id": "om_1",
+            "chat_id": "oc_1",
+            "recall_time": "1717040606666",
+            "recall_type": "message_owner",
+        },
+    }
+
+    model = P2ImMessageRecalledV1.from_context(build_event_context(payload))
+
+    assert model.event_id == "evt_recall_1"
+    assert model.message_id == "om_1"
+    assert model.chat_id == "oc_1"
+    assert model.recall_time == "1717040606666"
+    assert model.recall_type == "message_owner"
+
+
+def test_im_message_reaction_models_from_context():
+    created_payload = {
+        "schema": "2.0",
+        "header": {
+            "event_id": "evt_react_created_1",
+            "event_type": "im.message.reaction.created_v1",
+            "create_time": "1717040607000",
+            "tenant_key": "tenant_1",
+            "app_id": "cli_1",
+        },
+        "event": {
+            "message_id": "om_1",
+            "reaction_type": {"emoji_type": "SMILE"},
+            "operator_type": "user",
+            "user_id": {"open_id": "ou_1", "user_id": "u_1", "union_id": "on_1"},
+            "app_id": "cli_op_1",
+            "action_time": "1717040607888",
+        },
+    }
+    deleted_payload = {
+        "schema": "2.0",
+        "header": {
+            "event_id": "evt_react_deleted_1",
+            "event_type": "im.message.reaction.deleted_v1",
+            "create_time": "1717040608000",
+            "tenant_key": "tenant_1",
+            "app_id": "cli_1",
+        },
+        "event": {
+            "message_id": "om_2",
+            "reaction_type": {"emoji_type": "THUMBSUP"},
+            "operator_type": "app",
+            "app_id": "cli_op_2",
+            "action_time": "1717040608999",
+        },
+    }
+
+    created = P2ImMessageReactionCreatedV1.from_context(build_event_context(created_payload))
+    deleted = P2ImMessageReactionDeletedV1.from_context(build_event_context(deleted_payload))
+
+    assert created.message_id == "om_1"
+    assert created.emoji_type == "SMILE"
+    assert created.operator_type == "user"
+    assert created.operator_open_id == "ou_1"
+    assert created.operator_user_id == "u_1"
+    assert created.operator_union_id == "on_1"
+    assert created.operator_app_id == "cli_op_1"
+    assert created.action_time == "1717040607888"
+
+    assert deleted.message_id == "om_2"
+    assert deleted.emoji_type == "THUMBSUP"
+    assert deleted.operator_type == "app"
+    assert deleted.operator_open_id is None
+    assert deleted.operator_app_id == "cli_op_2"
+    assert deleted.action_time == "1717040608999"
+
+
+def test_registry_dispatches_additional_im_events_with_typed_models():
+    captured: list[str] = []
+    registry = FeishuEventRegistry()
+    registry.on_im_message_read(lambda event: captured.append(f"read:{event.reader_open_id}"))
+    registry.on_im_message_recalled(lambda event: captured.append(f"recalled:{event.message_id}"))
+    registry.on_im_message_reaction_created(lambda event: captured.append(f"created:{event.emoji_type}"))
+    registry.on_im_message_reaction_deleted(lambda event: captured.append(f"deleted:{event.emoji_type}"))
+
+    registry.dispatch(
+        build_event_context(
+            {
+                "schema": "2.0",
+                "header": {"event_id": "evt_1", "event_type": "im.message.message_read_v1"},
+                "event": {"reader": {"reader_id": {"open_id": "ou_read"}}},
+            }
+        )
+    )
+    registry.dispatch(
+        build_event_context(
+            {
+                "schema": "2.0",
+                "header": {"event_id": "evt_2", "event_type": "im.message.recalled_v1"},
+                "event": {"message_id": "om_recalled"},
+            }
+        )
+    )
+    registry.dispatch(
+        build_event_context(
+            {
+                "schema": "2.0",
+                "header": {"event_id": "evt_3", "event_type": "im.message.reaction.created_v1"},
+                "event": {"reaction_type": {"emoji_type": "SMILE"}},
+            }
+        )
+    )
+    registry.dispatch(
+        build_event_context(
+            {
+                "schema": "2.0",
+                "header": {"event_id": "evt_4", "event_type": "im.message.reaction.deleted_v1"},
+                "event": {"reaction_type": {"emoji_type": "THUMBSUP"}},
+            }
+        )
+    )
+
+    assert captured == [
+        "read:ou_read",
+        "recalled:om_recalled",
+        "created:SMILE",
+        "deleted:THUMBSUP",
+    ]
 
 
 def test_bot_menu_model_reads_operator_ids_from_operator_id():

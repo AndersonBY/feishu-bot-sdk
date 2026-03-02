@@ -53,6 +53,17 @@ def _as_mapping_list(value: Any) -> list[Mapping[str, Any]]:
     return items
 
 
+def _as_string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    items: list[str] = []
+    for item in value:
+        parsed = _as_optional_str(item)
+        if parsed is not None:
+            items.append(parsed)
+    return items
+
+
 @dataclass(frozen=True)
 class P2ImMessageReceiveV1:
     event_id: Optional[str]
@@ -99,6 +110,144 @@ class P2ImMessageReceiveV1:
             sender_open_id=_as_optional_str(sender_id.get("open_id")),
             sender_user_id=_as_optional_str(sender_id.get("user_id")),
             sender_union_id=_as_optional_str(sender_id.get("union_id")),
+            raw=dict(context.payload),
+        )
+
+
+@dataclass(frozen=True)
+class P2ImMessageReadV1:
+    event_id: Optional[str]
+    create_time: Optional[str]
+    tenant_key: Optional[str]
+    app_id: Optional[str]
+    reader_open_id: Optional[str]
+    reader_user_id: Optional[str]
+    reader_union_id: Optional[str]
+    read_time: Optional[str]
+    reader_tenant_key: Optional[str]
+    message_id_list: list[str] = field(default_factory=list)
+    raw: Mapping[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_context(cls, context: EventContext) -> "P2ImMessageReadV1":
+        event = _as_mapping(context.event)
+        reader = _as_mapping(event.get("reader"))
+        reader_id = _as_mapping(reader.get("reader_id"))
+        return cls(
+            event_id=context.envelope.event_id,
+            create_time=context.envelope.create_time,
+            tenant_key=context.envelope.tenant_key,
+            app_id=context.envelope.app_id,
+            reader_open_id=_as_optional_str(reader_id.get("open_id")),
+            reader_user_id=_as_optional_str(reader_id.get("user_id")),
+            reader_union_id=_as_optional_str(reader_id.get("union_id")),
+            read_time=_as_optional_str(reader.get("read_time")),
+            reader_tenant_key=_as_optional_str(reader.get("tenant_key")),
+            message_id_list=_as_string_list(event.get("message_id_list")),
+            raw=dict(context.payload),
+        )
+
+
+@dataclass(frozen=True)
+class P2ImMessageRecalledV1:
+    event_id: Optional[str]
+    create_time: Optional[str]
+    tenant_key: Optional[str]
+    app_id: Optional[str]
+    message_id: Optional[str]
+    chat_id: Optional[str]
+    recall_time: Optional[str]
+    recall_type: Optional[str]
+    raw: Mapping[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_context(cls, context: EventContext) -> "P2ImMessageRecalledV1":
+        event = _as_mapping(context.event)
+        return cls(
+            event_id=context.envelope.event_id,
+            create_time=context.envelope.create_time,
+            tenant_key=context.envelope.tenant_key,
+            app_id=context.envelope.app_id,
+            message_id=_as_optional_str(event.get("message_id")),
+            chat_id=_as_optional_str(event.get("chat_id")),
+            recall_time=_as_optional_str(event.get("recall_time")),
+            recall_type=_as_optional_str(event.get("recall_type")),
+            raw=dict(context.payload),
+        )
+
+
+@dataclass(frozen=True)
+class P2ImMessageReactionCreatedV1:
+    event_id: Optional[str]
+    create_time: Optional[str]
+    tenant_key: Optional[str]
+    app_id: Optional[str]
+    message_id: Optional[str]
+    emoji_type: Optional[str]
+    operator_type: Optional[str]
+    operator_open_id: Optional[str]
+    operator_user_id: Optional[str]
+    operator_union_id: Optional[str]
+    operator_app_id: Optional[str]
+    action_time: Optional[str]
+    raw: Mapping[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_context(cls, context: EventContext) -> "P2ImMessageReactionCreatedV1":
+        event = _as_mapping(context.event)
+        reaction_type = _as_mapping(event.get("reaction_type"))
+        operator = _as_mapping(event.get("user_id"))
+        return cls(
+            event_id=context.envelope.event_id,
+            create_time=context.envelope.create_time,
+            tenant_key=context.envelope.tenant_key,
+            app_id=context.envelope.app_id,
+            message_id=_as_optional_str(event.get("message_id")),
+            emoji_type=_as_optional_str(reaction_type.get("emoji_type")),
+            operator_type=_as_optional_str(event.get("operator_type")),
+            operator_open_id=_as_optional_str(operator.get("open_id")),
+            operator_user_id=_as_optional_str(operator.get("user_id")),
+            operator_union_id=_as_optional_str(operator.get("union_id")),
+            operator_app_id=_as_optional_str(event.get("app_id")),
+            action_time=_as_optional_str(event.get("action_time")),
+            raw=dict(context.payload),
+        )
+
+
+@dataclass(frozen=True)
+class P2ImMessageReactionDeletedV1:
+    event_id: Optional[str]
+    create_time: Optional[str]
+    tenant_key: Optional[str]
+    app_id: Optional[str]
+    message_id: Optional[str]
+    emoji_type: Optional[str]
+    operator_type: Optional[str]
+    operator_open_id: Optional[str]
+    operator_user_id: Optional[str]
+    operator_union_id: Optional[str]
+    operator_app_id: Optional[str]
+    action_time: Optional[str]
+    raw: Mapping[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_context(cls, context: EventContext) -> "P2ImMessageReactionDeletedV1":
+        event = _as_mapping(context.event)
+        reaction_type = _as_mapping(event.get("reaction_type"))
+        operator = _as_mapping(event.get("user_id"))
+        return cls(
+            event_id=context.envelope.event_id,
+            create_time=context.envelope.create_time,
+            tenant_key=context.envelope.tenant_key,
+            app_id=context.envelope.app_id,
+            message_id=_as_optional_str(event.get("message_id")),
+            emoji_type=_as_optional_str(reaction_type.get("emoji_type")),
+            operator_type=_as_optional_str(event.get("operator_type")),
+            operator_open_id=_as_optional_str(operator.get("open_id")),
+            operator_user_id=_as_optional_str(operator.get("user_id")),
+            operator_union_id=_as_optional_str(operator.get("union_id")),
+            operator_app_id=_as_optional_str(event.get("app_id")),
+            action_time=_as_optional_str(event.get("action_time")),
             raw=dict(context.payload),
         )
 

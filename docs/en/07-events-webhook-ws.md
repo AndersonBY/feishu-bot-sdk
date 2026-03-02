@@ -27,6 +27,10 @@ def on_menu(event):
 Built-in typed event models:
 
 - `P2ImMessageReceiveV1`
+- `P2ImMessageReadV1`
+- `P2ImMessageRecalledV1`
+- `P2ImMessageReactionCreatedV1`
+- `P2ImMessageReactionDeletedV1`
 - `P2ApplicationBotMenuV6`
 - `P2CardActionTrigger`
 - `P2URLPreviewGet`

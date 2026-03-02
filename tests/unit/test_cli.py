@@ -222,6 +222,130 @@ def test_im_send_markdown_from_stdin(monkeypatch: Any, capsys: Any) -> None:
     assert payload["message_id"] == "om_stdin_1"
 
 
+def test_im_push_follow_up(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    captured: dict[str, Any] = {}
+
+    def _fake_push_follow_up(
+        _self: MessageService,
+        message_id: str,
+        *,
+        follow_ups: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        captured["message_id"] = message_id
+        captured["follow_ups"] = follow_ups
+        return {"ok": True}
+
+    monkeypatch.setattr("feishu_bot_sdk.im.messages.MessageService.push_follow_up", _fake_push_follow_up)
+
+    code = cli.main(
+        [
+            "im",
+            "push-follow-up",
+            "om_1",
+            "--follow-ups-json",
+            '[{"content":"继续处理"}]',
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert captured["message_id"] == "om_1"
+    assert captured["follow_ups"] == [{"content": "继续处理"}]
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True
+
+
+def test_im_forward_thread(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    captured: dict[str, Any] = {}
+
+    def _fake_forward_thread(
+        _self: MessageService,
+        thread_id: str,
+        *,
+        receive_id_type: str,
+        receive_id: str,
+        uuid: str | None = None,
+    ) -> dict[str, Any]:
+        captured["thread_id"] = thread_id
+        captured["receive_id_type"] = receive_id_type
+        captured["receive_id"] = receive_id
+        captured["uuid"] = uuid
+        return {"message_id": "om_forward_1"}
+
+    monkeypatch.setattr("feishu_bot_sdk.im.messages.MessageService.forward_thread", _fake_forward_thread)
+
+    code = cli.main(
+        [
+            "im",
+            "forward-thread",
+            "omt_1",
+            "--receive-id-type",
+            "chat_id",
+            "--receive-id",
+            "oc_1",
+            "--uuid",
+            "dedup-1",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert captured["thread_id"] == "omt_1"
+    assert captured["receive_id_type"] == "chat_id"
+    assert captured["receive_id"] == "oc_1"
+    assert captured["uuid"] == "dedup-1"
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["message_id"] == "om_forward_1"
+
+
+def test_im_update_url_previews(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    captured: dict[str, Any] = {}
+
+    def _fake_update_url_previews(
+        _self: MessageService,
+        *,
+        preview_tokens: list[str],
+        open_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        captured["preview_tokens"] = preview_tokens
+        captured["open_ids"] = open_ids
+        return {"ok": True}
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.im.messages.MessageService.batch_update_url_previews",
+        _fake_update_url_previews,
+    )
+
+    code = cli.main(
+        [
+            "im",
+            "update-url-previews",
+            "--preview-token",
+            "token_1",
+            "--preview-token",
+            "token_2",
+            "--open-id",
+            "ou_1",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert captured["preview_tokens"] == ["token_1", "token_2"]
+    assert captured["open_ids"] == ["ou_1"]
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True
+
+
 def test_media_download_file_writes_bytes(monkeypatch: Any, tmp_path: Path, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")

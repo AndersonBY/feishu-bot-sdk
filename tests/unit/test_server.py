@@ -119,6 +119,68 @@ def test_server_typed_handler_registration():
     assert server.status().event_counts["im.message.receive_v1"] == 1
 
 
+def test_server_additional_typed_handler_registration():
+    server = FeishuBotServer(
+        app_id="cli_test",
+        app_secret="secret_test",
+        ws_client_factory=lambda _registry: _BlockingWSClient(),
+    )
+    captured: list[str] = []
+    server.on_im_message_read(lambda event: captured.append(f"read:{event.reader_open_id}"))
+    server.on_im_message_recalled(lambda event: captured.append(f"recalled:{event.message_id}"))
+    server.on_im_message_reaction_created(lambda event: captured.append(f"created:{event.emoji_type}"))
+    server.on_im_message_reaction_deleted(lambda event: captured.append(f"deleted:{event.emoji_type}"))
+
+    server.registry.dispatch(
+        build_event_context(
+            {
+                "schema": "2.0",
+                "header": {"event_id": "evt_read_1", "event_type": "im.message.message_read_v1"},
+                "event": {"reader": {"reader_id": {"open_id": "ou_read_1"}}},
+            }
+        )
+    )
+    server.registry.dispatch(
+        build_event_context(
+            {
+                "schema": "2.0",
+                "header": {"event_id": "evt_recall_1", "event_type": "im.message.recalled_v1"},
+                "event": {"message_id": "om_recall_1"},
+            }
+        )
+    )
+    server.registry.dispatch(
+        build_event_context(
+            {
+                "schema": "2.0",
+                "header": {"event_id": "evt_reaction_1", "event_type": "im.message.reaction.created_v1"},
+                "event": {"reaction_type": {"emoji_type": "SMILE"}},
+            }
+        )
+    )
+    server.registry.dispatch(
+        build_event_context(
+            {
+                "schema": "2.0",
+                "header": {"event_id": "evt_reaction_2", "event_type": "im.message.reaction.deleted_v1"},
+                "event": {"reaction_type": {"emoji_type": "THUMBSUP"}},
+            }
+        )
+    )
+
+    assert captured == [
+        "read:ou_read_1",
+        "recalled:om_recall_1",
+        "created:SMILE",
+        "deleted:THUMBSUP",
+    ]
+    status = server.status()
+    assert status.event_counts["im.message.message_read_v1"] == 1
+    assert status.event_counts["im.message.recalled_v1"] == 1
+    assert status.event_counts["im.message.reaction.created_v1"] == 1
+    assert status.event_counts["im.message.reaction.deleted_v1"] == 1
+
+
 def test_run_forever_propagates_client_error():
     async def run() -> None:
         server = FeishuBotServer(
@@ -160,4 +222,3 @@ def test_on_default_supports_async_handler():
         assert server.status().event_counts["custom.event"] == 1
 
     asyncio.run(run())
-
