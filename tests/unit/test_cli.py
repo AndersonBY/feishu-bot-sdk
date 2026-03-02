@@ -14,6 +14,7 @@ from feishu_bot_sdk.config import FeishuConfig
 from feishu_bot_sdk.drive_files import DriveFileService
 from feishu_bot_sdk.drive_permissions import DrivePermissionService
 from feishu_bot_sdk.events import build_event_context
+from feishu_bot_sdk.im.media import MediaService
 from feishu_bot_sdk.im.messages import MessageService
 from feishu_bot_sdk.webhook.security import compute_signature
 from feishu_bot_sdk.wiki import WikiService
@@ -219,6 +220,35 @@ def test_im_send_markdown_from_stdin(monkeypatch: Any, capsys: Any) -> None:
     assert captured["markdown"] == "### stdin markdown"
     payload = json.loads(capsys.readouterr().out)
     assert payload["message_id"] == "om_stdin_1"
+
+
+def test_media_download_file_writes_bytes(monkeypatch: Any, tmp_path: Path, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    def _fake_download_file(_self: MediaService, file_key: str) -> bytes:
+        assert file_key == "file_1"
+        return b"hello-bytes"
+
+    monkeypatch.setattr("feishu_bot_sdk.im.media.MediaService.download_file", _fake_download_file)
+
+    output = tmp_path / "downloads" / "demo.bin"
+    code = cli.main(
+        [
+            "media",
+            "download-file",
+            "file_1",
+            str(output),
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert output.read_bytes() == b"hello-bytes"
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True
+    assert payload["file_key"] == "file_1"
+    assert payload["size"] == 11
 
 
 def test_bitable_create_from_csv_with_grant(monkeypatch: Any, capsys: Any) -> None:

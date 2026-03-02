@@ -13,6 +13,7 @@ A lightweight Python SDK for Feishu bot integrations, including:
 - Markdown append to Docx
 - Webhook callbacks and long connections (WebSocket)
 - Typed event models (IM/card/URL preview/Bitable record & field changed)
+- Automatic typed parsing for incoming IM content (`event.content` by `message_type`)
 - Adaptive rate limiter (auto backoff/recovery by endpoint feedback)
 - Both sync and async APIs
 

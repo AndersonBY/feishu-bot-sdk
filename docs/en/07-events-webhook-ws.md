@@ -34,6 +34,36 @@ Built-in typed event models:
 - `P2DriveFileBitableFieldChangedV1`
 - `P1CustomizedEvent`
 
+## Received Message Content Parsing
+
+`P2ImMessageReceiveV1` now parses message `content` by `message_type` automatically:
+
+- `event.content`: typed message content object
+- `event.content_raw`: original JSON string
+- `event.text`: text shortcut for `text` and `hongbao`
+
+```python
+from feishu_bot_sdk import (
+    FeishuEventRegistry,
+    TextMessageContent,
+    ImageMessageContent,
+    FileMessageContent,
+)
+
+registry = FeishuEventRegistry()
+
+@registry.on_im_message_receive
+def on_message(event):
+    if isinstance(event.content, TextMessageContent):
+        print("text:", event.content.text)
+    elif isinstance(event.content, ImageMessageContent):
+        print("image_key:", event.content.image_key)
+    elif isinstance(event.content, FileMessageContent):
+        print("file:", event.content.file_name, event.content.file_key)
+    else:
+        print("raw:", event.content_raw)
+```
+
 ## Webhook Receiver
 
 ```python

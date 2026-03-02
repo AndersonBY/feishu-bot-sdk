@@ -1,7 +1,11 @@
-import json
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional
 
+from .message_content import (
+    ParsedMessageContent,
+    extract_text_from_parsed_message,
+    parse_received_message_content,
+)
 from .types import EventContext
 
 
@@ -59,7 +63,8 @@ class P2ImMessageReceiveV1:
     chat_id: Optional[str]
     chat_type: Optional[str]
     message_type: Optional[str]
-    content: str
+    content_raw: str
+    content: ParsedMessageContent
     text: Optional[str]
     sender_open_id: Optional[str]
     sender_user_id: Optional[str]
@@ -72,8 +77,13 @@ class P2ImMessageReceiveV1:
         message = _as_mapping(event.get("message"))
         sender = _as_mapping(event.get("sender"))
         sender_id = _as_mapping(sender.get("sender_id"))
-        content = _as_optional_str(message.get("content")) or ""
-        text = _extract_text_content(content)
+        message_type = _as_optional_str(message.get("message_type"))
+        content_raw = _as_optional_str(message.get("content")) or ""
+        content = parse_received_message_content(
+            message_type=message_type,
+            content_raw=content_raw,
+        )
+        text = extract_text_from_parsed_message(content)
         return cls(
             event_id=context.envelope.event_id,
             create_time=context.envelope.create_time,
@@ -82,7 +92,8 @@ class P2ImMessageReceiveV1:
             message_id=_as_optional_str(message.get("message_id")),
             chat_id=_as_optional_str(message.get("chat_id")),
             chat_type=_as_optional_str(message.get("chat_type")),
-            message_type=_as_optional_str(message.get("message_type")),
+            message_type=message_type,
+            content_raw=content_raw,
             content=content,
             text=text,
             sender_open_id=_as_optional_str(sender_id.get("open_id")),
@@ -292,18 +303,3 @@ class P2DriveFileBitableFieldChangedV1:
             update_time=_as_optional_int(event.get("update_time")),
             raw=dict(context.payload),
         )
-
-
-def _extract_text_content(content: str) -> Optional[str]:
-    if not content:
-        return None
-    try:
-        content_json = json.loads(content)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(content_json, dict):
-        return None
-    text = content_json.get("text")
-    if isinstance(text, str):
-        return text
-    return None

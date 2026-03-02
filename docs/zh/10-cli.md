@@ -44,6 +44,7 @@ feishu im send-markdown --receive-id ou_xxx --markdown-file ./msg.md --format js
 
 # 文件与文档
 feishu media upload-file ./final.csv --format json
+feishu media download-file file_xxx ./downloads/file.bin --format json
 feishu bitable create-from-csv ./final.csv --app-name "任务结果" --table-name "结果表"
 feishu docx create-from-markdown --title "日报" --markdown-file ./report.md
 

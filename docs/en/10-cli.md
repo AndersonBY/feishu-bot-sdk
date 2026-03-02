@@ -44,6 +44,7 @@ feishu im send-markdown --receive-id ou_xxx --markdown-file ./msg.md --format js
 
 # file and docs
 feishu media upload-file ./final.csv --format json
+feishu media download-file file_xxx ./downloads/file.bin --format json
 feishu bitable create-from-csv ./final.csv --app-name "Task Result" --table-name "Result"
 feishu docx create-from-markdown --title "Daily Report" --markdown-file ./report.md
 

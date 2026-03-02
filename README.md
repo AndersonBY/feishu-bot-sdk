@@ -13,6 +13,7 @@
 - Markdown 追加写入 Docx
 - 事件回调（Webhook）与长连接（WebSocket）
 - 事件类型模型（IM、卡片、URL 预览、多维表格 record/field changed）
+- IM 接收消息内容自动解析（按 `message_type` 输出强类型 `event.content`）
 - 自适应限流器（按接口返回动态收敛/恢复）
 - 同步 / 异步两套 API
 

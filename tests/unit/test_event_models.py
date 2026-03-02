@@ -2,9 +2,18 @@ import asyncio
 
 from feishu_bot_sdk import FeishuEventRegistry, build_event_context
 from feishu_bot_sdk.events import (
+    CalendarMessageContent,
+    FileMessageContent,
+    ImageMessageContent,
+    MergeForwardMessageContent,
+    PostMessageContent,
     P2ApplicationBotMenuV6,
     P2DriveFileBitableFieldChangedV1,
     P2DriveFileBitableRecordChangedV1,
+    P2ImMessageReceiveV1,
+    TextMessageContent,
+    UnknownMessageContent,
+    parse_received_message_content,
 )
 
 
@@ -229,3 +238,102 @@ def test_bot_menu_model_prefers_direct_operator_ids_when_present():
     assert model.operator_open_id == "ou_direct"
     assert model.operator_user_id == "ouser_direct"
     assert model.operator_union_id == "on_direct"
+
+
+def test_parse_received_message_content_for_common_types():
+    text = parse_received_message_content(
+        message_type="text",
+        content_raw='{"text":"hello"}',
+    )
+    assert isinstance(text, TextMessageContent)
+    assert text.text == "hello"
+
+    image = parse_received_message_content(
+        message_type="image",
+        content_raw='{"image_key":"img_1"}',
+    )
+    assert isinstance(image, ImageMessageContent)
+    assert image.image_key == "img_1"
+
+    file_content = parse_received_message_content(
+        message_type="file",
+        content_raw='{"file_key":"file_1","file_name":"demo.txt"}',
+    )
+    assert isinstance(file_content, FileMessageContent)
+    assert file_content.file_key == "file_1"
+    assert file_content.file_name == "demo.txt"
+
+    post = parse_received_message_content(
+        message_type="post",
+        content_raw='{"title":"日报","content":[[{"tag":"text","text":"hello"}]]}',
+    )
+    assert isinstance(post, PostMessageContent)
+    assert post.title == "日报"
+    assert post.content[0][0]["tag"] == "text"
+
+    calendar = parse_received_message_content(
+        message_type="calendar",
+        content_raw='{"summary":"会议","start_time":"1","end_time":"2"}',
+    )
+    assert isinstance(calendar, CalendarMessageContent)
+    assert calendar.summary == "会议"
+    assert calendar.message_type == "calendar"
+
+    merge_forward = parse_received_message_content(
+        message_type="merge_forward",
+        content_raw='{"content":"Merged and Forwarded Message"}',
+    )
+    assert isinstance(merge_forward, MergeForwardMessageContent)
+    assert merge_forward.content == "Merged and Forwarded Message"
+
+
+def test_parse_received_message_content_returns_unknown_for_invalid_payload():
+    parsed = parse_received_message_content(
+        message_type="text",
+        content_raw="{invalid-json",
+    )
+    assert isinstance(parsed, UnknownMessageContent)
+    assert parsed.message_type == "text"
+    assert parsed.parse_error is not None
+
+    unknown_type = parse_received_message_content(
+        message_type="new_type",
+        content_raw='{"k":"v"}',
+    )
+    assert isinstance(unknown_type, UnknownMessageContent)
+    assert unknown_type.message_type == "new_type"
+    assert unknown_type.raw["k"] == "v"
+
+
+def test_im_message_receive_model_parses_typed_content():
+    payload = {
+        "schema": "2.0",
+        "header": {
+            "event_id": "evt_msg_1",
+            "event_type": "im.message.receive_v1",
+            "create_time": "1717040604000",
+            "tenant_key": "tenant_1",
+            "app_id": "cli_1",
+        },
+        "event": {
+            "message": {
+                "message_id": "om_1",
+                "chat_id": "oc_1",
+                "chat_type": "p2p",
+                "message_type": "text",
+                "content": '{"text":"hello event"}',
+            },
+            "sender": {
+                "sender_id": {
+                    "open_id": "ou_1",
+                    "user_id": "u_1",
+                    "union_id": "on_1",
+                }
+            },
+        },
+    }
+    model = P2ImMessageReceiveV1.from_context(build_event_context(payload))
+    assert isinstance(model.content, TextMessageContent)
+    assert model.content.text == "hello event"
+    assert model.content_raw == '{"text":"hello event"}'
+    assert model.text == "hello event"

@@ -34,6 +34,36 @@ def on_menu(event):
 - `P2DriveFileBitableFieldChangedV1`
 - `P1CustomizedEvent`（自定义事件）
 
+## 接收消息内容解析
+
+`P2ImMessageReceiveV1` 现在会自动按 `message_type` 解析 `content`，并提供：
+
+- `event.content`: 强类型消息内容对象
+- `event.content_raw`: 原始 JSON 字符串
+- `event.text`: 文本类消息快捷字段（`text`/`hongbao`）
+
+```python
+from feishu_bot_sdk import (
+    FeishuEventRegistry,
+    TextMessageContent,
+    ImageMessageContent,
+    FileMessageContent,
+)
+
+registry = FeishuEventRegistry()
+
+@registry.on_im_message_receive
+def on_message(event):
+    if isinstance(event.content, TextMessageContent):
+        print("text:", event.content.text)
+    elif isinstance(event.content, ImageMessageContent):
+        print("image_key:", event.content.image_key)
+    elif isinstance(event.content, FileMessageContent):
+        print("file:", event.content.file_name, event.content.file_key)
+    else:
+        print("raw:", event.content_raw)
+```
+
 ## Webhook 接收
 
 ```python

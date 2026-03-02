@@ -266,6 +266,11 @@ def _build_media_commands(
     upload_file.add_argument("--content-type", help="Override mime type")
     upload_file.set_defaults(handler=_cmd_media_upload_file)
 
+    download_file = media_sub.add_parser("download-file", help="Download file by file_key", parents=[shared])
+    download_file.add_argument("file_key", help="File key")
+    download_file.add_argument("output", help="Output file path")
+    download_file.set_defaults(handler=_cmd_media_download_file)
+
 
 def _build_bitable_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
@@ -1066,6 +1071,21 @@ def _cmd_media_upload_file(args: argparse.Namespace) -> Mapping[str, Any]:
         duration=getattr(args, "duration", None),
         content_type=getattr(args, "content_type", None),
     )
+
+
+def _cmd_media_download_file(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = MediaService(_build_client(args))
+    content = service.download_file(str(args.file_key))
+    output_path = Path(str(args.output))
+    if output_path.parent and not output_path.parent.exists():
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(content)
+    return {
+        "ok": True,
+        "file_key": str(args.file_key),
+        "output": str(output_path),
+        "size": len(content),
+    }
 
 
 def _cmd_bitable_create_from_csv(args: argparse.Namespace) -> Mapping[str, Any]:
