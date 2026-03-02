@@ -41,7 +41,8 @@ feishu --help
   - 环境变量：`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_AUTH_MODE`、`FEISHU_ACCESS_TOKEN`
   - 用户态变量：`FEISHU_USER_ACCESS_TOKEN`、`FEISHU_USER_REFRESH_TOKEN`
   - OAuth 交换变量：`FEISHU_APP_ACCESS_TOKEN`
-  - 全局参数：`--app-id`、`--app-secret`、`--auth-mode`、`--access-token`
+  - Token Store：`FEISHU_PROFILE`、`FEISHU_TOKEN_STORE_PATH`、`FEISHU_NO_STORE`
+  - 全局参数：`--app-id`、`--app-secret`、`--auth-mode`、`--access-token`、`--profile`、`--token-store`、`--no-store`
 
 示例：
 
@@ -49,7 +50,13 @@ feishu --help
 # 1) 获取当前认证模式 token（JSON 输出）
 feishu auth token --format json
 
-# 1.1) OAuth 授权与换取用户 token
+# 1.1) CLI User Auth（localhost 回调 + 自动落盘 token）
+feishu auth login --scope "offline_access contact:user.base:readonly" --no-browser --format json
+feishu auth whoami --format json
+feishu auth refresh --format json
+feishu auth logout --format json
+
+# 1.2) 低层 OAuth 调试命令
 feishu oauth authorize-url --redirect-uri https://example.com/callback --format json
 feishu oauth exchange-code --code CODE --format json
 

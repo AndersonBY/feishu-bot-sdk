@@ -19,24 +19,33 @@ feishu --help
 - `--access-token`：当前认证模式的静态 access token（可选）
 - `--app-access-token`：OAuth code/refresh 交换使用（可选）
 - `--user-access-token` / `--user-refresh-token`：用户态 token（`auth_mode=user` 常用）
+- `--profile`：本地 token profile，默认读取 `FEISHU_PROFILE` 或 `default`
+- `--token-store`：本地 token 存储路径
+- `--no-store`：禁用本地 token 读写
 - `--base-url`：默认 `https://open.feishu.cn/open-apis`
 - `--timeout`：请求超时秒数
 
-认证优先级：环境变量优先，其次命令行参数。
+认证优先级：环境变量 > 命令行参数 > 本地 token store。
 
 - 环境变量：`FEISHU_APP_ID` / `FEISHU_APP_SECRET` / `FEISHU_AUTH_MODE` / `FEISHU_ACCESS_TOKEN`
 - 用户态环境变量：`FEISHU_USER_ACCESS_TOKEN` / `FEISHU_USER_REFRESH_TOKEN`
 - OAuth 交换环境变量：`FEISHU_APP_ACCESS_TOKEN`
+- Token store 变量：`FEISHU_PROFILE` / `FEISHU_TOKEN_STORE_PATH` / `FEISHU_NO_STORE`
 - 兼容变量：`APP_ID` / `APP_SECRET`
 
 ## 常用命令
 
 ```bash
-# 鉴权
+# 鉴权（推荐：无公网 localhost 回调）
 feishu auth token --format json
+feishu auth login --scope "offline_access contact:user.base:readonly" --no-browser --format json
+feishu auth whoami --format json
+feishu auth refresh --format json
+feishu auth logout --format json
+
+# 低层 OAuth 调试命令
 feishu oauth authorize-url --redirect-uri https://example.com/callback --format json
 feishu oauth exchange-code --code CODE --format json
-feishu oauth user-info --auth-mode user --user-access-token u-xxx --format json
 
 # 发消息
 feishu im send-text --receive-id ou_xxx --text "hello"
@@ -65,6 +74,20 @@ feishu calendar list-calendars --page-size 50 --format json
 feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json
 feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
 ```
+
+## User Auth（CLI 最佳实践）
+
+`feishu auth login` 默认走本地回调（`http://127.0.0.1:18080/callback`），并支持 PKCE。
+
+- 第一步：在飞书开发者后台安全设置中添加本地重定向 URL（localhost）
+- 第二步：执行 `feishu auth login`
+- 第三步：后续直接执行 `feishu auth whoami` 或其它 `auth_mode=user` 命令
+
+自动处理策略：
+
+- access token 临近过期（默认提前 300 秒）会自动 refresh
+- 接口返回 token 失效相关错误时会自动 refresh 并重试 1 次
+- refresh 成功后会自动更新本地 token store（包含新 refresh token）
 
 ## 日历附件（Agent 强烈建议）
 

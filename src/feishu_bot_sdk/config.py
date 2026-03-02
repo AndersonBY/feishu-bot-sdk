@@ -15,6 +15,9 @@ class FeishuConfig:
     app_access_token: Optional[str] = None
     user_access_token: Optional[str] = None
     user_refresh_token: Optional[str] = None
+    user_access_token_expires_at: Optional[float] = None
+    user_refresh_token_expires_at: Optional[float] = None
+    user_token_refresh_before_seconds: float = 300.0
     doc_url_prefix: Optional[str] = None
     doc_folder_token: Optional[str] = None
     member_permission: str = "edit"
@@ -33,3 +36,7 @@ class FeishuConfig:
         if normalized_mode not in {"tenant", "user"}:
             raise ValueError("auth_mode must be either 'tenant' or 'user'")
         object.__setattr__(self, "auth_mode", normalized_mode)
+        refresh_before = float(self.user_token_refresh_before_seconds)
+        if refresh_before < 0:
+            raise ValueError("user_token_refresh_before_seconds must be >= 0")
+        object.__setattr__(self, "user_token_refresh_before_seconds", refresh_before)

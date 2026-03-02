@@ -2,17 +2,24 @@ from __future__ import annotations
 
 import asyncio
 import argparse
+import base64
 import contextlib
 import dataclasses
+import hashlib
 import json
 import os
+import re
+import secrets
 import signal
 import subprocess
 import sys
 import threading
+import time
+import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
+from urllib.parse import parse_qs, urlparse
 
 from .bitable import BitableService
 from .bot import BotService
@@ -28,6 +35,7 @@ from .exceptions import ConfigurationError, FeishuError, HTTPRequestError
 from .feishu import FeishuClient
 from .im import MediaService, MessageService
 from .server import FeishuBotServer
+from .token_store import StoredUserToken, TokenStore, default_token_store_path
 from .webhook import (
     WebhookReceiver,
     build_challenge_response,
@@ -39,6 +47,43 @@ from .ws import AsyncLongConnectionClient, fetch_ws_endpoint
 
 _DEFAULT_BASE_URL = "https://open.feishu.cn/open-apis"
 _DEFAULT_TIMEOUT_SECONDS = 30.0
+_DEFAULT_OAUTH_CALLBACK_HOST = "127.0.0.1"
+_DEFAULT_OAUTH_CALLBACK_PORT = 18080
+_DEFAULT_OAUTH_CALLBACK_PATH = "/callback"
+_DEFAULT_USER_TOKEN_REFRESH_BEFORE_SECONDS = 300.0
+_HELP_FORMATTER = argparse.RawTextHelpFormatter
+
+_ROOT_HELP_EPILOG = (
+    "Quick start (Agent-friendly):\n"
+    "  1) feishu auth login --scope \"offline_access contact:user:search\" --no-browser --format json\n"
+    "  2) feishu auth whoami --auth-mode user --format json\n"
+    "  3) feishu contact user search --query \"name\" --auth-mode user --format json\n"
+    "  4) feishu calendar create-event --auth-mode user --calendar-id <id> --event-file event.json --format json\n"
+    "\n"
+    "Token precedence: env vars > CLI flags > local token store profile."
+)
+
+_AUTH_HELP_EPILOG = (
+    "Common flow:\n"
+    "  feishu auth login --scope \"offline_access contact:user:search calendar:calendar.event:create\" --no-browser --format json\n"
+    "  feishu auth whoami --auth-mode user --format json\n"
+    "  feishu auth refresh --auth-mode user --format json\n"
+    "\n"
+    "If login fails with redirect_uri error:\n"
+    "  Configure redirect URL in Feishu console:\n"
+    "  Development Config -> Security -> Redirect URL\n"
+    "  Example: http://127.0.0.1:18080/callback"
+)
+
+
+@dataclasses.dataclass(frozen=True)
+class _UserTokenStoreContext:
+    enabled: bool
+    profile: str
+    store_path: Path
+    store: TokenStore | None
+    from_env_or_arg: bool
+    loaded_token: StoredUserToken | None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -49,6 +94,8 @@ def build_parser() -> argparse.ArgumentParser:
         prog="feishu",
         description="Feishu CLI powered by feishu-bot-sdk",
         parents=[shared],
+        formatter_class=_HELP_FORMATTER,
+        epilog=_ROOT_HELP_EPILOG,
     )
     subparsers = parser.add_subparsers(dest="group")
     subparsers.required = True
@@ -116,6 +163,9 @@ def _add_global_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--app-access-token", help="Static app_access_token for OAuth token exchange")
     parser.add_argument("--user-access-token", help="Static user_access_token")
     parser.add_argument("--user-refresh-token", help="User refresh_token for auto refresh")
+    parser.add_argument("--profile", help="Token profile name. Default: FEISHU_PROFILE or default")
+    parser.add_argument("--token-store", help="Token store file path")
+    parser.add_argument("--no-store", action="store_true", help="Disable reading/writing local token store")
     parser.add_argument("--base-url", help=f"Feishu OpenAPI base url. Default: {_DEFAULT_BASE_URL}")
     parser.add_argument("--timeout", type=float, help=f"HTTP timeout seconds. Default: {_DEFAULT_TIMEOUT_SECONDS}")
 
@@ -124,12 +174,87 @@ def _build_auth_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
     shared: argparse.ArgumentParser,
 ) -> None:
-    auth_parser = subparsers.add_parser("auth", help="Authentication and raw API request")
+    auth_parser = subparsers.add_parser(
+        "auth",
+        help="Authentication and raw API request",
+        description=(
+            "Authentication and token lifecycle operations.\n"
+            "Use `auth login` for User Auth (OAuth with localhost callback),\n"
+            "then use `auth whoami` to verify token usability."
+        ),
+        formatter_class=_HELP_FORMATTER,
+        epilog=_AUTH_HELP_EPILOG,
+    )
     auth_sub = auth_parser.add_subparsers(dest="auth_command")
     auth_sub.required = True
 
     token_parser = auth_sub.add_parser("token", help="Get access token for current auth mode", parents=[shared])
     token_parser.set_defaults(handler=_cmd_auth_token)
+
+    login_parser = auth_sub.add_parser(
+        "login",
+        help="Interactive OAuth login for user_access_token",
+        parents=[shared],
+        description=(
+            "Run OAuth authorization code flow and persist user tokens.\n"
+            "Default callback: http://127.0.0.1:18080/callback\n"
+            "The exact redirect URI must be pre-configured in Feishu console."
+        ),
+        formatter_class=_HELP_FORMATTER,
+        epilog=(
+            "Examples:\n"
+            "  feishu auth login --scope \"offline_access contact:user:search\" --no-browser --format json\n"
+            "  feishu auth login --redirect-uri http://127.0.0.1:8080/callback --format json\n"
+            "\n"
+            "Notes:\n"
+            "  - If --no-browser is set, CLI prints Authorize URL to stderr.\n"
+            "  - Token precedence remains: env > flags > local store."
+        ),
+    )
+    login_parser.add_argument("--scope", help="OAuth scope string")
+    login_parser.add_argument("--state", help="OAuth state. Auto-generated when omitted")
+    login_parser.add_argument("--redirect-uri", help="OAuth redirect URI. Default: local callback URI")
+    login_parser.add_argument("--redirect-host", default=_DEFAULT_OAUTH_CALLBACK_HOST, help="Local callback host")
+    login_parser.add_argument("--redirect-port", type=int, default=_DEFAULT_OAUTH_CALLBACK_PORT, help="Local callback port")
+    login_parser.add_argument("--redirect-path", default=_DEFAULT_OAUTH_CALLBACK_PATH, help="Local callback path")
+    login_parser.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=180.0,
+        help="Timeout waiting for callback",
+    )
+    login_parser.add_argument("--no-browser", action="store_true", help="Do not auto-open browser")
+    login_parser.add_argument("--no-pkce", action="store_true", help="Disable PKCE")
+    login_parser.set_defaults(handler=_cmd_auth_login)
+
+    refresh_parser = auth_sub.add_parser(
+        "refresh",
+        help="Refresh user access token",
+        parents=[shared],
+        description=(
+            "Refresh user_access_token using refresh_token.\n"
+            "By default reads refresh_token from env/flags/local token store."
+        ),
+        formatter_class=_HELP_FORMATTER,
+    )
+    refresh_parser.add_argument("--refresh-token", help="OAuth refresh token")
+    refresh_parser.set_defaults(handler=_cmd_auth_refresh)
+
+    whoami_parser = auth_sub.add_parser(
+        "whoami",
+        help="Get current user info via user token",
+        parents=[shared],
+        description=(
+            "Validate current user token by calling /authen/v1/user_info.\n"
+            "Auto refresh is attempted when token is near expiry or invalid."
+        ),
+        formatter_class=_HELP_FORMATTER,
+    )
+    whoami_parser.set_defaults(handler=_cmd_auth_whoami)
+
+    logout_parser = auth_sub.add_parser("logout", help="Clear local stored user tokens", parents=[shared])
+    logout_parser.add_argument("--all-profiles", action="store_true", help="Remove all profiles in token store")
+    logout_parser.set_defaults(handler=_cmd_auth_logout)
 
     request_parser = auth_sub.add_parser("request", help="Send a raw Feishu OpenAPI request", parents=[shared])
     request_parser.add_argument("method", help="HTTP method, e.g. GET/POST/PUT/PATCH/DELETE")
@@ -160,6 +285,8 @@ def _build_oauth_commands(
     exchange_code = oauth_sub.add_parser("exchange-code", help="Exchange authorization code", parents=[shared])
     exchange_code.add_argument("--code", required=True, help="OAuth authorization code")
     exchange_code.add_argument("--grant-type", default="authorization_code", help="Grant type")
+    exchange_code.add_argument("--redirect-uri", help="OAuth redirect_uri used in authorize step")
+    exchange_code.add_argument("--code-verifier", help="PKCE code_verifier")
     exchange_code.set_defaults(handler=_cmd_oauth_exchange_code)
 
     refresh_token = oauth_sub.add_parser("refresh-token", help="Refresh user access token", parents=[shared])
@@ -530,6 +657,12 @@ def _build_calendar_commands(
             "Tip: for event attachments, prefer `calendar attach-material` "
             "to avoid attachment token permission issues."
         ),
+        formatter_class=_HELP_FORMATTER,
+        epilog=(
+            "Examples:\n"
+            "  feishu calendar primary --auth-mode user --format json\n"
+            "  feishu calendar create-event --auth-mode user --calendar-id <id> --event-file event.json --format json"
+        ),
     )
     calendar_sub = calendar_parser.add_subparsers(dest="calendar_command")
     calendar_sub.required = True
@@ -591,7 +724,28 @@ def _build_calendar_commands(
     get_event.add_argument("--user-id-type", help="Optional user_id_type")
     get_event.set_defaults(handler=_cmd_calendar_get_event)
 
-    create_event = calendar_sub.add_parser("create-event", help="Create event", parents=[shared])
+    create_event = calendar_sub.add_parser(
+        "create-event",
+        help="Create event",
+        parents=[shared],
+        description=(
+            "Create a calendar event on specified calendar_id.\n"
+            "Payload must include at least summary/start_time/end_time."
+        ),
+        formatter_class=_HELP_FORMATTER,
+        epilog=(
+            "event.json example:\n"
+            "  {\n"
+            "    \"summary\": \"1:1 sync\",\n"
+            "    \"description\": \"created by feishu cli\",\n"
+            "    \"start_time\": {\"timestamp\": \"1772475902\"},\n"
+            "    \"end_time\": {\"timestamp\": \"1772479502\"}\n"
+            "  }\n"
+            "\n"
+            "Command:\n"
+            "  feishu calendar create-event --auth-mode user --calendar-id <id> --event-file event.json --format json"
+        ),
+    )
     create_event.add_argument("--calendar-id", required=True, help="Calendar id")
     create_event.add_argument("--event-json", help="Event JSON object string")
     create_event.add_argument("--event-file", help="Event JSON file path")
@@ -692,7 +846,20 @@ def _build_contact_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
     shared: argparse.ArgumentParser,
 ) -> None:
-    contact_parser = subparsers.add_parser("contact", help="Contact (address-book) operations")
+    contact_parser = subparsers.add_parser(
+        "contact",
+        help="Contact (address-book) operations",
+        description=(
+            "Contact / address-book operations.\n"
+            "Some APIs require user auth and specific scopes."
+        ),
+        formatter_class=_HELP_FORMATTER,
+        epilog=(
+            "Examples:\n"
+            "  feishu contact user get --user-id <open_id> --user-id-type open_id --auth-mode user --format json\n"
+            "  feishu contact user search --query \"name\" --auth-mode user --format json"
+        ),
+    )
     contact_sub = contact_parser.add_subparsers(dest="contact_command")
     contact_sub.required = True
 
@@ -700,7 +867,16 @@ def _build_contact_commands(
     user_sub = user_parser.add_subparsers(dest="contact_user_command")
     user_sub.required = True
 
-    user_get = user_sub.add_parser("get", help="Get user by id", parents=[shared])
+    user_get = user_sub.add_parser(
+        "get",
+        help="Get user by id",
+        parents=[shared],
+        description=(
+            "Get single user profile by user id/open_id/union_id.\n"
+            "Typical user scope: contact:contact.base:readonly"
+        ),
+        formatter_class=_HELP_FORMATTER,
+    )
     user_get.add_argument("--user-id", required=True, help="User id")
     user_get.add_argument("--user-id-type", help="Optional user_id_type")
     user_get.add_argument("--department-id-type", help="Optional department_id_type")
@@ -749,6 +925,15 @@ def _build_contact_commands(
         "search",
         help="Search users (requires user access token)",
         parents=[shared],
+        description=(
+            "Search users by keyword.\n"
+            "Requires user auth and scope: contact:user:search"
+        ),
+        formatter_class=_HELP_FORMATTER,
+        epilog=(
+            "Example:\n"
+            "  feishu contact user search --query \"Alice\" --page-size 5 --auth-mode user --format json"
+        ),
     )
     user_search.add_argument("--query", required=True, help="Search query")
     user_search.add_argument("--page-size", type=int, help="Page size")
@@ -1073,10 +1258,111 @@ def _add_webhook_body_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _cmd_auth_token(args: argparse.Namespace) -> Mapping[str, Any]:
-    client = _build_client(args)
+    force_user_auth = str(getattr(args, "auth_mode", "")).strip().lower() == "user"
+    client = _build_client(args, force_user_auth=force_user_auth)
     return {
         "auth_mode": client.config.auth_mode,
         "access_token": client.get_access_token(),
+    }
+
+
+def _cmd_auth_login(args: argparse.Namespace) -> Mapping[str, Any]:
+    client = _build_client(args, force_user_auth=True)
+    redirect_uri = _resolve_oauth_redirect_uri(args)
+    callback = _parse_local_redirect(redirect_uri)
+    if callback is None:
+        raise ValueError("auth login requires a localhost/127.0.0.1 redirect_uri")
+    state = str(getattr(args, "state", None) or _generate_state())
+    use_pkce = not bool(getattr(args, "no_pkce", False))
+    code_verifier: str | None = None
+    code_challenge: str | None = None
+    if use_pkce:
+        code_verifier, code_challenge = _generate_pkce_pair()
+
+    authorize_url = client.build_authorize_url(
+        redirect_uri=redirect_uri,
+        scope=getattr(args, "scope", None),
+        state=state,
+        code_challenge=code_challenge,
+        code_challenge_method="S256" if code_challenge else None,
+    )
+    no_browser = bool(getattr(args, "no_browser", False))
+    if not no_browser:
+        with contextlib.suppress(Exception):
+            webbrowser.open(authorize_url)
+    else:
+        print(f"Authorize URL: {authorize_url}", file=sys.stderr, flush=True)
+    callback_result = _wait_for_oauth_callback(
+        host=callback["host"],
+        port=callback["port"],
+        path=callback["path"],
+        timeout_seconds=float(getattr(args, "timeout_seconds", 180.0)),
+    )
+    callback_state = callback_result.get("state")
+    if callback_state and callback_state != state:
+        raise ValueError("oauth state mismatch")
+    token = client.exchange_authorization_code(
+        callback_result["code"],
+        redirect_uri=redirect_uri,
+        code_verifier=code_verifier,
+    )
+    stored = _store_user_token(args, token)
+    token_payload = token.to_dict()
+    token_payload.update(
+        {
+            "authorize_url": authorize_url,
+            "profile": stored.get("profile"),
+            "store_path": stored.get("store_path"),
+            "stored": stored.get("stored", False),
+        }
+    )
+    return token_payload
+
+
+def _cmd_auth_refresh(args: argparse.Namespace) -> Mapping[str, Any]:
+    client = _build_client(args, force_user_auth=True)
+    token = client.refresh_user_access_token(refresh_token=getattr(args, "refresh_token", None))
+    stored = _store_user_token(args, token)
+    payload = token.to_dict()
+    payload.update(
+        {
+            "profile": stored.get("profile"),
+            "store_path": stored.get("store_path"),
+            "stored": stored.get("stored", False),
+        }
+    )
+    return payload
+
+
+def _cmd_auth_whoami(args: argparse.Namespace) -> Mapping[str, Any]:
+    client = _build_client(args, force_user_auth=True)
+    return client.get_user_info().to_dict()
+
+
+def _cmd_auth_logout(args: argparse.Namespace) -> Mapping[str, Any]:
+    context = _resolve_user_token_store_context(args)
+    if not context.enabled or context.store is None:
+        return {
+            "stored": False,
+            "profile": context.profile,
+            "store_path": str(context.store_path),
+            "message": "token store disabled",
+        }
+    if bool(getattr(args, "all_profiles", False)):
+        context.store.clear()
+        return {
+            "stored": True,
+            "all_profiles": True,
+            "store_path": str(context.store_path),
+            "deleted": True,
+        }
+    deleted = context.store.delete_profile(context.profile)
+    return {
+        "stored": True,
+        "all_profiles": False,
+        "profile": context.profile,
+        "store_path": str(context.store_path),
+        "deleted": deleted,
     }
 
 
@@ -1107,7 +1393,7 @@ def _cmd_auth_request(args: argparse.Namespace) -> Mapping[str, Any]:
 
 
 def _cmd_oauth_authorize_url(args: argparse.Namespace) -> Mapping[str, Any]:
-    client = _build_client(args)
+    client = _build_client(args, force_user_auth=True)
     url = client.build_authorize_url(
         redirect_uri=str(args.redirect_uri),
         scope=getattr(args, "scope", None),
@@ -1117,20 +1403,28 @@ def _cmd_oauth_authorize_url(args: argparse.Namespace) -> Mapping[str, Any]:
 
 
 def _cmd_oauth_exchange_code(args: argparse.Namespace) -> Any:
-    client = _build_client(args)
-    return client.exchange_authorization_code(
+    client = _build_client(args, force_user_auth=True)
+    token = client.exchange_authorization_code(
         str(args.code),
         grant_type=str(args.grant_type),
+        redirect_uri=getattr(args, "redirect_uri", None),
+        code_verifier=getattr(args, "code_verifier", None),
     )
+    payload = token.to_dict()
+    payload.update(_store_user_token(args, token))
+    return payload
 
 
 def _cmd_oauth_refresh_token(args: argparse.Namespace) -> Any:
-    client = _build_client(args)
-    return client.refresh_user_access_token(refresh_token=getattr(args, "refresh_token", None))
+    client = _build_client(args, force_user_auth=True)
+    token = client.refresh_user_access_token(refresh_token=getattr(args, "refresh_token", None))
+    payload = token.to_dict()
+    payload.update(_store_user_token(args, token))
+    return payload
 
 
 def _cmd_oauth_user_info(args: argparse.Namespace) -> Any:
-    client = _build_client(args)
+    client = _build_client(args, force_user_auth=True)
     return client.get_user_info(user_access_token=getattr(args, "user_access_token", None))
 
 
@@ -2297,11 +2591,30 @@ async def _run_ws_listener(
     return int(state["events"])
 
 
-def _build_client(args: argparse.Namespace) -> FeishuClient:
-    return FeishuClient(_build_config(args))
+def _build_client(args: argparse.Namespace, *, force_user_auth: bool = False) -> FeishuClient:
+    token_context = _resolve_user_token_store_context(args)
+    config = _build_config(args, force_user_auth=force_user_auth, token_context=token_context)
+    on_user_token_updated = None
+    if token_context.enabled and token_context.store is not None and not token_context.from_env_or_arg:
+        profile = token_context.profile
+        app_id = config.app_id
+        store = token_context.store
+
+        def _persist(token: Any) -> None:
+            if not hasattr(token, "access_token"):
+                return
+            store.save_profile(profile, _to_stored_user_token(token, app_id=app_id))
+
+        on_user_token_updated = _persist
+    return FeishuClient(config, on_user_token_updated=on_user_token_updated)
 
 
-def _build_config(args: argparse.Namespace) -> FeishuConfig:
+def _build_config(
+    args: argparse.Namespace,
+    *,
+    force_user_auth: bool = False,
+    token_context: _UserTokenStoreContext | None = None,
+) -> FeishuConfig:
     env_app_id = os.getenv("FEISHU_APP_ID") or os.getenv("APP_ID")
     env_app_secret = os.getenv("FEISHU_APP_SECRET") or os.getenv("APP_SECRET")
     env_auth_mode = os.getenv("FEISHU_AUTH_MODE")
@@ -2313,21 +2626,93 @@ def _build_config(args: argparse.Namespace) -> FeishuConfig:
 
     app_id = env_app_id or getattr(args, "app_id", None)
     app_secret = env_app_secret or getattr(args, "app_secret", None)
-    auth_mode = (env_auth_mode or getattr(args, "auth_mode", None) or "tenant").strip().lower()
+    if force_user_auth:
+        auth_mode = "user"
+    else:
+        auth_mode = (env_auth_mode or getattr(args, "auth_mode", None) or "tenant").strip().lower()
     base_url = getattr(args, "base_url", None) or env_base_url or _DEFAULT_BASE_URL
     app_access_token = env_app_access_token or getattr(args, "app_access_token", None)
-    user_access_token = env_user_access_token or getattr(args, "user_access_token", None)
-    user_refresh_token = env_user_refresh_token or getattr(args, "user_refresh_token", None)
+    stored_token = token_context.loaded_token if token_context is not None else None
+    stored_access_token = stored_token.access_token if stored_token is not None else None
+    stored_refresh_token = stored_token.refresh_token if stored_token is not None else None
+    user_access_from_store = (
+        env_user_access_token is None
+        and getattr(args, "user_access_token", None) is None
+        and stored_token is not None
+        and bool(stored_access_token)
+    )
+    user_refresh_from_store = (
+        env_user_refresh_token is None
+        and getattr(args, "user_refresh_token", None) is None
+        and stored_token is not None
+        and bool(stored_refresh_token)
+    )
+    user_access_token = (
+        env_user_access_token
+        or getattr(args, "user_access_token", None)
+        or (stored_access_token if user_access_from_store else None)
+    )
+    user_refresh_token = (
+        env_user_refresh_token
+        or getattr(args, "user_refresh_token", None)
+        or (stored_refresh_token if user_refresh_from_store else None)
+    )
     generic_access_token = env_access_token or getattr(args, "access_token", None)
     resolved_access_token = generic_access_token
+    user_access_token_expires_at = stored_token.expires_at if user_access_from_store and stored_token else None
+    user_refresh_token_expires_at = (
+        stored_token.refresh_expires_at if user_refresh_from_store and stored_token else None
+    )
+    env_refresh_before = os.getenv("FEISHU_USER_TOKEN_REFRESH_BEFORE_SECONDS")
+    refresh_before_raw = env_refresh_before
+    refresh_before_seconds = _DEFAULT_USER_TOKEN_REFRESH_BEFORE_SECONDS
+    if refresh_before_raw:
+        try:
+            refresh_before_seconds = float(refresh_before_raw)
+        except ValueError as exc:
+            raise ValueError("FEISHU_USER_TOKEN_REFRESH_BEFORE_SECONDS must be a number") from exc
 
     timeout_seconds = _resolve_timeout_seconds(args)
 
     if auth_mode not in {"tenant", "user"}:
         raise ConfigurationError("invalid auth mode: FEISHU_AUTH_MODE/--auth-mode must be 'tenant' or 'user'")
 
+    group = getattr(args, "group", None)
+    auth_command = str(getattr(args, "auth_command", ""))
+    oauth_command = str(getattr(args, "oauth_command", ""))
+
+    skip_tenant_token_requirement = (
+        (group == "oauth" and oauth_command in {"authorize-url", "exchange-code", "refresh-token"})
+        or (group == "auth" and auth_command in {"login", "refresh"})
+    )
+    skip_user_access_token_requirement = (
+        (group == "oauth" and oauth_command in {"authorize-url", "exchange-code", "refresh-token"})
+        or (group == "auth" and auth_command in {"login", "refresh"})
+    )
+
+    if group == "auth":
+        if auth_command == "login":
+            if not app_id:
+                raise ConfigurationError("auth login requires app_id")
+            if not (app_access_token or (app_id and app_secret)):
+                raise ConfigurationError("auth login requires app_access_token or app_id/app_secret")
+        elif auth_command == "refresh":
+            refresh_token_arg = getattr(args, "refresh_token", None)
+            if not refresh_token_arg and not user_refresh_token:
+                raise ConfigurationError("auth refresh requires --refresh-token or stored/user refresh token")
+            if not (app_access_token or (app_id and app_secret)):
+                raise ConfigurationError("auth refresh requires app_access_token or app_id/app_secret")
+        elif auth_command == "whoami":
+            if not resolved_access_token and not user_access_token and not user_refresh_token:
+                raise ConfigurationError(
+                    "auth whoami requires user_access_token/access_token or user_refresh_token"
+                )
+            if user_refresh_token and not (app_access_token or (app_id and app_secret)):
+                raise ConfigurationError(
+                    "refreshing user token requires app_access_token or app_id/app_secret"
+                )
+
     if getattr(args, "group", None) == "oauth":
-        oauth_command = str(getattr(args, "oauth_command", ""))
         if oauth_command == "authorize-url":
             if not app_id:
                 raise ConfigurationError("oauth authorize-url requires app_id")
@@ -2353,17 +2738,19 @@ def _build_config(args: argparse.Namespace) -> FeishuConfig:
             user_refresh_token=user_refresh_token,
             base_url=base_url,
             timeout_seconds=timeout_seconds,
+            user_access_token_expires_at=user_access_token_expires_at,
+            user_refresh_token_expires_at=user_refresh_token_expires_at,
+            user_token_refresh_before_seconds=refresh_before_seconds,
         )
 
     if auth_mode == "tenant":
-        if not resolved_access_token and (not app_id or not app_secret):
+        if not skip_tenant_token_requirement and not resolved_access_token and (not app_id or not app_secret):
             raise ConfigurationError(
                 "tenant mode requires either access_token or app_id/app_secret"
             )
     else:
-        if not resolved_access_token:
-            resolved_access_token = user_access_token
-        if not resolved_access_token and not user_refresh_token:
+        effective_user_access = resolved_access_token or user_access_token
+        if not skip_user_access_token_requirement and not effective_user_access and not user_refresh_token:
             raise ConfigurationError(
                 "user mode requires user_access_token/access_token or user_refresh_token"
             )
@@ -2380,9 +2767,277 @@ def _build_config(args: argparse.Namespace) -> FeishuConfig:
         app_access_token=app_access_token,
         user_access_token=user_access_token,
         user_refresh_token=user_refresh_token,
+        user_access_token_expires_at=user_access_token_expires_at,
+        user_refresh_token_expires_at=user_refresh_token_expires_at,
+        user_token_refresh_before_seconds=refresh_before_seconds,
         base_url=base_url,
         timeout_seconds=timeout_seconds,
     )
+
+
+def _resolve_user_token_store_context(args: argparse.Namespace) -> _UserTokenStoreContext:
+    profile = (
+        str(getattr(args, "profile", "")).strip()
+        or str(os.getenv("FEISHU_PROFILE", "")).strip()
+        or "default"
+    )
+    no_store_raw = bool(getattr(args, "no_store", False)) or _is_truthy(os.getenv("FEISHU_NO_STORE"))
+    token_store_path_value = (
+        getattr(args, "token_store", None)
+        or os.getenv("FEISHU_TOKEN_STORE_PATH")
+        or os.getenv("FEISHU_TOKEN_STORE")
+    )
+    store_path = (
+        Path(str(token_store_path_value))
+        if token_store_path_value
+        else default_token_store_path()
+    )
+    from_env_or_arg = any(
+        bool(value)
+        for value in (
+            os.getenv("FEISHU_USER_ACCESS_TOKEN"),
+            os.getenv("FEISHU_USER_REFRESH_TOKEN"),
+            getattr(args, "user_access_token", None),
+            getattr(args, "user_refresh_token", None),
+        )
+    )
+    if no_store_raw:
+        return _UserTokenStoreContext(
+            enabled=False,
+            profile=profile,
+            store_path=store_path,
+            store=None,
+            from_env_or_arg=from_env_or_arg,
+            loaded_token=None,
+        )
+    store = TokenStore(store_path)
+    loaded = store.load_profile(profile)
+    return _UserTokenStoreContext(
+        enabled=True,
+        profile=profile,
+        store_path=store_path,
+        store=store,
+        from_env_or_arg=from_env_or_arg,
+        loaded_token=loaded,
+    )
+
+
+def _store_user_token(args: argparse.Namespace, token: Any) -> Mapping[str, Any]:
+    context = _resolve_user_token_store_context(args)
+    if not context.enabled or context.store is None:
+        return {
+            "stored": False,
+            "profile": context.profile,
+            "store_path": str(context.store_path),
+        }
+    app_id = (
+        os.getenv("FEISHU_APP_ID")
+        or os.getenv("APP_ID")
+        or getattr(args, "app_id", None)
+    )
+    context.store.save_profile(
+        context.profile,
+        _to_stored_user_token(token, app_id=str(app_id) if app_id else None),
+    )
+    return {
+        "stored": True,
+        "profile": context.profile,
+        "store_path": str(context.store_path),
+    }
+
+
+def _to_stored_user_token(token: Any, *, app_id: str | None) -> StoredUserToken:
+    raw_payload: Mapping[str, Any] = {}
+    raw = getattr(token, "raw", None)
+    if isinstance(raw, Mapping):
+        raw_payload = raw
+    now = time.time()
+    expires_in = _to_optional_int(getattr(token, "expires_in", None))
+    refresh_expires_in = _to_optional_int(getattr(token, "refresh_expires_in", None))
+    expires_at = now + max(expires_in, 1) if expires_in is not None else None
+    refresh_expires_at = (
+        now + max(refresh_expires_in, 1)
+        if refresh_expires_in is not None
+        else None
+    )
+    scope = _to_optional_str(getattr(token, "scope", None))
+    if scope is None:
+        scope = _to_optional_str(raw_payload.get("scope"))
+    return StoredUserToken(
+        access_token=str(getattr(token, "access_token")),
+        refresh_token=_to_optional_str(getattr(token, "refresh_token", None)),
+        expires_at=expires_at,
+        refresh_expires_at=refresh_expires_at,
+        token_type=_to_optional_str(getattr(token, "token_type", None)),
+        scope=scope,
+        app_id=app_id,
+        tenant_key=_to_optional_str(getattr(token, "tenant_key", None)),
+        open_id=_to_optional_str(getattr(token, "open_id", None)),
+        user_id=_to_optional_str(getattr(token, "user_id", None)),
+        union_id=_to_optional_str(getattr(token, "union_id", None)),
+        updated_at=now,
+    )
+
+
+def _resolve_oauth_redirect_uri(args: argparse.Namespace) -> str:
+    redirect_uri = getattr(args, "redirect_uri", None)
+    if redirect_uri:
+        return str(redirect_uri)
+    host = str(getattr(args, "redirect_host", _DEFAULT_OAUTH_CALLBACK_HOST))
+    port = int(getattr(args, "redirect_port", _DEFAULT_OAUTH_CALLBACK_PORT))
+    path = str(getattr(args, "redirect_path", _DEFAULT_OAUTH_CALLBACK_PATH))
+    if not path.startswith("/"):
+        path = f"/{path}"
+    return f"http://{host}:{port}{path}"
+
+
+def _parse_local_redirect(redirect_uri: str) -> Mapping[str, Any] | None:
+    parsed = urlparse(redirect_uri)
+    host = parsed.hostname
+    if host not in {"127.0.0.1", "localhost"}:
+        return None
+    path = parsed.path or "/"
+    port = parsed.port
+    if port is None:
+        port = 80 if parsed.scheme == "http" else 443
+    return {"host": host, "port": int(port), "path": path}
+
+
+def _wait_for_oauth_callback(
+    *,
+    host: str,
+    port: int,
+    path: str,
+    timeout_seconds: float,
+) -> Mapping[str, str]:
+    result: dict[str, str] = {}
+    done = threading.Event()
+
+    class _OAuthCallbackHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            parsed = urlparse(self.path)
+            if parsed.path != path:
+                self.send_response(404)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b"Not Found")
+                return
+            query = parse_qs(parsed.query, keep_blank_values=True)
+            error = _first_query(query, "error")
+            if error:
+                result["error"] = error
+                result["error_description"] = _first_query(query, "error_description") or ""
+                done.set()
+                self.send_response(400)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b"OAuth authorization failed.")
+                return
+            code = _first_query(query, "code")
+            state = _first_query(query, "state")
+            if not code:
+                self.send_response(400)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(b"Missing code.")
+                return
+            result["code"] = code
+            if state:
+                result["state"] = state
+            done.set()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(
+                b"<html><body><h3>Feishu authorization completed.</h3>"
+                b"<p>You can close this tab now.</p></body></html>"
+            )
+
+        def log_message(self, format: str, *args: Any) -> None:
+            return
+
+    server = ThreadingHTTPServer((host, port), _OAuthCallbackHandler)
+    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.1}, daemon=True)
+    thread.start()
+    try:
+        if not done.wait(timeout=timeout_seconds):
+            raise TimeoutError(
+                f"oauth callback timeout after {timeout_seconds:.0f}s, "
+                "please check redirect URI and app security settings"
+            )
+        error = result.get("error")
+        if error:
+            error_description = result.get("error_description")
+            if error_description:
+                raise ValueError(f"oauth authorization failed: {error} ({error_description})")
+            raise ValueError(f"oauth authorization failed: {error}")
+        code = result.get("code")
+        if not code:
+            raise ValueError("oauth callback missing authorization code")
+        payload: dict[str, str] = {"code": code}
+        state = result.get("state")
+        if state:
+            payload["state"] = state
+        return payload
+    finally:
+        with contextlib.suppress(Exception):
+            server.shutdown()
+        with contextlib.suppress(Exception):
+            server.server_close()
+        thread.join(timeout=1.0)
+
+
+def _generate_state() -> str:
+    return secrets.token_urlsafe(24)
+
+
+def _generate_pkce_pair() -> tuple[str, str]:
+    verifier = secrets.token_urlsafe(64)
+    digest = hashlib.sha256(verifier.encode("utf-8")).digest()
+    challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+    return verifier, challenge
+
+
+def _first_query(query: Mapping[str, list[str]], key: str) -> str | None:
+    values = query.get(key)
+    if not values:
+        return None
+    value = values[0]
+    return value if value else None
+
+
+def _is_truthy(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _to_optional_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
+def _to_optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            return int(text)
+        except ValueError:
+            return None
+    return None
 
 
 def _resolve_timeout_seconds(args: argparse.Namespace) -> float:
@@ -2889,13 +3544,48 @@ def _format_http_error(exc: HTTPRequestError) -> str:
     if exc.response_text:
         parts.append(f"response={exc.response_text[:500]}")
         response_lower = exc.response_text.lower()
+        if '"code":20029' in response_lower or "redirect_uri" in response_lower and "illegal" in response_lower:
+            parts.append(
+                "hint=oauth redirect_uri is invalid; configure exact redirect URL in "
+                "Feishu console: Development Config -> Security -> Redirect URL."
+            )
         if '"code":193107' in response_lower or "no permission to access attachment file token" in response_lower:
             parts.append(
                 "hint=calendar attachments require media upload with "
                 "parent_type='calendar' and parent_node='<calendar_id>'; "
                 "prefer `feishu calendar attach-material`."
             )
+        if '"code":99991679' in response_lower or "required one of these privileges under the user identity" in response_lower:
+            scope_hint = _extract_required_user_scopes(exc.response_text)
+            if scope_hint:
+                parts.append(
+                    "hint=missing user scopes; re-authorize with:\n"
+                    f"feishu auth login --scope \"offline_access {scope_hint}\" --format json"
+                )
+            else:
+                parts.append(
+                    "hint=missing user scope; run `feishu auth login --scope \"offline_access <required_scope>\"` "
+                    "and retry."
+                )
     return "; ".join(parts)
+
+
+def _extract_required_user_scopes(response_text: str) -> str:
+    match = re.search(
+        r"required one of these privileges under the user identity:\s*\[([^\]]+)\]",
+        response_text,
+        flags=re.IGNORECASE,
+    )
+    if match is None:
+        return ""
+    raw_scopes = [item.strip() for item in match.group(1).split(",")]
+    scopes: list[str] = []
+    for scope in raw_scopes:
+        if not scope:
+            continue
+        if scope not in scopes:
+            scopes.append(scope)
+    return " ".join(scopes)
 
 
 def _is_flat_mapping(mapping: Mapping[str, Any]) -> bool:

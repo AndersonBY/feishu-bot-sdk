@@ -15,8 +15,11 @@ from feishu_bot_sdk.contact import ContactService
 from feishu_bot_sdk.drive_files import DriveFileService
 from feishu_bot_sdk.drive_permissions import DrivePermissionService
 from feishu_bot_sdk.events import build_event_context
+from feishu_bot_sdk.exceptions import HTTPRequestError
+from feishu_bot_sdk.feishu import OAuthUserToken
 from feishu_bot_sdk.im.media import MediaService
 from feishu_bot_sdk.im.messages import MessageService
+from feishu_bot_sdk.token_store import StoredUserToken
 from feishu_bot_sdk.webhook.security import compute_signature
 from feishu_bot_sdk.wiki import WikiService
 from feishu_bot_sdk.ws.endpoint import WSEndpoint, WSRemoteConfig
@@ -47,6 +50,47 @@ def test_build_config_prefers_env_credentials(monkeypatch: Any) -> None:
     assert isinstance(config, FeishuConfig)
     assert config.app_id == "env_app_id"
     assert config.app_secret == "env_app_secret"
+
+
+def test_build_config_uses_user_token_from_store_when_env_and_args_missing() -> None:
+    store_token = StoredUserToken(
+        access_token="store_access_token",
+        expires_at=123456.0,
+    )
+    context = cli._UserTokenStoreContext(
+        enabled=True,
+        profile="default",
+        store_path=Path("tokens.json"),
+        store=None,
+        from_env_or_arg=False,
+        loaded_token=store_token,
+    )
+    config = cli._build_config(_base_args(auth_mode="user"), force_user_auth=True, token_context=context)
+    assert config.access_token is None
+    assert config.user_access_token == "store_access_token"
+    assert config.user_refresh_token is None
+    assert config.user_access_token_expires_at == 123456.0
+    assert config.user_refresh_token_expires_at is None
+
+
+def test_build_config_prefers_env_user_token_over_store(monkeypatch: Any) -> None:
+    monkeypatch.setenv("FEISHU_USER_ACCESS_TOKEN", "env_user_access_token")
+    store_token = StoredUserToken(
+        access_token="store_access_token",
+        expires_at=123456.0,
+    )
+    context = cli._UserTokenStoreContext(
+        enabled=True,
+        profile="default",
+        store_path=Path("tokens.json"),
+        store=None,
+        from_env_or_arg=True,
+        loaded_token=store_token,
+    )
+    config = cli._build_config(_base_args(auth_mode="user"), force_user_auth=True, token_context=context)
+    assert config.access_token is None
+    assert config.user_access_token == "env_user_access_token"
+    assert config.user_access_token_expires_at is None
 
 
 def test_auth_token_json_output(monkeypatch: Any, capsys: Any) -> None:
@@ -987,10 +1031,19 @@ def test_oauth_exchange_code(monkeypatch: Any, capsys: Any) -> None:
         code: str,
         *,
         grant_type: str = "authorization_code",
-    ) -> dict[str, Any]:
+        redirect_uri: str | None = None,
+        code_verifier: str | None = None,
+    ) -> OAuthUserToken:
         assert code == "code_123"
         assert grant_type == "authorization_code"
-        return {"access_token": "u_token_1", "refresh_token": "u_refresh_1"}
+        assert redirect_uri is None
+        assert code_verifier is None
+        return OAuthUserToken(
+            access_token="u_token_1",
+            token_type="Bearer",
+            expires_in=7200,
+            refresh_token="u_refresh_1",
+        )
 
     monkeypatch.setattr("feishu_bot_sdk.feishu.FeishuClient.exchange_authorization_code", _fake_exchange)
 
@@ -1007,6 +1060,137 @@ def test_oauth_exchange_code(monkeypatch: Any, capsys: Any) -> None:
     assert code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["access_token"] == "u_token_1"
+
+
+def test_extract_required_user_scopes() -> None:
+    text = (
+        "required one of these privileges under the user identity: "
+        "[contact:user:search, contact:contact.base:readonly, contact:user:search]"
+    )
+    assert cli._extract_required_user_scopes(text) == "contact:user:search contact:contact.base:readonly"
+
+
+def test_format_http_error_permission_hint_includes_scope_suggestion() -> None:
+    exc = HTTPRequestError(
+        "http request failed",
+        status_code=400,
+        response_text=(
+            '{"code":99991679,"msg":"Unauthorized. required one of these privileges under the user identity: '
+            '[contact:user:search, contact:contact.base:readonly]"}'
+        ),
+    )
+    message = cli._format_http_error(exc)
+    assert "missing user scopes" in message
+    assert "contact:user:search contact:contact.base:readonly" in message
+
+
+def test_format_http_error_redirect_uri_hint() -> None:
+    exc = HTTPRequestError(
+        "http request failed",
+        status_code=400,
+        response_text='{"code":20029,"msg":"redirect_uri request is illegal"}',
+    )
+    message = cli._format_http_error(exc)
+    assert "oauth redirect_uri is invalid" in message
+
+
+def test_auth_login_stores_user_token(monkeypatch: Any, tmp_path: Path, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    def _fake_wait_for_oauth_callback(*, host: str, port: int, path: str, timeout_seconds: float) -> dict[str, str]:
+        assert host == "127.0.0.1"
+        assert port == 18080
+        assert path == "/callback"
+        assert timeout_seconds == 180.0
+        return {"code": "code_123", "state": "state_123"}
+
+    def _fake_exchange(
+        _self: Any,
+        code: str,
+        *,
+        grant_type: str = "authorization_code",
+        redirect_uri: str | None = None,
+        code_verifier: str | None = None,
+    ) -> OAuthUserToken:
+        assert code == "code_123"
+        assert grant_type == "authorization_code"
+        assert redirect_uri == "http://127.0.0.1:18080/callback"
+        assert isinstance(code_verifier, str) and code_verifier
+        return OAuthUserToken(
+            access_token="u_token_1",
+            token_type="Bearer",
+            expires_in=7200,
+            refresh_token="u_refresh_1",
+            refresh_expires_in=36000,
+            open_id="ou_123",
+        )
+
+    monkeypatch.setattr("feishu_bot_sdk.cli._wait_for_oauth_callback", _fake_wait_for_oauth_callback)
+    monkeypatch.setattr("feishu_bot_sdk.feishu.FeishuClient.exchange_authorization_code", _fake_exchange)
+
+    store_path = tmp_path / "tokens.json"
+    code = cli.main(
+        [
+            "auth",
+            "login",
+            "--state",
+            "state_123",
+            "--no-browser",
+            "--token-store",
+            str(store_path),
+            "--profile",
+            "default",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["access_token"] == "u_token_1"
+    assert payload["stored"] is True
+    stored = json.loads(store_path.read_text(encoding="utf-8"))
+    profile = stored["profiles"]["default"]
+    assert profile["access_token"] == "u_token_1"
+    assert profile["refresh_token"] == "u_refresh_1"
+    assert profile["open_id"] == "ou_123"
+
+
+def test_auth_logout_clears_profile(monkeypatch: Any, tmp_path: Path, capsys: Any) -> None:
+    store_path = tmp_path / "tokens.json"
+    store_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "profiles": {
+                    "default": {
+                        "access_token": "u_token_1",
+                        "refresh_token": "u_refresh_1",
+                    }
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    code = cli.main(
+        [
+            "auth",
+            "logout",
+            "--token-store",
+            str(store_path),
+            "--profile",
+            "default",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["deleted"] is True
+    data = json.loads(store_path.read_text(encoding="utf-8"))
+    assert data["profiles"] == {}
 
 
 def test_webhook_verify_signature(monkeypatch: Any, capsys: Any) -> None:

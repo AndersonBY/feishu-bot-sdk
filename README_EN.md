@@ -41,7 +41,8 @@ feishu --help
   - Env: `FEISHU_APP_ID`, `FEISHU_APP_SECRET`, `FEISHU_AUTH_MODE`, `FEISHU_ACCESS_TOKEN`
   - User env: `FEISHU_USER_ACCESS_TOKEN`, `FEISHU_USER_REFRESH_TOKEN`
   - OAuth exchange env: `FEISHU_APP_ACCESS_TOKEN`
-  - Flags: `--app-id`, `--app-secret`, `--auth-mode`, `--access-token`
+  - Token store: `FEISHU_PROFILE`, `FEISHU_TOKEN_STORE_PATH`, `FEISHU_NO_STORE`
+  - Flags: `--app-id`, `--app-secret`, `--auth-mode`, `--access-token`, `--profile`, `--token-store`, `--no-store`
 
 Examples:
 
@@ -49,7 +50,13 @@ Examples:
 # 1) Get token for current auth mode (JSON output)
 feishu auth token --format json
 
-# 1.1) OAuth authorize + token exchange
+# 1.1) CLI User Auth (localhost callback + token persistence)
+feishu auth login --scope "offline_access contact:user.base:readonly" --no-browser --format json
+feishu auth whoami --format json
+feishu auth refresh --format json
+feishu auth logout --format json
+
+# 1.2) Low-level OAuth debug commands
 feishu oauth authorize-url --redirect-uri https://example.com/callback --format json
 feishu oauth exchange-code --code CODE --format json
 

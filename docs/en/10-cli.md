@@ -19,24 +19,33 @@ feishu --help
 - `--access-token`: optional static access token for current auth mode
 - `--app-access-token`: optional app token for OAuth code/refresh exchange
 - `--user-access-token` / `--user-refresh-token`: user tokens (common with `auth_mode=user`)
+- `--profile`: local token profile (default from `FEISHU_PROFILE` or `default`)
+- `--token-store`: local token store path
+- `--no-store`: disable local token store read/write
 - `--base-url`: default `https://open.feishu.cn/open-apis`
 - `--timeout`: request timeout seconds
 
-Auth precedence: environment variables first, then CLI flags.
+Auth precedence: environment variables > CLI flags > local token store.
 
 - Env vars: `FEISHU_APP_ID` / `FEISHU_APP_SECRET` / `FEISHU_AUTH_MODE` / `FEISHU_ACCESS_TOKEN`
 - User auth env vars: `FEISHU_USER_ACCESS_TOKEN` / `FEISHU_USER_REFRESH_TOKEN`
 - OAuth exchange env var: `FEISHU_APP_ACCESS_TOKEN`
+- Token store env vars: `FEISHU_PROFILE` / `FEISHU_TOKEN_STORE_PATH` / `FEISHU_NO_STORE`
 - Compatible vars: `APP_ID` / `APP_SECRET`
 
 ## Common Commands
 
 ```bash
-# auth
+# auth (recommended: localhost callback, no public URL)
 feishu auth token --format json
+feishu auth login --scope "offline_access contact:user.base:readonly" --no-browser --format json
+feishu auth whoami --format json
+feishu auth refresh --format json
+feishu auth logout --format json
+
+# low-level OAuth debug commands
 feishu oauth authorize-url --redirect-uri https://example.com/callback --format json
 feishu oauth exchange-code --code CODE --format json
-feishu oauth user-info --auth-mode user --user-access-token u-xxx --format json
 
 # messaging
 feishu im send-text --receive-id ou_xxx --text "hello"
@@ -65,6 +74,20 @@ feishu calendar list-calendars --page-size 50 --format json
 feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json
 feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
 ```
+
+## User Auth (CLI Best Practice)
+
+`feishu auth login` uses a local callback by default (`http://127.0.0.1:18080/callback`) and enables PKCE.
+
+- Step 1: add the localhost redirect URL in Feishu app security settings
+- Step 2: run `feishu auth login`
+- Step 3: use `feishu auth whoami` and other `auth_mode=user` commands directly
+
+Automatic behavior:
+
+- pre-refresh near-expiry access tokens (default 300 seconds before expiry)
+- on token-invalid API responses, auto-refresh and retry once
+- persist refreshed token pairs to local token store (including rotated refresh token)
 
 ## Calendar Attachments (Strongly Recommended for Agents)
 

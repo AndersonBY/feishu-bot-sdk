@@ -3,7 +3,7 @@ import json
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Callable, Dict, Mapping, Optional
 from urllib.parse import urlencode
 
 from .config import FeishuConfig
@@ -28,6 +28,7 @@ class OAuthUserToken:
     user_id: Optional[str] = None
     union_id: Optional[str] = None
     tenant_key: Optional[str] = None
+    scope: Optional[str] = None
     raw: Optional[Mapping[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -41,6 +42,7 @@ class OAuthUserToken:
             "user_id": self.user_id,
             "union_id": self.union_id,
             "tenant_key": self.tenant_key,
+            "scope": self.scope,
             "raw": dict(self.raw or {}),
         }
 
@@ -94,6 +96,7 @@ class FeishuClient:
         *,
         http_client: Optional[JsonHttpClient] = None,
         rate_limiter: Optional[AdaptiveRateLimiter] = None,
+        on_user_token_updated: Optional[Callable[[OAuthUserToken], None]] = None,
     ) -> None:
         self._config = config
         self._http = http_client or JsonHttpClient(timeout_seconds=config.timeout_seconds)
@@ -101,7 +104,10 @@ class FeishuClient:
         self._app_token_cache: Optional[_TokenCache] = None
         self._tenant_token_cache: Optional[_TokenCache] = None
         self._user_token_cache: Optional[_UserTokenCache] = _initial_user_token_cache(config)
-        self._token_lock = threading.Lock()
+        self._app_token_lock = threading.Lock()
+        self._tenant_token_lock = threading.Lock()
+        self._user_token_lock = threading.Lock()
+        self._on_user_token_updated = on_user_token_updated
 
     @property
     def config(self) -> FeishuConfig:
@@ -117,7 +123,7 @@ class FeishuClient:
         cached = self._app_token_cache
         if cached and cached.expires_at > time.time() + 30:
             return cached.token
-        with self._token_lock:
+        with self._app_token_lock:
             cached = self._app_token_cache
             if cached and cached.expires_at > time.time() + 30:
                 return cached.token
@@ -130,17 +136,23 @@ class FeishuClient:
         redirect_uri: str,
         scope: Optional[str] = None,
         state: Optional[str] = None,
+        code_challenge: Optional[str] = None,
+        code_challenge_method: Optional[str] = None,
     ) -> str:
         if not self._config.app_id:
             raise ConfigurationError("app_id is required to build authorize url")
         query: dict[str, str] = {
             "app_id": self._config.app_id,
+            "response_type": "code",
             "redirect_uri": redirect_uri,
         }
         if scope:
             query["scope"] = scope
         if state:
             query["state"] = state
+        if code_challenge:
+            query["code_challenge"] = code_challenge
+            query["code_challenge_method"] = code_challenge_method or "S256"
         base_open_domain = _derive_open_domain(self._config.base_url)
         return f"{base_open_domain}/open-apis/authen/v1/authorize?{urlencode(query)}"
 
@@ -149,11 +161,17 @@ class FeishuClient:
         code: str,
         *,
         grant_type: str = "authorization_code",
+        redirect_uri: Optional[str] = None,
+        code_verifier: Optional[str] = None,
     ) -> OAuthUserToken:
         payload = {
             "grant_type": grant_type,
             "code": code,
         }
+        if redirect_uri:
+            payload["redirect_uri"] = redirect_uri
+        if code_verifier:
+            payload["code_verifier"] = code_verifier
         data = self._request_with_app_access_token("POST", "/authen/v1/access_token", payload=payload)
         token = _parse_user_token(data)
         self._update_user_token_cache(token)
@@ -201,40 +219,60 @@ class FeishuClient:
         payload: Optional[Mapping[str, object]] = None,
         params: Optional[Mapping[str, object]] = None,
     ) -> Dict[str, Any]:
-        token = self._resolve_access_token()
-        url = f"{self._config.base_url}{path}"
         method_upper = method.upper()
+        url = f"{self._config.base_url}{path}"
         query_params = dict(params or {})
         json_payload = dict(payload or {})
         if method_upper == "GET" and not query_params:
             query_params = json_payload
             json_payload = {}
-        headers = {"Authorization": f"Bearer {token}"}
-        if method_upper != "GET":
-            headers["Content-Type"] = "application/json"
         key = build_rate_limit_key(method_upper, path)
-        if self._rate_limiter is not None:
-            self._rate_limiter.acquire(key)
-        try:
-            data = self._http.request_json(
-                method_upper,
-                url,
-                headers=headers,
-                params=query_params,
-                payload=json_payload,
-                timeout_seconds=self._config.timeout_seconds,
-            )
-        except HTTPRequestError as exc:
-            if self._rate_limiter is not None and exc.status_code == 429:
-                self._rate_limiter.on_throttled(key, _extract_retry_after(exc.response_headers))
-            raise
-        if data.get("code") != 0:
-            if self._rate_limiter is not None and _is_throttled_response(data):
-                self._rate_limiter.on_throttled(key)
-            raise FeishuError(f"feishu api failed: {data}")
-        if self._rate_limiter is not None:
-            self._rate_limiter.on_success(key)
-        return data
+        refreshed_once = False
+        while True:
+            token = self._resolve_access_token()
+            headers = {"Authorization": f"Bearer {token}"}
+            if method_upper != "GET":
+                headers["Content-Type"] = "application/json"
+            if self._rate_limiter is not None:
+                self._rate_limiter.acquire(key)
+            try:
+                data = self._http.request_json(
+                    method_upper,
+                    url,
+                    headers=headers,
+                    params=query_params,
+                    payload=json_payload,
+                    timeout_seconds=self._config.timeout_seconds,
+                )
+            except HTTPRequestError as exc:
+                if self._rate_limiter is not None and exc.status_code == 429:
+                    self._rate_limiter.on_throttled(key, _extract_retry_after(exc.response_headers))
+                if (
+                    not refreshed_once
+                    and self._config.auth_mode == "user"
+                    and _is_token_http_error(exc)
+                    and self._can_refresh_user_token()
+                ):
+                    self._force_refresh_user_access_token()
+                    refreshed_once = True
+                    continue
+                raise
+            if data.get("code") != 0:
+                if self._rate_limiter is not None and _is_throttled_response(data):
+                    self._rate_limiter.on_throttled(key)
+                if (
+                    not refreshed_once
+                    and self._config.auth_mode == "user"
+                    and _is_token_api_error(data)
+                    and self._can_refresh_user_token()
+                ):
+                    self._force_refresh_user_access_token()
+                    refreshed_once = True
+                    continue
+                raise FeishuError(f"feishu api failed: {data}")
+            if self._rate_limiter is not None:
+                self._rate_limiter.on_success(key)
+            return data
 
     def _resolve_access_token(self) -> str:
         if self._config.access_token:
@@ -250,7 +288,7 @@ class FeishuClient:
         cached = self._tenant_token_cache
         if cached and cached.expires_at > time.time() + 30:
             return cached.token
-        with self._token_lock:
+        with self._tenant_token_lock:
             cached = self._tenant_token_cache
             if cached and cached.expires_at > time.time() + 30:
                 return cached.token
@@ -262,14 +300,22 @@ class FeishuClient:
             return self._config.user_access_token
 
         cached = self._user_token_cache
-        if cached and cached.expires_at > time.time() + 30:
+        refresh_before = self._config.user_token_refresh_before_seconds
+        if cached and cached.expires_at > time.time() + refresh_before:
             return cached.access_token
-        with self._token_lock:
+        with self._user_token_lock:
             cached = self._user_token_cache
-            if cached and cached.expires_at > time.time() + 30:
+            if cached and cached.expires_at > time.time() + refresh_before:
                 return cached.access_token
             token = self.refresh_user_access_token()
             return token.access_token
+
+    def _can_refresh_user_token(self) -> bool:
+        return _pick_refresh_token(self._config, self._user_token_cache) is not None
+
+    def _force_refresh_user_access_token(self) -> OAuthUserToken:
+        with self._user_token_lock:
+            return self.refresh_user_access_token()
 
     def _refresh_app_access_token(self) -> str:
         if not self._config.app_id or not self._config.app_secret:
@@ -363,6 +409,9 @@ class FeishuClient:
             refresh_token=token.refresh_token,
             refresh_expires_at=refresh_expires_at,
         )
+        callback = self._on_user_token_updated
+        if callback is not None:
+            callback(token)
 
 
 class AsyncFeishuClient:
@@ -372,6 +421,7 @@ class AsyncFeishuClient:
         *,
         http_client: Optional[AsyncJsonHttpClient] = None,
         rate_limiter: Optional[AsyncAdaptiveRateLimiter] = None,
+        on_user_token_updated: Optional[Callable[[OAuthUserToken], None]] = None,
     ) -> None:
         self._config = config
         self._http = http_client or AsyncJsonHttpClient(timeout_seconds=config.timeout_seconds)
@@ -379,7 +429,10 @@ class AsyncFeishuClient:
         self._app_token_cache: Optional[_TokenCache] = None
         self._tenant_token_cache: Optional[_TokenCache] = None
         self._user_token_cache: Optional[_UserTokenCache] = _initial_user_token_cache(config)
-        self._token_lock = asyncio.Lock()
+        self._app_token_lock = asyncio.Lock()
+        self._tenant_token_lock = asyncio.Lock()
+        self._user_token_lock = asyncio.Lock()
+        self._on_user_token_updated = on_user_token_updated
 
     @property
     def config(self) -> FeishuConfig:
@@ -395,7 +448,7 @@ class AsyncFeishuClient:
         cached = self._app_token_cache
         if cached and cached.expires_at > time.time() + 30:
             return cached.token
-        async with self._token_lock:
+        async with self._app_token_lock:
             cached = self._app_token_cache
             if cached and cached.expires_at > time.time() + 30:
                 return cached.token
@@ -408,17 +461,23 @@ class AsyncFeishuClient:
         redirect_uri: str,
         scope: Optional[str] = None,
         state: Optional[str] = None,
+        code_challenge: Optional[str] = None,
+        code_challenge_method: Optional[str] = None,
     ) -> str:
         if not self._config.app_id:
             raise ConfigurationError("app_id is required to build authorize url")
         query: dict[str, str] = {
             "app_id": self._config.app_id,
+            "response_type": "code",
             "redirect_uri": redirect_uri,
         }
         if scope:
             query["scope"] = scope
         if state:
             query["state"] = state
+        if code_challenge:
+            query["code_challenge"] = code_challenge
+            query["code_challenge_method"] = code_challenge_method or "S256"
         base_open_domain = _derive_open_domain(self._config.base_url)
         return f"{base_open_domain}/open-apis/authen/v1/authorize?{urlencode(query)}"
 
@@ -427,11 +486,17 @@ class AsyncFeishuClient:
         code: str,
         *,
         grant_type: str = "authorization_code",
+        redirect_uri: Optional[str] = None,
+        code_verifier: Optional[str] = None,
     ) -> OAuthUserToken:
         payload = {
             "grant_type": grant_type,
             "code": code,
         }
+        if redirect_uri:
+            payload["redirect_uri"] = redirect_uri
+        if code_verifier:
+            payload["code_verifier"] = code_verifier
         data = await self._request_with_app_access_token("POST", "/authen/v1/access_token", payload=payload)
         token = _parse_user_token(data)
         self._update_user_token_cache(token)
@@ -479,40 +544,60 @@ class AsyncFeishuClient:
         payload: Optional[Mapping[str, object]] = None,
         params: Optional[Mapping[str, object]] = None,
     ) -> Dict[str, Any]:
-        token = await self._resolve_access_token()
-        url = f"{self._config.base_url}{path}"
         method_upper = method.upper()
+        url = f"{self._config.base_url}{path}"
         query_params = dict(params or {})
         json_payload = dict(payload or {})
         if method_upper == "GET" and not query_params:
             query_params = json_payload
             json_payload = {}
-        headers = {"Authorization": f"Bearer {token}"}
-        if method_upper != "GET":
-            headers["Content-Type"] = "application/json"
         key = build_rate_limit_key(method_upper, path)
-        if self._rate_limiter is not None:
-            await self._rate_limiter.acquire(key)
-        try:
-            data = await self._http.request_json(
-                method_upper,
-                url,
-                headers=headers,
-                params=query_params,
-                payload=json_payload,
-                timeout_seconds=self._config.timeout_seconds,
-            )
-        except HTTPRequestError as exc:
-            if self._rate_limiter is not None and exc.status_code == 429:
-                await self._rate_limiter.on_throttled(key, _extract_retry_after(exc.response_headers))
-            raise
-        if data.get("code") != 0:
-            if self._rate_limiter is not None and _is_throttled_response(data):
-                await self._rate_limiter.on_throttled(key)
-            raise FeishuError(f"feishu api failed: {data}")
-        if self._rate_limiter is not None:
-            await self._rate_limiter.on_success(key)
-        return data
+        refreshed_once = False
+        while True:
+            token = await self._resolve_access_token()
+            headers = {"Authorization": f"Bearer {token}"}
+            if method_upper != "GET":
+                headers["Content-Type"] = "application/json"
+            if self._rate_limiter is not None:
+                await self._rate_limiter.acquire(key)
+            try:
+                data = await self._http.request_json(
+                    method_upper,
+                    url,
+                    headers=headers,
+                    params=query_params,
+                    payload=json_payload,
+                    timeout_seconds=self._config.timeout_seconds,
+                )
+            except HTTPRequestError as exc:
+                if self._rate_limiter is not None and exc.status_code == 429:
+                    await self._rate_limiter.on_throttled(key, _extract_retry_after(exc.response_headers))
+                if (
+                    not refreshed_once
+                    and self._config.auth_mode == "user"
+                    and _is_token_http_error(exc)
+                    and self._can_refresh_user_token()
+                ):
+                    await self._force_refresh_user_access_token()
+                    refreshed_once = True
+                    continue
+                raise
+            if data.get("code") != 0:
+                if self._rate_limiter is not None and _is_throttled_response(data):
+                    await self._rate_limiter.on_throttled(key)
+                if (
+                    not refreshed_once
+                    and self._config.auth_mode == "user"
+                    and _is_token_api_error(data)
+                    and self._can_refresh_user_token()
+                ):
+                    await self._force_refresh_user_access_token()
+                    refreshed_once = True
+                    continue
+                raise FeishuError(f"feishu api failed: {data}")
+            if self._rate_limiter is not None:
+                await self._rate_limiter.on_success(key)
+            return data
 
     async def aclose(self) -> None:
         await self._http.aclose()
@@ -531,7 +616,7 @@ class AsyncFeishuClient:
         cached = self._tenant_token_cache
         if cached and cached.expires_at > time.time() + 30:
             return cached.token
-        async with self._token_lock:
+        async with self._tenant_token_lock:
             cached = self._tenant_token_cache
             if cached and cached.expires_at > time.time() + 30:
                 return cached.token
@@ -543,14 +628,22 @@ class AsyncFeishuClient:
             return self._config.user_access_token
 
         cached = self._user_token_cache
-        if cached and cached.expires_at > time.time() + 30:
+        refresh_before = self._config.user_token_refresh_before_seconds
+        if cached and cached.expires_at > time.time() + refresh_before:
             return cached.access_token
-        async with self._token_lock:
+        async with self._user_token_lock:
             cached = self._user_token_cache
-            if cached and cached.expires_at > time.time() + 30:
+            if cached and cached.expires_at > time.time() + refresh_before:
                 return cached.access_token
             token = await self.refresh_user_access_token()
             return token.access_token
+
+    def _can_refresh_user_token(self) -> bool:
+        return _pick_refresh_token(self._config, self._user_token_cache) is not None
+
+    async def _force_refresh_user_access_token(self) -> OAuthUserToken:
+        async with self._user_token_lock:
+            return await self.refresh_user_access_token()
 
     async def _refresh_app_access_token(self) -> str:
         if not self._config.app_id or not self._config.app_secret:
@@ -644,6 +737,9 @@ class AsyncFeishuClient:
             refresh_token=token.refresh_token,
             refresh_expires_at=refresh_expires_at,
         )
+        callback = self._on_user_token_updated
+        if callback is not None:
+            callback(token)
 
 
 def _build_rate_tuning(config: FeishuConfig) -> RateLimitTuning:
@@ -697,6 +793,41 @@ def _extract_retry_after(headers: Mapping[str, str]) -> Optional[float]:
     return None
 
 
+def _is_token_api_error(data: Mapping[str, object]) -> bool:
+    code = data.get("code")
+    if isinstance(code, int) and code in {99991663, 99991664, 99991665, 99991668, 99991671}:
+        return True
+    message = _to_optional_str(data.get("msg")) or ""
+    if not message:
+        return False
+    lowered = message.lower()
+    token_keywords = (
+        "token",
+        "access token",
+        "token expired",
+        "token invalid",
+        "invalid access token",
+        "refresh token",
+    )
+    if not any(keyword in lowered for keyword in token_keywords):
+        return False
+    return "permission" not in lowered
+
+
+def _is_token_http_error(exc: HTTPRequestError) -> bool:
+    if exc.status_code not in {400, 401, 403}:
+        return False
+    response = (exc.response_text or "").lower()
+    if not response:
+        return False
+    return (
+        "token" in response
+        or "unauthorized" in response
+        or "invalid access token" in response
+        or "expired" in response
+    )
+
+
 def _derive_open_domain(base_url: str) -> str:
     marker = "/open-apis"
     index = base_url.find(marker)
@@ -708,11 +839,13 @@ def _derive_open_domain(base_url: str) -> str:
 def _initial_user_token_cache(config: FeishuConfig) -> Optional[_UserTokenCache]:
     if not config.user_access_token:
         return None
-    expires_at = float("inf")
-    refresh_expires_at: Optional[float] = None
-    if config.user_refresh_token:
-        # Unknown exact expire time; force refresh soon for managed mode.
-        expires_at = 0.0
+    expires_at = config.user_access_token_expires_at
+    if expires_at is None:
+        expires_at = float("inf")
+        if config.user_refresh_token:
+            # Unknown exact expire time; refresh once to ensure rotation info.
+            expires_at = 0.0
+    refresh_expires_at: Optional[float] = config.user_refresh_token_expires_at
     return _UserTokenCache(
         access_token=config.user_access_token,
         expires_at=expires_at,
@@ -749,6 +882,7 @@ def _parse_user_token(data: Mapping[str, Any]) -> OAuthUserToken:
         user_id=_to_optional_str(payload.get("user_id")),
         union_id=_to_optional_str(payload.get("union_id")),
         tenant_key=_to_optional_str(payload.get("tenant_key")),
+        scope=_to_optional_str(payload.get("scope")),
         raw=dict(payload),
     )
 
