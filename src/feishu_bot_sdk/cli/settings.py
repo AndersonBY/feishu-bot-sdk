@@ -16,6 +16,8 @@ ROOT_HELP_EPILOG = (
     "  2) feishu auth whoami --auth-mode user --format json\n"
     "  3) feishu contact user search --query \"name\" --auth-mode user --format json\n"
     "  4) feishu calendar create-event --auth-mode user --calendar-id <id> --event-file event.json --format json\n"
+    "  5) non-text message resource: feishu media download-file <resource_key> <output> "
+    "--message-id <om_xxx> --resource-type image|file --auth-mode tenant --format json\n"
     "\n"
     "Token precedence: env vars > CLI flags > local token store profile."
 )

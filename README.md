@@ -77,6 +77,9 @@ feishu im reply-markdown om_xxx --markdown "### 已收到" --format json
 
 # 5) 上传图片
 feishu media upload-image ./demo.png
+# 5.1) 下载文件/图片；若是消息内资源需带 message_id
+feishu media download-file file_xxx ./downloads/file.bin --format json
+feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx --resource-type image --format json
 
 # 6) CSV 创建多维表格并授权
 feishu bitable create-from-csv ./final.csv --app-name "任务结果" --table-name "结果表" --grant-member-id ou_xxx

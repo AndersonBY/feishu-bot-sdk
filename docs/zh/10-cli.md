@@ -57,6 +57,9 @@ feishu im update-url-previews --preview-token token_1 --preview-token token_2 --
 # 文件与文档
 feishu media upload-file ./final.csv --format json
 feishu media download-file file_xxx ./downloads/file.bin --format json
+feishu media download-file img_v3_xxx ./downloads/image.jpg --format json
+# 用户发送的消息资源需带 message_id
+feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx --resource-type image --format json
 feishu bitable create-from-csv ./final.csv --app-name "任务结果" --table-name "结果表"
 feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
 feishu docx create-from-markdown --title "日报" --markdown-file ./report.md

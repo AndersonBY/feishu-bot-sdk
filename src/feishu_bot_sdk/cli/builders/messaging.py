@@ -17,6 +17,7 @@ from ..commands import (
     _cmd_media_upload_file,
     _cmd_media_upload_image,
 )
+from ..settings import HELP_FORMATTER as _HELP_FORMATTER
 from .common import _add_receive_args
 
 def _build_im_commands(
@@ -124,7 +125,21 @@ def _build_media_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
     shared: argparse.ArgumentParser,
 ) -> None:
-    media_parser = subparsers.add_parser("media", help="Media upload/download")
+    media_parser = subparsers.add_parser(
+        "media",
+        help="Media upload/download",
+        description=(
+            "Upload/download IM media.\n"
+            "For resources from received messages, use --message-id with download-file."
+        ),
+        formatter_class=_HELP_FORMATTER,
+        epilog=(
+            "Examples:\n"
+            "  feishu media upload-image ./demo.png --format json\n"
+            "  feishu media download-file file_xxx ./downloads/file.bin --format json\n"
+            "  feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx --resource-type image --auth-mode tenant --format json"
+        ),
+    )
     media_sub = media_parser.add_subparsers(dest="media_command")
     media_sub.required = True
 
@@ -141,7 +156,20 @@ def _build_media_commands(
     upload_file.add_argument("--content-type", help="Override mime type")
     upload_file.set_defaults(handler=_cmd_media_upload_file)
 
-    download_file = media_sub.add_parser("download-file", help="Download file by file_key", parents=[shared])
-    download_file.add_argument("file_key", help="File key")
+    download_file = media_sub.add_parser(
+        "download-file",
+        help="Download file/image by key (supports message resources)",
+        parents=[shared],
+    )
+    download_file.add_argument("file_key", help="File key or image key")
     download_file.add_argument("output", help="Output file path")
+    download_file.add_argument(
+        "--message-id",
+        help="If provided, download resource from this message via /im/v1/messages/{message_id}/resources/{file_key}",
+    )
+    download_file.add_argument(
+        "--resource-type",
+        choices=("file", "image", "media"),
+        help="Resource type when --message-id is provided. Default inferred from key prefix.",
+    )
     download_file.set_defaults(handler=_cmd_media_download_file)

@@ -153,14 +153,37 @@ def _cmd_media_upload_file(args: argparse.Namespace) -> Mapping[str, Any]:
 
 def _cmd_media_download_file(args: argparse.Namespace) -> Mapping[str, Any]:
     service = MediaService(_build_client(args))
-    content = service.download_file(str(args.file_key))
+    file_key = str(args.file_key)
+    message_id = getattr(args, "message_id", None)
+    resource_type = getattr(args, "resource_type", None)
+    mode = "file"
+
+    if message_id:
+        resolved_resource_type = str(resource_type or ("image" if file_key.startswith("img_") else "file"))
+        content = service.download_message_resource(
+            str(message_id),
+            file_key,
+            resource_type=resolved_resource_type,
+        )
+        mode = "message_resource"
+    else:
+        if resource_type:
+            raise ValueError("--resource-type requires --message-id")
+        if file_key.startswith("img_"):
+            content = service.download_image(file_key)
+            mode = "image"
+        else:
+            content = service.download_file(file_key)
+
     output_path = Path(str(args.output))
     if output_path.parent and not output_path.parent.exists():
         output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_bytes(content)
     return {
         "ok": True,
-        "file_key": str(args.file_key),
+        "file_key": file_key,
+        "mode": mode,
+        "message_id": str(message_id) if message_id else None,
         "output": str(output_path),
         "size": len(content),
     }

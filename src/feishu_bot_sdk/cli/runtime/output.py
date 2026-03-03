@@ -164,6 +164,17 @@ def _format_http_error(exc: HTTPRequestError) -> str:
                 "parent_type='calendar' and parent_node='<calendar_id>'; "
                 "prefer `feishu calendar attach-material`."
             )
+        if '"code":234001' in response_lower and "invalid request param" in response_lower:
+            parts.append(
+                "hint=invalid request parameters. For IM image/file resources from received messages, "
+                "use message resource download with message_id, for example: "
+                "`feishu media download-file <resource_key> <output> --message-id <om_xxx> --resource-type image|file --auth-mode tenant`."
+            )
+        if '"code":99991668' in response_lower and "user access token not support" in response_lower:
+            parts.append(
+                "hint=this endpoint does not support user access token; "
+                "retry with tenant auth: `--auth-mode tenant` (or provide app_id/app_secret)."
+            )
         if '"code":99991679' in response_lower or "required one of these privileges under the user identity" in response_lower:
             scope_hint = _extract_required_user_scopes(exc.response_text)
             if scope_hint:
@@ -180,6 +191,11 @@ def _format_http_error(exc: HTTPRequestError) -> str:
             parts.append(
                 "hint=invalid access token; prefer user auth for search APIs: "
                 "`feishu auth login --scope \"offline_access search:app search:message search:docs:read\" --format json`"
+            )
+        if '"code":234008' in response_lower or "not the resource sender" in response_lower:
+            parts.append(
+                "hint=resource belongs to a message sender. For user-sent image/file, use message resource download: "
+                "`feishu media download-file <resource_key> <output> --message-id <om_xxx> --resource-type image|file`."
             )
     return "; ".join(parts)
 

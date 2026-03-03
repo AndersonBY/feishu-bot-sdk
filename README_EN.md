@@ -77,6 +77,9 @@ feishu im reply-markdown om_xxx --markdown "### received" --format json
 
 # 5) Upload image
 feishu media upload-image ./demo.png
+# 5.1) Download file/image; for user-sent message resources include message_id
+feishu media download-file file_xxx ./downloads/file.bin --format json
+feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx --resource-type image --format json
 
 # 6) Create Bitable from CSV and grant access
 feishu bitable create-from-csv ./final.csv --app-name "Task Result" --table-name "Result" --grant-member-id ou_xxx
