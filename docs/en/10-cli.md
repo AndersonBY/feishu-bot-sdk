@@ -63,6 +63,11 @@ feishu docx create-from-markdown --title "Daily Report" --markdown-file ./report
 # wiki
 feishu wiki search-nodes --query "weekly report" --format json
 
+# search
+feishu search app --query "approval" --auth-mode user --format json
+feishu search message --query "incident" --chat-type group_chat --auth-mode user --format json
+feishu search doc-wiki --query "weekly report" --doc-filter-json '{"only_title": true}' --auth-mode user --format json
+
 # contact
 feishu contact user get --user-id ou_xxx --user-id-type open_id --format json
 feishu contact user by-department --department-id od_xxx --page-size 20 --format json

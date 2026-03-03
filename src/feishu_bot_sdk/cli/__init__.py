@@ -18,6 +18,7 @@ from .builders import (
     _build_im_commands,
     _build_media_commands,
     _build_oauth_commands,
+    _build_search_commands,
     _build_server_commands,
     _build_webhook_commands,
     _build_wiki_commands,
@@ -28,6 +29,7 @@ from .runtime import (
     _build_client,
     _build_config,
     _extract_required_user_scopes,
+    _format_feishu_error_message,
     _format_http_error,
     _is_process_alive,
     _print_error,
@@ -67,6 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     _build_wiki_commands(subparsers, shared)
     _build_calendar_commands(subparsers, shared)
     _build_contact_commands(subparsers, shared)
+    _build_search_commands(subparsers, shared)
     _build_webhook_commands(subparsers, shared)
     _build_ws_commands(subparsers, shared)
     _build_server_commands(subparsers, shared)
@@ -95,7 +98,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         message = _format_http_error(exc)
         return _print_error(message, exit_code=4, output_format=output_format)
     except FeishuError as exc:
-        return _print_error(str(exc), exit_code=3, output_format=output_format)
+        message = _format_feishu_error_message(str(exc))
+        return _print_error(message, exit_code=3, output_format=output_format)
     except Exception as exc:
         return _print_error(f"{type(exc).__name__}: {exc}", exit_code=1, output_format=output_format)
 
@@ -110,6 +114,7 @@ __all__ = [
     "_build_client",
     "_build_config",
     "_extract_required_user_scopes",
+    "_format_feishu_error_message",
     "_wait_for_oauth_callback",
     "_serve_webhook_http",
     "_spawn_background_process",

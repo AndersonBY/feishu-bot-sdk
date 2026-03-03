@@ -63,6 +63,11 @@ feishu docx create-from-markdown --title "日报" --markdown-file ./report.md
 # Wiki
 feishu wiki search-nodes --query "项目周报" --format json
 
+# 搜索
+feishu search app --query "审批" --auth-mode user --format json
+feishu search message --query "故障" --chat-type group_chat --auth-mode user --format json
+feishu search doc-wiki --query "项目周报" --doc-filter-json '{"only_title": true}' --auth-mode user --format json
+
 # 通讯录
 feishu contact user get --user-id ou_xxx --user-id-type open_id --format json
 feishu contact user by-department --department-id od_xxx --page-size 20 --format json

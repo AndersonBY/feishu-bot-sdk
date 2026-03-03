@@ -11,6 +11,7 @@
 - Wiki 知识库（space/node/member/search/task）与云文档内容导出（`docs/v1/content`）
 - 通讯录能力（用户/部门/授权范围查询 + 分页迭代）
 - 日历能力（日历 CRUD、日程 CRUD、忙闲查询、CalDAV 配置）
+- 搜索能力（应用搜索、消息搜索、文档/Wiki 搜索）
 - Markdown 追加写入 Docx
 - 事件回调（Webhook）与长连接（WebSocket）
 - 事件类型模型（IM、卡片、URL 预览、多维表格 record/field changed）
@@ -89,6 +90,11 @@ feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xx
 # 9) 搜索 Wiki 节点
 feishu wiki search-nodes --query "项目周报" --format json
 
+# 9.1) 搜索能力（应用 / 消息 / 文档/Wiki）
+feishu search app --query "审批" --auth-mode user --format json
+feishu search message --query "故障" --chat-type group_chat --auth-mode user --format json
+feishu search doc-wiki --query "项目周报" --doc-filter-json '{"only_title": true}' --auth-mode user --format json
+
 # 10) 通讯录查询
 feishu contact user get --user-id ou_xxx --user-id-type open_id --format json
 feishu contact department search --query "研发" --format json
@@ -136,6 +142,7 @@ cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --fo
 - CLI 命令行工具：[`docs/zh/10-cli.md`](./docs/zh/10-cli.md)
 - 日历（Calendar）：[`docs/zh/11-calendar.md`](./docs/zh/11-calendar.md)
 - 通讯录（Contact）：[`docs/zh/12-contact.md`](./docs/zh/12-contact.md)
+- 搜索（Search）：[`docs/zh/13-search.md`](./docs/zh/13-search.md)
 
 ## 响应模型（重要）
 
@@ -361,6 +368,22 @@ for item in contact.iter_users_by_department("od_xxx", page_size=50):
     print(item.get("open_id"))
 ```
 
+## 搜索（Search）
+
+```python
+from feishu_bot_sdk import SearchService
+
+search = SearchService(client)
+apps = search.search_apps("审批", page_size=10)
+print(apps.items)
+
+messages = search.search_messages("故障", chat_type="group_chat", page_size=20)
+print(messages.items)
+
+docs = search.search_doc_wiki("项目周报", doc_filter={"only_title": True}, page_size=20)
+print(docs.res_units)
+```
+
 ## 核心对象
 
 - `FeishuClient` / `AsyncFeishuClient`：飞书 API 基础客户端
@@ -372,6 +395,7 @@ for item in contact.iter_users_by_department("od_xxx", page_size=50):
 - `DrivePermissionService` / `AsyncDrivePermissionService`：成员、公开设置、密码与 owner transfer
 - `CalendarService` / `AsyncCalendarService`：日历、日程、忙闲和 CalDAV 配置
 - `ContactService` / `AsyncContactService`：通讯录用户、部门、授权范围
+- `SearchService` / `AsyncSearchService`：应用、消息、文档/Wiki 搜索
 - `MessageService` / `AsyncMessageService`：消息管理
 - `MediaService` / `AsyncMediaService`：媒体资源
 - `FeishuBotServer`：长连接服务封装（回调注册 + 启停 + 状态管理）

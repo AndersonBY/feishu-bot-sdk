@@ -176,6 +176,11 @@ def _format_http_error(exc: HTTPRequestError) -> str:
                     "hint=missing user scope; run `feishu auth login --scope \"offline_access <required_scope>\"` "
                     "and retry."
                 )
+        if '"code":99991663' in response_lower or '"code":99991668' in response_lower:
+            parts.append(
+                "hint=invalid access token; prefer user auth for search APIs: "
+                "`feishu auth login --scope \"offline_access search:app search:message search:docs:read\" --format json`"
+            )
     return "; ".join(parts)
 
 
@@ -195,6 +200,22 @@ def _extract_required_user_scopes(response_text: str) -> str:
         if scope not in scopes:
             scopes.append(scope)
     return " ".join(scopes)
+
+
+def _format_feishu_error_message(message: str) -> str:
+    lower = message.lower()
+    parts = [message]
+    if "code': 20005" in lower or '"code": 20005' in lower or "invalid access token" in lower:
+        parts.append(
+            "hint=user access token is invalid or expired; re-login with:\n"
+            "feishu auth login --scope \"offline_access search:app search:message search:docs:read\" --format json"
+        )
+    if "code': 20026" in lower or '"code": 20026' in lower or "refresh token is invalid" in lower:
+        parts.append(
+            "hint=refresh token is invalid/rotated; run `feishu auth login` again, "
+            "or clear FEISHU_USER_REFRESH_TOKEN to use static user access token only."
+        )
+    return "; ".join(parts)
 
 
 def _is_flat_mapping(mapping: Mapping[str, Any]) -> bool:

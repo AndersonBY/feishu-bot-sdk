@@ -70,6 +70,7 @@ from .rate_limit import (
     build_rate_limit_key,
 )
 from .response import DataResponse, Struct
+from .search import AsyncSearchService, SearchService
 from .server import FeishuBotServer, FeishuBotServerStatus
 from .wiki import AsyncWikiService, WikiService
 from .webhook import (
@@ -105,6 +106,7 @@ __all__ = [
     "AsyncLongConnectionClient",
     "AsyncMediaService",
     "AsyncMessageService",
+    "AsyncSearchService",
     "AsyncAdaptiveRateLimiter",
     "AsyncWikiService",
     "AdaptiveRateLimiter",
@@ -161,6 +163,7 @@ __all__ = [
     "PostMessageContent",
     "RateLimitTuning",
     "ReconnectPolicy",
+    "SearchService",
     "SDKError",
     "ShareChatMessageContent",
     "ShareUserMessageContent",

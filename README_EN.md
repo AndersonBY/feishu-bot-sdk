@@ -11,6 +11,7 @@ A lightweight Python SDK for Feishu bot integrations, including:
 - Wiki APIs (space/node/member/search/task) and Docs content export (`docs/v1/content`)
 - Contact APIs (user/department/scope query + pagination iterators)
 - Calendar APIs (calendar/event CRUD, freebusy, CalDAV config)
+- Search APIs (app search, message search, doc/wiki search)
 - Markdown append to Docx
 - Webhook callbacks and long connections (WebSocket)
 - Typed event models (IM/card/URL preview/Bitable record & field changed)
@@ -89,6 +90,11 @@ feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xx
 # 9) Search wiki nodes
 feishu wiki search-nodes --query "weekly report" --format json
 
+# 9.1) Search APIs (apps/messages/docs-wiki)
+feishu search app --query "approval" --auth-mode user --format json
+feishu search message --query "incident" --chat-type group_chat --auth-mode user --format json
+feishu search doc-wiki --query "weekly report" --doc-filter-json '{"only_title": true}' --auth-mode user --format json
+
 # 10) Contact queries
 feishu contact user get --user-id ou_xxx --user-id-type open_id --format json
 feishu contact department search --query "engineering" --format json
@@ -136,6 +142,7 @@ cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --fo
 - CLI tool: [`docs/en/10-cli.md`](./docs/en/10-cli.md)
 - Calendar: [`docs/en/11-calendar.md`](./docs/en/11-calendar.md)
 - Contact: [`docs/en/12-contact.md`](./docs/en/12-contact.md)
+- Search: [`docs/en/13-search.md`](./docs/en/13-search.md)
 
 ## Response Model (Important)
 
@@ -361,6 +368,22 @@ for item in contact.iter_users_by_department("od_xxx", page_size=50):
     print(item.get("open_id"))
 ```
 
+## Search
+
+```python
+from feishu_bot_sdk import SearchService
+
+search = SearchService(client)
+apps = search.search_apps("approval", page_size=10)
+print(apps.items)
+
+messages = search.search_messages("incident", chat_type="group_chat", page_size=20)
+print(messages.items)
+
+docs = search.search_doc_wiki("weekly report", doc_filter={"only_title": True}, page_size=20)
+print(docs.res_units)
+```
+
 ## Main Objects
 
 - `FeishuClient` / `AsyncFeishuClient`: base Feishu API client
@@ -372,6 +395,7 @@ for item in contact.iter_users_by_department("od_xxx", page_size=50):
 - `DrivePermissionService` / `AsyncDrivePermissionService`: members, public settings, password, and owner transfer
 - `CalendarService` / `AsyncCalendarService`: calendars, events, freebusy, and CalDAV config
 - `ContactService` / `AsyncContactService`: contact users, departments, and scopes
+- `SearchService` / `AsyncSearchService`: app, message, and doc/wiki search
 - `MessageService` / `AsyncMessageService`: message management
 - `MediaService` / `AsyncMediaService`: media resources
 - `FeishuBotServer`: long-connection server wrapper (handlers + lifecycle + status)

@@ -18,6 +18,7 @@ This directory contains module-based SDK documentation. Each module has a standa
 - [10 CLI Tool](./en/10-cli.md)
 - [11 Calendar](./en/11-calendar.md)
 - [12 Contact](./en/12-contact.md)
+- [13 Search](./en/13-search.md)
 
 ## Suggested Reading Path
 
@@ -26,3 +27,4 @@ This directory contains module-based SDK documentation. Each module has a standa
 - For result delivery workflows, focus on [03 Drive](./en/03-drive.md), [04 Bitable](./en/04-bitable.md), and [05 Docx/Docs Content](./en/05-docx-and-docs.md).
 - For scheduling workflows, focus on [11 Calendar](./en/11-calendar.md).
 - For org-structure and user lookup workflows, focus on [12 Contact](./en/12-contact.md).
+- For app/message/doc discovery workflows, focus on [13 Search](./en/13-search.md).

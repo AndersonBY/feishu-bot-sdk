@@ -18,6 +18,7 @@
 - [10 CLI 命令行工具](./zh/10-cli.md)
 - [11 日历（Calendar）](./zh/11-calendar.md)
 - [12 通讯录（Contact）](./zh/12-contact.md)
+- [13 搜索（Search）](./zh/13-search.md)
 
 ## 阅读建议
 
@@ -26,3 +27,4 @@
 - 如果你做结果交付，重点看 [03 Drive 文件与权限](./zh/03-drive.md)、[04 多维表格](./zh/04-bitable.md)、[05 云文档](./zh/05-docx-and-docs.md)。
 - 如果你做日程协同，重点看 [11 日历（Calendar）](./zh/11-calendar.md)。
 - 如果你做组织架构或成员查询，重点看 [12 通讯录（Contact）](./zh/12-contact.md)。
+- 如果你要做应用/消息/文档检索，重点看 [13 搜索（Search）](./zh/13-search.md)。
