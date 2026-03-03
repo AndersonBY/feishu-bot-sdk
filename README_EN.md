@@ -80,15 +80,18 @@ feishu media upload-image ./demo.png
 
 # 6) Create Bitable from CSV and grant access
 feishu bitable create-from-csv ./final.csv --app-name "Task Result" --table-name "Result" --grant-member-id ou_xxx
+feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
 
 # 7) Create and append markdown to Docx
 feishu docx create-from-markdown --title "Daily Report" --markdown-file ./report.md
+feishu docx get-markdown --doc-token doccn_xxx --doc-type docx --format json
 
 # 8) Upload file to Drive
 feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx
+feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
 
 # 9) Search wiki nodes
-feishu wiki search-nodes --query "weekly report" --format json
+feishu wiki search-nodes --query "weekly report" --all --format json
 
 # 9.1) Search APIs (apps/messages/docs-wiki)
 feishu search app --query "approval" --auth-mode user --format json

@@ -58,10 +58,14 @@ feishu im update-url-previews --preview-token token_1 --preview-token token_2 --
 feishu media upload-file ./final.csv --format json
 feishu media download-file file_xxx ./downloads/file.bin --format json
 feishu bitable create-from-csv ./final.csv --app-name "任务结果" --table-name "结果表"
+feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
 feishu docx create-from-markdown --title "日报" --markdown-file ./report.md
+feishu docx get-markdown --doc-token doccn_xxx --doc-type docx --format json
+feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
 
 # Wiki
-feishu wiki search-nodes --query "项目周报" --format json
+feishu wiki search-nodes --query "项目周报" --all --format json
+feishu wiki list-spaces --all --format json
 
 # 搜索
 feishu search app --query "审批" --auth-mode user --format json
@@ -93,6 +97,13 @@ feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path 
 - access token 临近过期（默认提前 300 秒）会自动 refresh
 - 接口返回 token 失效相关错误时会自动 refresh 并重试 1 次
 - refresh 成功后会自动更新本地 token store（包含新 refresh token）
+
+## 内容类命令（Agent 建议）
+
+- 分页查询优先使用 `--all`：`bitable list-records`、`wiki list-spaces`、`wiki search-nodes`、`wiki list-nodes`
+- `bitable list-records` 现已支持 `--view-id`、`--filter`、`--sort`、`--field-names`、`--text-field-as-array`
+- 授权参数已做强约束：`--member-id-type`、`--resource-type`、`--permission`，可减少参数拼写错误
+- `docx get-markdown --doc-type` 已限制官方支持值，避免无效文档类型
 
 ## 日历附件（Agent 强烈建议）
 

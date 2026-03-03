@@ -80,15 +80,18 @@ feishu media upload-image ./demo.png
 
 # 6) CSV 创建多维表格并授权
 feishu bitable create-from-csv ./final.csv --app-name "任务结果" --table-name "结果表" --grant-member-id ou_xxx
+feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
 
 # 7) 创建并写入 Docx
 feishu docx create-from-markdown --title "日报" --markdown-file ./report.md
+feishu docx get-markdown --doc-token doccn_xxx --doc-type docx --format json
 
 # 8) 上传云空间文件
 feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx
+feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
 
 # 9) 搜索 Wiki 节点
-feishu wiki search-nodes --query "项目周报" --format json
+feishu wiki search-nodes --query "项目周报" --all --format json
 
 # 9.1) 搜索能力（应用 / 消息 / 文档/Wiki）
 feishu search app --query "审批" --auth-mode user --format json

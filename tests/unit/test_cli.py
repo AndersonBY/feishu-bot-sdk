@@ -554,6 +554,85 @@ def test_bitable_create_from_csv_with_grant(monkeypatch: Any, capsys: Any) -> No
     assert "app_token" in capsys.readouterr().out
 
 
+def test_bitable_list_records_all(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    calls: list[dict[str, Any]] = []
+
+    def _fake_list_records(
+        _self: BitableService,
+        app_token: str,
+        table_id: str,
+        *,
+        page_size: int | None = None,
+        page_token: str | None = None,
+        view_id: str | None = None,
+        user_id_type: str | None = None,
+        filter: str | None = None,
+        sort: str | None = None,
+        field_names: str | None = None,
+        text_field_as_array: bool | None = None,
+    ) -> dict[str, Any]:
+        calls.append(
+            {
+                "app_token": app_token,
+                "table_id": table_id,
+                "page_size": page_size,
+                "page_token": page_token,
+                "view_id": view_id,
+                "user_id_type": user_id_type,
+                "filter": filter,
+                "sort": sort,
+                "field_names": field_names,
+                "text_field_as_array": text_field_as_array,
+            }
+        )
+        if page_token == "next_1":
+            return {"items": [{"record_id": "rec_2"}], "has_more": False}
+        return {"items": [{"record_id": "rec_1"}], "has_more": True, "page_token": "next_1"}
+
+    monkeypatch.setattr("feishu_bot_sdk.bitable.BitableService.list_records", _fake_list_records)
+
+    code = cli.main(
+        [
+            "bitable",
+            "list-records",
+            "--app-token",
+            "app_1",
+            "--table-id",
+            "tbl_1",
+            "--view-id",
+            "vew_1",
+            "--user-id-type",
+            "open_id",
+            "--filter",
+            "CurrentValue.[状态]=\"进行中\"",
+            "--sort",
+            '[{"field_name":"创建时间","desc":true}]',
+            "--field-names",
+            '["任务名称"]',
+            "--text-field-as-array",
+            "true",
+            "--all",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert len(calls) == 2
+    assert calls[0]["app_token"] == "app_1"
+    assert calls[0]["table_id"] == "tbl_1"
+    assert calls[0]["view_id"] == "vew_1"
+    assert calls[0]["user_id_type"] == "open_id"
+    assert calls[0]["text_field_as_array"] is True
+    assert calls[1]["page_token"] == "next_1"
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["all"] is True
+    assert payload["count"] == 2
+    assert [item["record_id"] for item in payload["items"]] == ["rec_1", "rec_2"]
+
+
 def test_docx_get_markdown_json_output(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
@@ -576,6 +655,21 @@ def test_docx_get_markdown_json_output(monkeypatch: Any, capsys: Any) -> None:
     assert code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["markdown"] == "doccn_xxx:docx:None"
+
+
+def test_docx_get_markdown_rejects_invalid_doc_type(capsys: Any) -> None:
+    code = cli.main(
+        [
+            "docx",
+            "get-markdown",
+            "--doc-token",
+            "doccn_xxx",
+            "--doc-type",
+            "invalid_doc_type",
+        ]
+    )
+    assert code == 2
+    assert "invalid choice" in capsys.readouterr().err
 
 
 def test_drive_grant_edit(monkeypatch: Any, capsys: Any) -> None:
@@ -617,6 +711,25 @@ def test_drive_grant_edit(monkeypatch: Any, capsys: Any) -> None:
     assert code == 0
     assert called["args"] == ("tok_1", "ou_1", "open_id", "docx", "edit")
     assert "ok" in capsys.readouterr().out
+
+
+def test_drive_grant_edit_rejects_invalid_permission(capsys: Any) -> None:
+    code = cli.main(
+        [
+            "drive",
+            "grant-edit",
+            "--token",
+            "tok_1",
+            "--resource-type",
+            "docx",
+            "--member-id",
+            "ou_1",
+            "--permission",
+            "owner",
+        ]
+    )
+    assert code == 2
+    assert "invalid choice" in capsys.readouterr().err
 
 
 def test_wiki_search_nodes(monkeypatch: Any, capsys: Any) -> None:
@@ -661,6 +774,123 @@ def test_wiki_search_nodes(monkeypatch: Any, capsys: Any) -> None:
     assert payload["space_id"] == "sp_1"
     assert payload["page_size"] == 10
     assert payload["items"][0]["query"] == "weekly"
+
+
+def test_wiki_list_spaces_all(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    calls: list[str | None] = []
+
+    def _fake_list_spaces(
+        _self: WikiService,
+        *,
+        page_size: int | None = None,
+        page_token: str | None = None,
+    ) -> dict[str, Any]:
+        calls.append(page_token)
+        if page_token == "next_1":
+            return {"items": [{"space_id": "sp_2"}], "has_more": False}
+        return {"items": [{"space_id": "sp_1"}], "has_more": True, "page_token": "next_1"}
+
+    monkeypatch.setattr("feishu_bot_sdk.wiki.WikiService.list_spaces", _fake_list_spaces)
+
+    code = cli.main(["wiki", "list-spaces", "--all", "--format", "json"])
+    assert code == 0
+    assert calls == [None, "next_1"]
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["all"] is True
+    assert payload["count"] == 2
+    assert [item["space_id"] for item in payload["items"]] == ["sp_1", "sp_2"]
+
+
+def test_wiki_search_nodes_all(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    calls: list[str | None] = []
+
+    def _fake_search_nodes(
+        _self: WikiService,
+        query: str,
+        *,
+        space_id: str | None = None,
+        node_id: str | None = None,
+        page_size: int | None = None,
+        page_token: str | None = None,
+    ) -> dict[str, Any]:
+        assert query == "weekly"
+        assert space_id == "sp_1"
+        calls.append(page_token)
+        if page_token == "next_1":
+            return {"items": [{"title": "node-2"}], "has_more": False}
+        return {"items": [{"title": "node-1"}], "has_more": True, "page_token": "next_1"}
+
+    monkeypatch.setattr("feishu_bot_sdk.wiki.WikiService.search_nodes", _fake_search_nodes)
+
+    code = cli.main(
+        [
+            "wiki",
+            "search-nodes",
+            "--query",
+            "weekly",
+            "--space-id",
+            "sp_1",
+            "--all",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert calls == [None, "next_1"]
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["all"] is True
+    assert payload["count"] == 2
+    assert [item["title"] for item in payload["items"]] == ["node-1", "node-2"]
+
+
+def test_wiki_list_nodes_all(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    calls: list[str | None] = []
+
+    def _fake_list_nodes(
+        _self: WikiService,
+        space_id: str,
+        *,
+        parent_node_token: str | None = None,
+        page_size: int | None = None,
+        page_token: str | None = None,
+    ) -> dict[str, Any]:
+        assert space_id == "sp_1"
+        assert parent_node_token == "node_parent_1"
+        calls.append(page_token)
+        if page_token == "next_1":
+            return {"items": [{"node_token": "node_2"}], "has_more": False}
+        return {"items": [{"node_token": "node_1"}], "has_more": True, "page_token": "next_1"}
+
+    monkeypatch.setattr("feishu_bot_sdk.wiki.WikiService.list_nodes", _fake_list_nodes)
+
+    code = cli.main(
+        [
+            "wiki",
+            "list-nodes",
+            "--space-id",
+            "sp_1",
+            "--parent-node-token",
+            "node_parent_1",
+            "--all",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert calls == [None, "next_1"]
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["all"] is True
+    assert payload["count"] == 2
+    assert [item["node_token"] for item in payload["items"]] == ["node_1", "node_2"]
 
 
 def test_search_app(monkeypatch: Any, capsys: Any) -> None:

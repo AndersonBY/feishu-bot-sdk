@@ -58,10 +58,14 @@ feishu im update-url-previews --preview-token token_1 --preview-token token_2 --
 feishu media upload-file ./final.csv --format json
 feishu media download-file file_xxx ./downloads/file.bin --format json
 feishu bitable create-from-csv ./final.csv --app-name "Task Result" --table-name "Result"
+feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
 feishu docx create-from-markdown --title "Daily Report" --markdown-file ./report.md
+feishu docx get-markdown --doc-token doccn_xxx --doc-type docx --format json
+feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
 
 # wiki
-feishu wiki search-nodes --query "weekly report" --format json
+feishu wiki search-nodes --query "weekly report" --all --format json
+feishu wiki list-spaces --all --format json
 
 # search
 feishu search app --query "approval" --auth-mode user --format json
@@ -93,6 +97,13 @@ Automatic behavior:
 - pre-refresh near-expiry access tokens (default 300 seconds before expiry)
 - on token-invalid API responses, auto-refresh and retry once
 - persist refreshed token pairs to local token store (including rotated refresh token)
+
+## Content Commands (Agent Tips)
+
+- Prefer `--all` for paged queries: `bitable list-records`, `wiki list-spaces`, `wiki search-nodes`, `wiki list-nodes`
+- `bitable list-records` now supports `--view-id`, `--filter`, `--sort`, `--field-names`, and `--text-field-as-array`
+- Permission-related flags now use strict choices: `--member-id-type`, `--resource-type`, `--permission`
+- `docx get-markdown --doc-type` is now restricted to official supported values
 
 ## Calendar Attachments (Strongly Recommended for Agents)
 

@@ -25,12 +25,33 @@ from ..commands import (
     _cmd_wiki_list_spaces,
     _cmd_wiki_search_nodes,
 )
+from ..settings import HELP_FORMATTER as _HELP_FORMATTER
+
+_ID_TYPE_CHOICES = ("open_id", "user_id", "union_id")
+_DOC_TYPE_CHOICES = ("docx", "sheet", "bitable", "file", "wiki_doc", "wiki_sheet")
+_DRIVE_RESOURCE_CHOICES = ("bitable", "docx")
+_PERMISSION_CHOICES = ("view", "edit", "full_access")
+
 
 def _build_bitable_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
     shared: argparse.ArgumentParser,
 ) -> None:
-    bitable_parser = subparsers.add_parser("bitable", help="Bitable operations")
+    bitable_parser = subparsers.add_parser(
+        "bitable",
+        help="Bitable operations",
+        description=(
+            "Bitable operations for app/table/record workflows.\n"
+            "Supports JSON from --*-json/--*-file/--*-stdin and auto pagination via --all."
+        ),
+        formatter_class=_HELP_FORMATTER,
+        epilog=(
+            "Examples:\n"
+            "  feishu bitable create-from-csv ./final.csv --app-name \"Task\" --table-name \"Result\" --format json\n"
+            "  echo '{\"Task\":\"Follow up\"}' | feishu bitable create-record --app-token app_xxx --table-id tbl_xxx --fields-stdin --format json\n"
+            "  feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json"
+        ),
+    )
     bitable_sub = bitable_parser.add_subparsers(dest="bitable_command")
     bitable_sub.required = True
 
@@ -46,6 +67,7 @@ def _build_bitable_commands(
     create_from_csv.add_argument(
         "--member-id-type",
         default="open_id",
+        choices=_ID_TYPE_CHOICES,
         help="open_id/user_id/union_id (default: open_id)",
     )
     create_from_csv.set_defaults(handler=_cmd_bitable_create_from_csv)
@@ -63,7 +85,7 @@ def _build_bitable_commands(
     create_record.add_argument("--fields-json", help="Fields JSON object string")
     create_record.add_argument("--fields-file", help="Fields JSON file path")
     create_record.add_argument("--fields-stdin", action="store_true", help="Read fields JSON from stdin")
-    create_record.add_argument("--user-id-type", help="Optional user_id_type")
+    create_record.add_argument("--user-id-type", choices=_ID_TYPE_CHOICES, help="Optional user_id_type")
     create_record.add_argument("--client-token", help="Optional client token")
     create_record.add_argument(
         "--ignore-consistency-check",
@@ -77,6 +99,17 @@ def _build_bitable_commands(
     list_records.add_argument("--table-id", required=True, help="Bitable table_id")
     list_records.add_argument("--page-size", type=int, help="Page size")
     list_records.add_argument("--page-token", help="Page token")
+    list_records.add_argument("--view-id", help="Optional view id")
+    list_records.add_argument("--user-id-type", choices=_ID_TYPE_CHOICES, help="Optional user_id_type")
+    list_records.add_argument("--filter", help="Optional filter expression string")
+    list_records.add_argument("--sort", help="Optional sort JSON string")
+    list_records.add_argument("--field-names", help="Optional field_names JSON array string")
+    list_records.add_argument(
+        "--text-field-as-array",
+        choices=("true", "false"),
+        help="Whether to return text field values as arrays",
+    )
+    list_records.add_argument("--all", action="store_true", help="Auto paginate and return all items")
     list_records.set_defaults(handler=_cmd_bitable_list_records)
 
     grant_edit = bitable_sub.add_parser("grant-edit", help="Grant edit permission on bitable", parents=[shared])
@@ -85,15 +118,31 @@ def _build_bitable_commands(
     grant_edit.add_argument(
         "--member-id-type",
         default="open_id",
+        choices=_ID_TYPE_CHOICES,
         help="open_id/user_id/union_id (default: open_id)",
     )
     grant_edit.set_defaults(handler=_cmd_bitable_grant_edit)
+
 
 def _build_docx_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
     shared: argparse.ArgumentParser,
 ) -> None:
-    docx_parser = subparsers.add_parser("docx", help="Docx and docs content operations")
+    docx_parser = subparsers.add_parser(
+        "docx",
+        help="Docx and docs content operations",
+        description=(
+            "Docx create/append/grant and docs content export operations.\n"
+            "Use get-markdown to export content from docs/v1/content."
+        ),
+        formatter_class=_HELP_FORMATTER,
+        epilog=(
+            "Examples:\n"
+            "  feishu docx create-from-markdown --title \"Daily\" --markdown-file ./report.md --format json\n"
+            "  feishu docx grant-edit --document-id doccn_xxx --member-id ou_xxx --member-id-type open_id --format json\n"
+            "  feishu docx get-markdown --doc-token doccn_xxx --doc-type docx --format json"
+        ),
+    )
     docx_sub = docx_parser.add_subparsers(dest="docx_command")
     docx_sub.required = True
 
@@ -125,21 +174,42 @@ def _build_docx_commands(
     grant_edit.add_argument(
         "--member-id-type",
         default="open_id",
+        choices=_ID_TYPE_CHOICES,
         help="open_id/user_id/union_id (default: open_id)",
     )
     grant_edit.set_defaults(handler=_cmd_docx_grant_edit)
 
     get_markdown = docx_sub.add_parser("get-markdown", help="Get markdown from docs content API", parents=[shared])
     get_markdown.add_argument("--doc-token", required=True, help="doc token")
-    get_markdown.add_argument("--doc-type", default="docx", help="docx/sheet/bitable/file/wiki_doc/wiki_sheet")
+    get_markdown.add_argument(
+        "--doc-type",
+        default="docx",
+        choices=_DOC_TYPE_CHOICES,
+        help="docx/sheet/bitable/file/wiki_doc/wiki_sheet",
+    )
     get_markdown.add_argument("--lang", help="Optional language")
     get_markdown.set_defaults(handler=_cmd_docx_get_markdown)
+
 
 def _build_drive_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
     shared: argparse.ArgumentParser,
 ) -> None:
-    drive_parser = subparsers.add_parser("drive", help="Drive file and permission operations")
+    drive_parser = subparsers.add_parser(
+        "drive",
+        help="Drive file and permission operations",
+        description=(
+            "Drive file upload, import/export task, and permission operations.\n"
+            "Task payload commands accept --task-json/--task-file/--task-stdin."
+        ),
+        formatter_class=_HELP_FORMATTER,
+        epilog=(
+            "Examples:\n"
+            "  feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx --format json\n"
+            "  echo '{\"file_extension\":\"csv\"}' | feishu drive create-import-task --task-stdin --format json\n"
+            "  feishu drive grant-edit --token tok_xxx --resource-type docx --member-id ou_xxx --permission edit --format json"
+        ),
+    )
     drive_sub = drive_parser.add_subparsers(dest="drive_command")
     drive_sub.required = True
 
@@ -175,38 +245,66 @@ def _build_drive_commands(
 
     grant_edit = drive_sub.add_parser("grant-edit", help="Grant edit permission", parents=[shared])
     grant_edit.add_argument("--token", required=True, help="Resource token")
-    grant_edit.add_argument("--resource-type", required=True, help="Resource type, e.g. bitable/docx")
+    grant_edit.add_argument(
+        "--resource-type",
+        required=True,
+        choices=_DRIVE_RESOURCE_CHOICES,
+        help="Resource type, e.g. bitable/docx",
+    )
     grant_edit.add_argument("--member-id", required=True, help="Member id")
     grant_edit.add_argument(
         "--member-id-type",
         default="open_id",
+        choices=_ID_TYPE_CHOICES,
         help="open_id/user_id/union_id (default: open_id)",
     )
     grant_edit.add_argument(
         "--permission",
         default="edit",
+        choices=_PERMISSION_CHOICES,
         help="Permission value (default: edit)",
     )
     grant_edit.set_defaults(handler=_cmd_drive_grant_edit)
 
     list_members = drive_sub.add_parser("list-members", help="List permission members", parents=[shared])
     list_members.add_argument("--token", required=True, help="Resource token")
-    list_members.add_argument("--resource-type", required=True, help="Resource type, e.g. bitable/docx")
+    list_members.add_argument(
+        "--resource-type",
+        required=True,
+        choices=_DRIVE_RESOURCE_CHOICES,
+        help="Resource type, e.g. bitable/docx",
+    )
     list_members.add_argument("--fields", help="Optional fields")
     list_members.add_argument("--perm-type", help="Optional perm_type")
     list_members.set_defaults(handler=_cmd_drive_list_members)
+
 
 def _build_wiki_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
     shared: argparse.ArgumentParser,
 ) -> None:
-    wiki_parser = subparsers.add_parser("wiki", help="Wiki operations")
+    wiki_parser = subparsers.add_parser(
+        "wiki",
+        help="Wiki operations",
+        description=(
+            "Wiki operations for listing spaces/nodes and searching nodes.\n"
+            "Use --all to auto paginate and merge all items."
+        ),
+        formatter_class=_HELP_FORMATTER,
+        epilog=(
+            "Examples:\n"
+            "  feishu wiki list-spaces --all --format json\n"
+            "  feishu wiki search-nodes --query \"weekly report\" --space-id spc_xxx --all --format json\n"
+            "  feishu wiki list-nodes --space-id spc_xxx --all --format json"
+        ),
+    )
     wiki_sub = wiki_parser.add_subparsers(dest="wiki_command")
     wiki_sub.required = True
 
     list_spaces = wiki_sub.add_parser("list-spaces", help="List wiki spaces", parents=[shared])
     list_spaces.add_argument("--page-size", type=int, help="Page size")
     list_spaces.add_argument("--page-token", help="Page token")
+    list_spaces.add_argument("--all", action="store_true", help="Auto paginate and return all items")
     list_spaces.set_defaults(handler=_cmd_wiki_list_spaces)
 
     search_nodes = wiki_sub.add_parser("search-nodes", help="Search wiki nodes", parents=[shared])
@@ -215,6 +313,7 @@ def _build_wiki_commands(
     search_nodes.add_argument("--node-id", help="Optional node id")
     search_nodes.add_argument("--page-size", type=int, help="Page size")
     search_nodes.add_argument("--page-token", help="Page token")
+    search_nodes.add_argument("--all", action="store_true", help="Auto paginate and return all items")
     search_nodes.set_defaults(handler=_cmd_wiki_search_nodes)
 
     get_node = wiki_sub.add_parser("get-node", help="Get wiki node by token", parents=[shared])
@@ -227,4 +326,5 @@ def _build_wiki_commands(
     list_nodes.add_argument("--parent-node-token", help="Optional parent node token")
     list_nodes.add_argument("--page-size", type=int, help="Page size")
     list_nodes.add_argument("--page-token", help="Page token")
+    list_nodes.add_argument("--all", action="store_true", help="Auto paginate and return all items")
     list_nodes.set_defaults(handler=_cmd_wiki_list_nodes)
