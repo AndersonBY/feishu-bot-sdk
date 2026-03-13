@@ -34,7 +34,7 @@ def main() -> None:
     )
     parser.add_argument("--text", default="Hello from feishu-bot-sdk (sync)")
     parser.add_argument("--csv", help="Optional CSV file to import as Bitable")
-    parser.add_argument("--markdown", help="Optional markdown file to append to Docx")
+    parser.add_argument("--markdown", help="Optional markdown file to insert into Docx")
     args = parser.parse_args()
 
     client = build_client()
@@ -51,10 +51,11 @@ def main() -> None:
     if args.markdown:
         markdown_text = Path(args.markdown).read_text(encoding="utf-8")
         docx = DocxService(client)
-        doc_id, doc_url = docx.create_document("SDK Sync Docx Demo")
-        docx.append_markdown(doc_id, markdown_text)
+        created = docx.create_document("SDK Sync Docx Demo")
+        doc_id = str(created["document_id"])
+        docx.insert_content(doc_id, markdown_text, content_type="markdown")
         docx.grant_edit_permission(doc_id, args.receive_id, args.receive_id_type)
-        print(f"Docx created: {doc_url or doc_id}")
+        print(f"Docx created: {created.get('url') or doc_id}")
 
 
 if __name__ == "__main__":

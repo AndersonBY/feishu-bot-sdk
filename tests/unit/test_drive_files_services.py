@@ -95,6 +95,93 @@ def test_drive_file_import_export_paths():
     assert stub.calls[3]["params"] == {"token": "doc_1"}
 
 
+def test_drive_file_meta_stats_view_copy_move_delete_shortcut_and_version_payloads():
+    def resolver(_call: Mapping[str, Any]) -> Mapping[str, Any]:
+        return {"code": 0, "data": {"ok": True}}
+
+    stub = _SyncClientStub(resolver)
+    service = DriveFileService(cast(FeishuClient, stub))
+
+    service.batch_query_metas(
+        [{"doc_token": "doc_1", "doc_type": "docx"}],
+        with_url=True,
+        user_id_type="open_id",
+    )
+    service.get_file_statistics("file_1", file_type="docx")
+    service.list_file_view_records(
+        "file_1",
+        file_type="docx",
+        page_size=50,
+        page_token="next_1",
+        viewer_id_type="open_id",
+    )
+    service.copy_file(
+        "file_1",
+        name="Demo copy",
+        folder_token="fld_1",
+        type="docx",
+        extra={"foo": "bar"},
+        user_id_type="open_id",
+    )
+    service.move_file("file_1", type="docx", folder_token="fld_2")
+    service.delete_file("file_1", type="docx")
+    service.create_shortcut(
+        parent_token="fld_2",
+        refer_token="doc_1",
+        refer_type="docx",
+        user_id_type="open_id",
+    )
+    service.create_version("file_1", name="v1", obj_type="docx", user_id_type="open_id")
+    service.list_versions("file_1", obj_type="docx", page_size=20, page_token="next_v", user_id_type="open_id")
+    service.get_version("file_1", "ver_1", user_id_type="open_id")
+    service.delete_version("file_1", "ver_1", user_id_type="open_id")
+
+    assert stub.calls[0]["path"] == "/drive/v1/metas/batch_query"
+    assert stub.calls[0]["payload"] == {
+        "request_docs": [{"doc_token": "doc_1", "doc_type": "docx"}],
+        "with_url": True,
+    }
+    assert stub.calls[0]["params"] == {"user_id_type": "open_id"}
+    assert stub.calls[1]["path"] == "/drive/v1/files/file_1/statistics"
+    assert stub.calls[1]["payload"] == {"file_type": "docx"}
+    assert stub.calls[2]["path"] == "/drive/v1/files/file_1/view_records"
+    assert stub.calls[2]["payload"] == {
+        "file_type": "docx",
+        "page_size": 50,
+        "page_token": "next_1",
+        "viewer_id_type": "open_id",
+    }
+    assert stub.calls[3]["path"] == "/drive/v1/files/file_1/copy"
+    assert stub.calls[3]["payload"] == {
+        "name": "Demo copy",
+        "type": "docx",
+        "folder_token": "fld_1",
+        "extra": {"foo": "bar"},
+    }
+    assert stub.calls[3]["params"] == {"user_id_type": "open_id"}
+    assert stub.calls[4]["path"] == "/drive/v1/files/file_1/move"
+    assert stub.calls[4]["payload"] == {"type": "docx", "folder_token": "fld_2"}
+    assert stub.calls[5]["method"] == "DELETE"
+    assert stub.calls[5]["path"] == "/drive/v1/files/file_1"
+    assert stub.calls[5]["params"] == {"type": "docx"}
+    assert stub.calls[6]["path"] == "/drive/v1/files/create_shortcut"
+    assert stub.calls[6]["payload"] == {
+        "parent_token": "fld_2",
+        "refer_entity": {"refer_token": "doc_1", "refer_type": "docx"},
+    }
+    assert stub.calls[7]["path"] == "/drive/v1/files/file_1/versions"
+    assert stub.calls[7]["payload"] == {"name": "v1", "obj_type": "docx"}
+    assert stub.calls[8]["params"] == {
+        "obj_type": "docx",
+        "page_size": 20,
+        "page_token": "next_v",
+        "user_id_type": "open_id",
+    }
+    assert stub.calls[9]["path"] == "/drive/v1/files/file_1/versions/ver_1"
+    assert stub.calls[10]["method"] == "DELETE"
+    assert stub.calls[10]["path"] == "/drive/v1/files/file_1/versions/ver_1"
+
+
 def test_drive_file_upload_uses_multipart(monkeypatch: Any):
     captured: dict[str, Any] = {}
 
@@ -211,7 +298,7 @@ def test_drive_media_download_and_tmp_urls(monkeypatch: Any):
     assert data == {"tmp_download_urls": [{"file_token": "m1"}]}
 
 
-def test_async_drive_file_upload_part_and_download_export(monkeypatch: Any):
+def test_async_drive_file_new_operations_and_download_export(monkeypatch: Any):
     captured: dict[str, Any] = {}
 
     async def fake_request_raw(
@@ -236,11 +323,64 @@ def test_async_drive_file_upload_part_and_download_export(monkeypatch: Any):
     service = AsyncDriveFileService(cast(AsyncFeishuClient, _AsyncClientStub(lambda _call: {"code": 0, "data": {}})))
 
     async def run() -> bytes:
-        await service.upload_part(upload_id="up_1", seq=1, content=b"abc")
+        await service.batch_query_metas([{"doc_token": "doc_1", "doc_type": "docx"}], with_url=True)
+        await service.list_versions("file_1", obj_type="docx", page_size=10, user_id_type="open_id")
         return await service.download_export_file("file_2")
 
     binary = asyncio.run(run())
 
     assert binary == b"export-bytes"
+    assert service._client.calls[0]["path"] == "/drive/v1/metas/batch_query"
+    assert service._client.calls[1]["path"] == "/drive/v1/files/file_1/versions"
+    assert service._client.calls[1]["params"] == {
+        "obj_type": "docx",
+        "page_size": 10,
+        "user_id_type": "open_id",
+    }
     assert captured["method"] == "GET"
     assert captured["path"] == "/drive/v1/export_tasks/file/file_2/download"
+
+
+def test_drive_list_files_and_create_folder():
+    def resolver(_call: Mapping[str, Any]) -> Mapping[str, Any]:
+        return {"code": 0, "data": {"files": [{"token": "f1"}], "has_more": False}}
+
+    stub = _SyncClientStub(resolver)
+    service = DriveFileService(cast(FeishuClient, stub))
+
+    service.list_files(folder_token="fld_root", page_size=20, order_by="EditedTime", direction="DESC", user_id_type="open_id")
+    service.create_folder(name="NewFolder", folder_token="fld_root")
+
+    assert len(stub.calls) == 2
+    assert stub.calls[0]["path"] == "/drive/v1/files"
+    assert stub.calls[0]["method"] == "GET"
+    assert stub.calls[0]["params"] == {
+        "folder_token": "fld_root",
+        "page_size": 20,
+        "order_by": "EditedTime",
+        "direction": "DESC",
+        "user_id_type": "open_id",
+    }
+    assert stub.calls[1]["path"] == "/drive/v1/files/create_folder"
+    assert stub.calls[1]["method"] == "POST"
+    assert stub.calls[1]["payload"] == {"name": "NewFolder", "folder_token": "fld_root"}
+
+
+def test_drive_iter_files_pagination():
+    def resolver(call: Mapping[str, Any]) -> Mapping[str, Any]:
+        page_token = call["params"].get("page_token")
+        if page_token == "p2":
+            return {"code": 0, "data": {"files": [{"token": "f2"}], "has_more": False}}
+        return {
+            "code": 0,
+            "data": {"files": [{"token": "f1"}], "has_more": True, "page_token": "p2"},
+        }
+
+    stub = _SyncClientStub(resolver)
+    service = DriveFileService(cast(FeishuClient, stub))
+    items = list(service.iter_files(folder_token="fld_root", page_size=1))
+
+    assert items == [{"token": "f1"}, {"token": "f2"}]
+    assert len(stub.calls) == 2
+    assert stub.calls[0]["params"] == {"folder_token": "fld_root", "page_size": 1}
+    assert stub.calls[1]["params"] == {"folder_token": "fld_root", "page_size": 1, "page_token": "p2"}

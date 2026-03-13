@@ -183,3 +183,60 @@ def test_async_batch_delete_records_payload():
     call = stub.calls[0]
     assert call["path"] == "/bitable/v1/apps/app_1/tables/tbl_1/records/batch_delete"
     assert call["payload"] == {"records": ["rec_a", "rec_b"]}
+
+
+def test_app_and_view_crud():
+    def resolver(_call: Mapping[str, Any]) -> Mapping[str, Any]:
+        return {"code": 0, "data": {"ok": True}}
+
+    stub = _SyncClientStub(resolver)
+    service = BitableService(cast(FeishuClient, stub))
+
+    service.get_app("app_1")
+    service.update_app("app_1", name="New Name")
+    service.copy_app("app_1", name="Copy", folder_token="fld_1")
+    service.list_views("app_1", "tbl_1", page_size=10, user_id_type="open_id")
+    service.get_view("app_1", "tbl_1", "vew_1")
+    service.create_view("app_1", "tbl_1", {"view_name": "Grid", "view_type": "grid"})
+    service.update_view("app_1", "tbl_1", "vew_1", {"view_name": "Updated"})
+    service.delete_view("app_1", "tbl_1", "vew_1")
+    service.get_field("app_1", "tbl_1", "fld_1")
+
+    assert len(stub.calls) == 9
+    assert stub.calls[0]["path"] == "/bitable/v1/apps/app_1"
+    assert stub.calls[0]["method"] == "GET"
+    assert stub.calls[1]["path"] == "/bitable/v1/apps/app_1"
+    assert stub.calls[1]["method"] == "PUT"
+    assert stub.calls[1]["payload"] == {"name": "New Name"}
+    assert stub.calls[2]["path"] == "/bitable/v1/apps/app_1/copy"
+    assert stub.calls[2]["method"] == "POST"
+    assert stub.calls[2]["payload"] == {"name": "Copy", "folder_token": "fld_1"}
+    assert stub.calls[3]["path"] == "/bitable/v1/apps/app_1/tables/tbl_1/views"
+    assert stub.calls[3]["params"] == {"page_size": 10, "user_id_type": "open_id"}
+    assert stub.calls[4]["path"] == "/bitable/v1/apps/app_1/tables/tbl_1/views/vew_1"
+    assert stub.calls[5]["path"] == "/bitable/v1/apps/app_1/tables/tbl_1/views"
+    assert stub.calls[5]["method"] == "POST"
+    assert stub.calls[5]["payload"] == {"view_name": "Grid", "view_type": "grid"}
+    assert stub.calls[6]["method"] == "PATCH"
+    assert stub.calls[6]["payload"] == {"view_name": "Updated"}
+    assert stub.calls[7]["method"] == "DELETE"
+    assert stub.calls[7]["path"] == "/bitable/v1/apps/app_1/tables/tbl_1/views/vew_1"
+    assert stub.calls[8]["path"] == "/bitable/v1/apps/app_1/tables/tbl_1/fields/fld_1"
+
+
+def test_iter_views_pagination():
+    def resolver(call: Mapping[str, Any]) -> Mapping[str, Any]:
+        page_token = call["params"].get("page_token")
+        if page_token == "p2":
+            return {"code": 0, "data": {"items": [{"view_id": "vew_2"}], "has_more": False}}
+        return {
+            "code": 0,
+            "data": {"items": [{"view_id": "vew_1"}], "has_more": True, "page_token": "p2"},
+        }
+
+    stub = _SyncClientStub(resolver)
+    service = BitableService(cast(FeishuClient, stub))
+    items = list(service.iter_views("app_1", "tbl_1", page_size=1))
+
+    assert items == [{"view_id": "vew_1"}, {"view_id": "vew_2"}]
+    assert len(stub.calls) == 2

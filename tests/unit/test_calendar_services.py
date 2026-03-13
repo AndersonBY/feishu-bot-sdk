@@ -183,3 +183,52 @@ def test_async_calendar_iteration() -> None:
     assert stub.calls[1]["params"] == {"page_size": 1, "page_token": "next"}
     assert stub.calls[2]["path"] == "/calendar/v4/calendars/cal_1/events"
     assert stub.calls[3]["params"] == {"page_size": 1, "page_token": "evt_next"}
+
+
+def test_calendar_attendee_and_instance_requests() -> None:
+    def resolver(_call: Mapping[str, Any]) -> Mapping[str, Any]:
+        return {"code": 0, "data": {"ok": True}}
+
+    stub = _SyncClientStub(resolver)
+    service = CalendarService(cast(FeishuClient, stub))
+
+    service.create_event_attendees(
+        "cal_1", "evt_1",
+        [{"type": "user", "user_id": "u1"}],
+        user_id_type="open_id",
+        need_notification=True,
+    )
+    service.list_event_attendees("cal_1", "evt_1", page_size=20, user_id_type="open_id")
+    service.batch_delete_event_attendees("cal_1", "evt_1", ["att_1", "att_2"], need_notification=False)
+    service.list_event_instances("cal_1", "evt_1", page_size=10, page_token="p1")
+
+    assert len(stub.calls) == 4
+    assert stub.calls[0]["path"] == "/calendar/v4/calendars/cal_1/events/evt_1/attendees"
+    assert stub.calls[0]["method"] == "POST"
+    assert stub.calls[0]["payload"] == {"attendees": [{"type": "user", "user_id": "u1"}], "need_notification": True}
+    assert stub.calls[0]["params"] == {"user_id_type": "open_id"}
+    assert stub.calls[1]["path"] == "/calendar/v4/calendars/cal_1/events/evt_1/attendees"
+    assert stub.calls[1]["method"] == "GET"
+    assert stub.calls[1]["params"] == {"page_size": 20, "user_id_type": "open_id"}
+    assert stub.calls[2]["path"] == "/calendar/v4/calendars/cal_1/events/evt_1/attendees/batch_delete"
+    assert stub.calls[2]["payload"] == {"attendee_ids": ["att_1", "att_2"], "need_notification": False}
+    assert stub.calls[3]["path"] == "/calendar/v4/calendars/cal_1/events/evt_1/instances"
+    assert stub.calls[3]["params"] == {"page_size": 10, "page_token": "p1"}
+
+
+def test_iter_event_attendees_pagination() -> None:
+    def resolver(call: Mapping[str, Any]) -> Mapping[str, Any]:
+        page_token = call["params"].get("page_token")
+        if page_token == "next":
+            return {"code": 0, "data": {"items": [{"attendee_id": "att_2"}], "has_more": False}}
+        return {
+            "code": 0,
+            "data": {"items": [{"attendee_id": "att_1"}], "has_more": True, "page_token": "next"},
+        }
+
+    stub = _SyncClientStub(resolver)
+    service = CalendarService(cast(FeishuClient, stub))
+    items = list(service.iter_event_attendees("cal_1", "evt_1", page_size=1))
+
+    assert items == [{"attendee_id": "att_1"}, {"attendee_id": "att_2"}]
+    assert len(stub.calls) == 2

@@ -37,6 +37,7 @@ def _add_receive_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--receive-id-type",
         default="open_id",
+        choices=("open_id", "user_id", "union_id", "email", "chat_id"),
         help="open_id/user_id/union_id/email/chat_id (default: open_id)",
     )
 

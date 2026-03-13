@@ -9,6 +9,15 @@
 - `feishu_bot_sdk.docx_blocks` -> `DocxBlockService` / `AsyncDocxBlockService`
 - `feishu_bot_sdk.docs_content` -> `DocContentService` / `AsyncDocContentService`
 
+## Recommended Split
+
+Treat Docx workflows as two separate concerns:
+
+- Writing docs: prefer `DocxService.insert_content()`, which follows the official `convert -> create_descendant -> replace_image` flow
+- Structured block editing: use `DocxBlockService`
+- Exported content reads: use `DocContentService`
+- Plain text reads: use `DocxDocumentService.get_raw_content()`
+
 ## Quick Example
 
 ```python
@@ -23,24 +32,43 @@ client = FeishuClient(
 )
 docx = DocxService(client)
 
-doc_id, doc_url = docx.create_document("Task Report")
-docx.append_markdown(doc_id, "# Title\n\nBody text.")
-docx.grant_edit_permission(doc_id, "ou_xxx", "open_id")
-print(doc_url or doc_id)
+created = docx.create_document("Task Report", folder_token="fld_xxx")
+document_id = created["document_id"]
+
+docx.insert_content(
+    document_id,
+    "# Title\n\nBody text.\n\n![logo](https://example.com/logo.png)",
+    content_type="markdown",
+    document_revision_id=-1,
+)
+docx.set_title(document_id, "Task Report (Updated)")
+docx.grant_edit_permission(document_id, "ou_xxx", "open_id")
+
+print(created["url"] or document_id)
 ```
 
 ## `DocxService` (High-Level)
 
-- `create_document(title)`
-- `append_markdown(document_id, markdown_text)`
-- `grant_edit_permission(document_id, member_id, member_id_type="open_id")`
+- Document creation: `create_document`
+- Content insertion: `insert_content`, `append_markdown`
+- Helper updates: `set_title`, `set_block_text`
+- Asset replacement: `replace_image`, `replace_file`
+- Content export: `get_content`
+- Permission helper: `grant_edit_permission`
 
-Use this for quick Markdown-to-doc workflows.
+Key behavior:
 
-## `DocxDocumentService` (Document and Block Listing)
+- `insert_content` supports both `markdown` and `html`
+- table blocks are sanitized before insert by removing read-only `merge_info`
+- converted images are downloaded, uploaded as `docx_image` media, then patched with `replace_image`
 
-- Document APIs: `create_document`, `get_document`, `get_raw_content`
-- Block listing: `list_blocks`, `iter_blocks`
+## `DocxDocumentService` (Document Info)
+
+- `create_document(title, folder_token=None)`
+- `get_document(document_id)`
+- `get_raw_content(document_id, lang=None)`
+- `list_blocks(...)`
+- `iter_blocks(...)`
 
 ## `DocxBlockService` (Block-Level Operations)
 
@@ -48,17 +76,24 @@ Use this for quick Markdown-to-doc workflows.
 - Create: `create_children`, `create_descendant`
 - Update: `update_block`, `batch_update`
 - Delete: `delete_children_range`
-- Convert: `convert_content` (markdown/html to doc blocks)
+- Convert: `convert_content(content, content_type="markdown")`
+
+Official request parameters are covered:
+
+- write operations: `document_revision_id`, `client_token`
+- read operations: `user_id_type`
+- child listing: `with_descendants`
 
 ## `DocContentService` (`docs/v1/content`)
 
 - `get_content(doc_token, doc_type="docx", content_type="markdown", lang=None)`
 - `get_markdown(doc_token, doc_type="docx", lang=None)`
 
-Use this when you need exported content text.
+Use this for Markdown / HTML export workflows.
 
 ## Practical Guidance
 
-- For report generation, start with `DocxService.append_markdown`.
-- For structured edits, switch to `DocxBlockService`.
-- For downstream text processing, use `DocContentService.get_markdown`.
+- For Markdown / HTML insertion, do not build blocks manually; use `DocxService.insert_content`
+- For partial edits, compose `list_children`, `update_block`, and `delete_children_range`
+- For image or attachment replacement, create the empty block first, then call `replace_image` or `replace_file`
+- For Markdown / HTML export, use `DocContentService` rather than write APIs

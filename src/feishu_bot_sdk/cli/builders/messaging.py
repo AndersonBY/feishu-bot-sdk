@@ -60,8 +60,8 @@ def _build_im_commands(
 
     send = im_sub.add_parser("send", help="Send generic message by msg_type + content", parents=[shared])
     _add_receive_args(send)
-    send.add_argument("--msg-type", required=True, help="Feishu msg_type")
-    send.add_argument("--content-json", help="Message content JSON object string")
+    send.add_argument("--msg-type", required=True, help="Feishu msg_type: text/image/interactive/share_chat/share_user/audio/media/file/sticker/post")
+    send.add_argument("--content-json", help='Message content JSON, e.g. {"text":"Hello"} for text, {"image_key":"img_xxx"} for image')
     send.add_argument("--content-file", help="Message content JSON file path")
     send.add_argument("--content-stdin", action="store_true", help="Read message content JSON from stdin")
     send.add_argument("--uuid", help="Client message id for idempotency")
@@ -69,8 +69,8 @@ def _build_im_commands(
 
     reply = im_sub.add_parser("reply", help="Reply generic message by msg_type + content", parents=[shared])
     reply.add_argument("message_id", help="Original message_id")
-    reply.add_argument("--msg-type", required=True, help="Feishu msg_type")
-    reply.add_argument("--content-json", help="Message content JSON object string")
+    reply.add_argument("--msg-type", required=True, help="Feishu msg_type: text/image/interactive/share_chat/share_user/audio/media/file/sticker/post")
+    reply.add_argument("--content-json", help='Message content JSON, e.g. {"text":"Hello"} for text, {"image_key":"img_xxx"} for image')
     reply.add_argument("--content-file", help="Message content JSON file path")
     reply.add_argument("--content-stdin", action="store_true", help="Read message content JSON from stdin")
     reply.add_argument("--uuid", help="Client message id for idempotency")
@@ -90,7 +90,7 @@ def _build_im_commands(
         parents=[shared],
     )
     push_follow_up.add_argument("message_id", help="message_id")
-    push_follow_up.add_argument("--follow-ups-json", help="Follow-up list JSON array string")
+    push_follow_up.add_argument("--follow-ups-json", help='Follow-up list JSON array, e.g. [{"content":"Approve","i18n_contents":{"zh_cn":"批准"}}]')
     push_follow_up.add_argument("--follow-ups-file", help="Follow-up list JSON file path")
     push_follow_up.add_argument("--follow-ups-stdin", action="store_true", help="Read follow-up list JSON from stdin")
     push_follow_up.set_defaults(handler=_cmd_im_push_follow_up)
@@ -145,12 +145,12 @@ def _build_media_commands(
 
     upload_image = media_sub.add_parser("upload-image", help="Upload image", parents=[shared])
     upload_image.add_argument("path", help="Image file path")
-    upload_image.add_argument("--image-type", default="message", help="message/avatar")
+    upload_image.add_argument("--image-type", default="message", choices=("message", "avatar"), help="Image type (default: message)")
     upload_image.set_defaults(handler=_cmd_media_upload_image)
 
     upload_file = media_sub.add_parser("upload-file", help="Upload file", parents=[shared])
     upload_file.add_argument("path", help="File path")
-    upload_file.add_argument("--file-type", default="stream", help="stream/mp4/pdf/doc/xls/ppt/opus")
+    upload_file.add_argument("--file-type", default="stream", choices=("stream", "mp4", "pdf", "doc", "xls", "ppt", "opus"), help="File type (default: stream)")
     upload_file.add_argument("--file-name", help="Override file name")
     upload_file.add_argument("--duration", type=int, help="Audio duration (ms)")
     upload_file.add_argument("--content-type", help="Override mime type")

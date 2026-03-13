@@ -35,7 +35,7 @@ async def async_main() -> None:
     )
     parser.add_argument("--text", default="Hello from feishu-bot-sdk (async)")
     parser.add_argument("--csv", help="Optional CSV file to import as Bitable")
-    parser.add_argument("--markdown", help="Optional markdown file to append to Docx")
+    parser.add_argument("--markdown", help="Optional markdown file to insert into Docx")
     args = parser.parse_args()
 
     client = build_client()
@@ -53,10 +53,11 @@ async def async_main() -> None:
         if args.markdown:
             markdown_text = Path(args.markdown).read_text(encoding="utf-8")
             docx = AsyncDocxService(client)
-            doc_id, doc_url = await docx.create_document("SDK Async Docx Demo")
-            await docx.append_markdown(doc_id, markdown_text)
+            created = await docx.create_document("SDK Async Docx Demo")
+            doc_id = str(created["document_id"])
+            await docx.insert_content(doc_id, markdown_text, content_type="markdown")
             await docx.grant_edit_permission(doc_id, args.receive_id, args.receive_id_type)
-            print(f"Docx created: {doc_url or doc_id}")
+            print(f"Docx created: {created.get('url') or doc_id}")
     finally:
         await client.aclose()
 

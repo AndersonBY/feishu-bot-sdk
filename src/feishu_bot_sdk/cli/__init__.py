@@ -20,6 +20,8 @@ from .builders import (
     _build_oauth_commands,
     _build_search_commands,
     _build_server_commands,
+    _build_sheets_commands,
+    _build_task_commands,
     _build_webhook_commands,
     _build_wiki_commands,
     _build_ws_commands,
@@ -70,6 +72,8 @@ def build_parser() -> argparse.ArgumentParser:
     _build_calendar_commands(subparsers, shared)
     _build_contact_commands(subparsers, shared)
     _build_search_commands(subparsers, shared)
+    _build_sheets_commands(subparsers, shared)
+    _build_task_commands(subparsers, shared)
     _build_webhook_commands(subparsers, shared)
     _build_ws_commands(subparsers, shared)
     _build_server_commands(subparsers, shared)

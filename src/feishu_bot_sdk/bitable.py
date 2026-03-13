@@ -566,6 +566,56 @@ class BitableService:
             payload={"records": list(record_ids)},
         )
 
+    def get_app(self, app_token: str) -> Mapping[str, Any]:
+        response = self._client.request_json("GET", f"/bitable/v1/apps/{app_token}")
+        return _unwrap_data(response)
+
+    def update_app(self, app_token: str, *, name: Optional[str] = None, is_advanced: Optional[bool] = None) -> Mapping[str, Any]:
+        payload = _drop_none({"name": name, "is_advanced": is_advanced})
+        response = self._client.request_json("PUT", f"/bitable/v1/apps/{app_token}", payload=payload)
+        return _unwrap_data(response)
+
+    def copy_app(self, app_token: str, *, name: Optional[str] = None, folder_token: Optional[str] = None, without_content: Optional[bool] = None, time_zone: Optional[str] = None) -> Mapping[str, Any]:
+        payload = _drop_none({"name": name, "folder_token": folder_token, "without_content": without_content, "time_zone": time_zone})
+        response = self._client.request_json("POST", f"/bitable/v1/apps/{app_token}/copy", payload=payload)
+        return _unwrap_data(response)
+
+    def list_views(self, app_token: str, table_id: str, *, page_size: Optional[int] = None, page_token: Optional[str] = None, user_id_type: Optional[str] = None) -> Mapping[str, Any]:
+        params = _drop_none({"page_size": page_size, "page_token": page_token, "user_id_type": user_id_type})
+        response = self._client.request_json("GET", f"/bitable/v1/apps/{app_token}/tables/{table_id}/views", params=params)
+        return _unwrap_data(response)
+
+    def iter_views(self, app_token: str, table_id: str, *, page_size: int = 100, user_id_type: Optional[str] = None) -> Iterator[Mapping[str, Any]]:
+        page_token: Optional[str] = None
+        while True:
+            data = self.list_views(app_token, table_id, page_size=page_size, page_token=page_token, user_id_type=user_id_type)
+            yield from _iter_page_items(data)
+            if not _has_more(data):
+                return
+            page_token = _next_page_token(data)
+            if not page_token:
+                return
+
+    def get_view(self, app_token: str, table_id: str, view_id: str) -> Mapping[str, Any]:
+        response = self._client.request_json("GET", f"/bitable/v1/apps/{app_token}/tables/{table_id}/views/{view_id}")
+        return _unwrap_data(response)
+
+    def create_view(self, app_token: str, table_id: str, view: Mapping[str, object]) -> Mapping[str, Any]:
+        response = self._client.request_json("POST", f"/bitable/v1/apps/{app_token}/tables/{table_id}/views", payload=dict(view))
+        return _unwrap_data(response)
+
+    def update_view(self, app_token: str, table_id: str, view_id: str, view: Mapping[str, object]) -> Mapping[str, Any]:
+        response = self._client.request_json("PATCH", f"/bitable/v1/apps/{app_token}/tables/{table_id}/views/{view_id}", payload=dict(view))
+        return _unwrap_data(response)
+
+    def delete_view(self, app_token: str, table_id: str, view_id: str) -> Mapping[str, Any]:
+        response = self._client.request_json("DELETE", f"/bitable/v1/apps/{app_token}/tables/{table_id}/views/{view_id}")
+        return _unwrap_data(response)
+
+    def get_field(self, app_token: str, table_id: str, field_id: str) -> Mapping[str, Any]:
+        response = self._client.request_json("GET", f"/bitable/v1/apps/{app_token}/tables/{table_id}/fields/{field_id}")
+        return _unwrap_data(response)
+
     def _cleanup_default_tables(self, app_token: str, keep_table_id: str) -> None:
         try:
             tables_resp = self._client.request_json(
@@ -1038,6 +1088,57 @@ class AsyncBitableService:
             f"/bitable/v1/apps/{app_token}/tables/{table_id}/records/batch_delete",
             payload={"records": list(record_ids)},
         )
+
+    async def get_app(self, app_token: str) -> Mapping[str, Any]:
+        response = await self._client.request_json("GET", f"/bitable/v1/apps/{app_token}")
+        return _unwrap_data(response)
+
+    async def update_app(self, app_token: str, *, name: Optional[str] = None, is_advanced: Optional[bool] = None) -> Mapping[str, Any]:
+        payload = _drop_none({"name": name, "is_advanced": is_advanced})
+        response = await self._client.request_json("PUT", f"/bitable/v1/apps/{app_token}", payload=payload)
+        return _unwrap_data(response)
+
+    async def copy_app(self, app_token: str, *, name: Optional[str] = None, folder_token: Optional[str] = None, without_content: Optional[bool] = None, time_zone: Optional[str] = None) -> Mapping[str, Any]:
+        payload = _drop_none({"name": name, "folder_token": folder_token, "without_content": without_content, "time_zone": time_zone})
+        response = await self._client.request_json("POST", f"/bitable/v1/apps/{app_token}/copy", payload=payload)
+        return _unwrap_data(response)
+
+    async def list_views(self, app_token: str, table_id: str, *, page_size: Optional[int] = None, page_token: Optional[str] = None, user_id_type: Optional[str] = None) -> Mapping[str, Any]:
+        params = _drop_none({"page_size": page_size, "page_token": page_token, "user_id_type": user_id_type})
+        response = await self._client.request_json("GET", f"/bitable/v1/apps/{app_token}/tables/{table_id}/views", params=params)
+        return _unwrap_data(response)
+
+    async def iter_views(self, app_token: str, table_id: str, *, page_size: int = 100, user_id_type: Optional[str] = None) -> AsyncIterator[Mapping[str, Any]]:
+        page_token: Optional[str] = None
+        while True:
+            data = await self.list_views(app_token, table_id, page_size=page_size, page_token=page_token, user_id_type=user_id_type)
+            for item in _iter_page_items(data):
+                yield item
+            if not _has_more(data):
+                return
+            page_token = _next_page_token(data)
+            if not page_token:
+                return
+
+    async def get_view(self, app_token: str, table_id: str, view_id: str) -> Mapping[str, Any]:
+        response = await self._client.request_json("GET", f"/bitable/v1/apps/{app_token}/tables/{table_id}/views/{view_id}")
+        return _unwrap_data(response)
+
+    async def create_view(self, app_token: str, table_id: str, view: Mapping[str, object]) -> Mapping[str, Any]:
+        response = await self._client.request_json("POST", f"/bitable/v1/apps/{app_token}/tables/{table_id}/views", payload=dict(view))
+        return _unwrap_data(response)
+
+    async def update_view(self, app_token: str, table_id: str, view_id: str, view: Mapping[str, object]) -> Mapping[str, Any]:
+        response = await self._client.request_json("PATCH", f"/bitable/v1/apps/{app_token}/tables/{table_id}/views/{view_id}", payload=dict(view))
+        return _unwrap_data(response)
+
+    async def delete_view(self, app_token: str, table_id: str, view_id: str) -> Mapping[str, Any]:
+        response = await self._client.request_json("DELETE", f"/bitable/v1/apps/{app_token}/tables/{table_id}/views/{view_id}")
+        return _unwrap_data(response)
+
+    async def get_field(self, app_token: str, table_id: str, field_id: str) -> Mapping[str, Any]:
+        response = await self._client.request_json("GET", f"/bitable/v1/apps/{app_token}/tables/{table_id}/fields/{field_id}")
+        return _unwrap_data(response)
 
     async def _cleanup_default_tables(self, app_token: str, keep_table_id: str) -> None:
         try:

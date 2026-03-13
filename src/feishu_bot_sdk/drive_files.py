@@ -1,7 +1,7 @@
 import hashlib
 import mimetypes
 import os
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Iterator, AsyncIterator, Mapping, Optional, Sequence
 
 import httpx
 
@@ -16,6 +16,26 @@ def _drop_none(params: Mapping[str, object]) -> dict[str, object]:
 
 def _unwrap_data(response: Mapping[str, Any]) -> DataResponse:
     return DataResponse.from_raw(response)
+
+
+def _iter_page_files(data: Mapping[str, Any]) -> Iterator[Mapping[str, Any]]:
+    files = data.get("files")
+    if not isinstance(files, list):
+        return
+    for item in files:
+        if isinstance(item, Mapping):
+            yield item
+
+
+def _next_page_token(data: Mapping[str, Any]) -> Optional[str]:
+    token = data.get("page_token")
+    if isinstance(token, str) and token:
+        return token
+    return None
+
+
+def _has_more(data: Mapping[str, Any]) -> bool:
+    return bool(data.get("has_more"))
 
 
 def _build_file_part(
@@ -42,6 +62,25 @@ def _join_file_tokens(file_tokens: Sequence[str]) -> str:
 class DriveFileService:
     def __init__(self, feishu_client: FeishuClient) -> None:
         self._client = feishu_client
+
+    def batch_query_metas(
+        self,
+        request_docs: Sequence[Mapping[str, object]],
+        *,
+        with_url: Optional[bool] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        payload: dict[str, object] = {"request_docs": [dict(item) for item in request_docs]}
+        if with_url is not None:
+            payload["with_url"] = with_url
+        response = self._client.request_json(
+            "POST",
+            "/drive/v1/metas/batch_query",
+            params=params,
+            payload=payload,
+        )
+        return _unwrap_data(response)
 
     def upload_file(
         self,
@@ -145,6 +184,190 @@ class DriveFileService:
 
     def download_file(self, file_token: str) -> bytes:
         return self._request_bytes_raw("GET", f"/drive/v1/files/{file_token}/download")
+
+    def get_file_statistics(
+        self,
+        file_token: str,
+        *,
+        file_type: str,
+    ) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "POST",
+            f"/drive/v1/files/{file_token}/statistics",
+            payload={"file_type": file_type},
+        )
+        return _unwrap_data(response)
+
+    def list_file_view_records(
+        self,
+        file_token: str,
+        *,
+        file_type: str,
+        page_size: int,
+        page_token: Optional[str] = None,
+        viewer_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        payload = _drop_none(
+            {
+                "file_type": file_type,
+                "page_size": page_size,
+                "page_token": page_token,
+                "viewer_id_type": viewer_id_type,
+            }
+        )
+        response = self._client.request_json(
+            "POST",
+            f"/drive/v1/files/{file_token}/view_records",
+            payload=payload,
+        )
+        return _unwrap_data(response)
+
+    def copy_file(
+        self,
+        file_token: str,
+        *,
+        name: str,
+        folder_token: str,
+        type: Optional[str] = None,
+        extra: Optional[Mapping[str, object]] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        payload = _drop_none(
+            {
+                "name": name,
+                "type": type,
+                "folder_token": folder_token,
+                "extra": dict(extra) if extra is not None else None,
+            }
+        )
+        response = self._client.request_json(
+            "POST",
+            f"/drive/v1/files/{file_token}/copy",
+            params=params,
+            payload=payload,
+        )
+        return _unwrap_data(response)
+
+    def move_file(
+        self,
+        file_token: str,
+        *,
+        type: Optional[str] = None,
+        folder_token: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        payload = _drop_none({"type": type, "folder_token": folder_token})
+        response = self._client.request_json(
+            "POST",
+            f"/drive/v1/files/{file_token}/move",
+            payload=payload,
+        )
+        return _unwrap_data(response)
+
+    def delete_file(
+        self,
+        file_token: str,
+        *,
+        type: str,
+    ) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "DELETE",
+            f"/drive/v1/files/{file_token}",
+            params={"type": type},
+        )
+        return _unwrap_data(response)
+
+    def create_shortcut(
+        self,
+        *,
+        parent_token: str,
+        refer_token: str,
+        refer_type: str,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        response = self._client.request_json(
+            "POST",
+            "/drive/v1/files/create_shortcut",
+            params=params,
+            payload={
+                "parent_token": parent_token,
+                "refer_entity": {
+                    "refer_token": refer_token,
+                    "refer_type": refer_type,
+                },
+            },
+        )
+        return _unwrap_data(response)
+
+    def create_version(
+        self,
+        file_token: str,
+        *,
+        name: str,
+        obj_type: str,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        response = self._client.request_json(
+            "POST",
+            f"/drive/v1/files/{file_token}/versions",
+            params=params,
+            payload={"name": name, "obj_type": obj_type},
+        )
+        return _unwrap_data(response)
+
+    def list_versions(
+        self,
+        file_token: str,
+        *,
+        obj_type: str,
+        page_size: int,
+        page_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none(
+            {
+                "obj_type": obj_type,
+                "page_size": page_size,
+                "page_token": page_token,
+                "user_id_type": user_id_type,
+            }
+        )
+        response = self._client.request_json(
+            "GET",
+            f"/drive/v1/files/{file_token}/versions",
+            params=params,
+        )
+        return _unwrap_data(response)
+
+    def get_version(
+        self,
+        file_token: str,
+        version_id: str,
+        *,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "GET",
+            f"/drive/v1/files/{file_token}/versions/{version_id}",
+            params=_drop_none({"user_id_type": user_id_type}),
+        )
+        return _unwrap_data(response)
+
+    def delete_version(
+        self,
+        file_token: str,
+        version_id: str,
+        *,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "DELETE",
+            f"/drive/v1/files/{file_token}/versions/{version_id}",
+            params=_drop_none({"user_id_type": user_id_type}),
+        )
+        return _unwrap_data(response)
 
     def create_import_task(self, task: Mapping[str, object]) -> Mapping[str, Any]:
         response = self._client.request_json(
@@ -309,6 +532,61 @@ class DriveFileService:
         )
         return _unwrap_data(response)
 
+    def list_files(
+        self,
+        *,
+        folder_token: Optional[str] = None,
+        page_size: Optional[int] = None,
+        page_token: Optional[str] = None,
+        order_by: Optional[str] = None,
+        direction: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({
+            "folder_token": folder_token,
+            "page_size": page_size,
+            "page_token": page_token,
+            "order_by": order_by,
+            "direction": direction,
+            "user_id_type": user_id_type,
+        })
+        response = self._client.request_json("GET", "/drive/v1/files", params=params)
+        return _unwrap_data(response)
+
+    def iter_files(
+        self,
+        *,
+        folder_token: Optional[str] = None,
+        page_size: int = 50,
+        order_by: Optional[str] = None,
+        direction: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Iterator[Mapping[str, Any]]:
+        page_token: Optional[str] = None
+        while True:
+            data = self.list_files(
+                folder_token=folder_token,
+                page_size=page_size,
+                page_token=page_token,
+                order_by=order_by,
+                direction=direction,
+                user_id_type=user_id_type,
+            )
+            yield from _iter_page_files(data)
+            if not _has_more(data):
+                return
+            page_token = _next_page_token(data)
+            if not page_token:
+                return
+
+    def create_folder(self, *, name: str, folder_token: str) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "POST",
+            "/drive/v1/files/create_folder",
+            payload={"name": name, "folder_token": folder_token},
+        )
+        return _unwrap_data(response)
+
     def _request_json_raw(
         self,
         method: str,
@@ -379,6 +657,25 @@ class DriveFileService:
 class AsyncDriveFileService:
     def __init__(self, feishu_client: AsyncFeishuClient) -> None:
         self._client = feishu_client
+
+    async def batch_query_metas(
+        self,
+        request_docs: Sequence[Mapping[str, object]],
+        *,
+        with_url: Optional[bool] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        payload: dict[str, object] = {"request_docs": [dict(item) for item in request_docs]}
+        if with_url is not None:
+            payload["with_url"] = with_url
+        response = await self._client.request_json(
+            "POST",
+            "/drive/v1/metas/batch_query",
+            params=params,
+            payload=payload,
+        )
+        return _unwrap_data(response)
 
     async def upload_file(
         self,
@@ -482,6 +779,190 @@ class AsyncDriveFileService:
 
     async def download_file(self, file_token: str) -> bytes:
         return await self._request_bytes_raw("GET", f"/drive/v1/files/{file_token}/download")
+
+    async def get_file_statistics(
+        self,
+        file_token: str,
+        *,
+        file_type: str,
+    ) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "POST",
+            f"/drive/v1/files/{file_token}/statistics",
+            payload={"file_type": file_type},
+        )
+        return _unwrap_data(response)
+
+    async def list_file_view_records(
+        self,
+        file_token: str,
+        *,
+        file_type: str,
+        page_size: int,
+        page_token: Optional[str] = None,
+        viewer_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        payload = _drop_none(
+            {
+                "file_type": file_type,
+                "page_size": page_size,
+                "page_token": page_token,
+                "viewer_id_type": viewer_id_type,
+            }
+        )
+        response = await self._client.request_json(
+            "POST",
+            f"/drive/v1/files/{file_token}/view_records",
+            payload=payload,
+        )
+        return _unwrap_data(response)
+
+    async def copy_file(
+        self,
+        file_token: str,
+        *,
+        name: str,
+        folder_token: str,
+        type: Optional[str] = None,
+        extra: Optional[Mapping[str, object]] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        payload = _drop_none(
+            {
+                "name": name,
+                "type": type,
+                "folder_token": folder_token,
+                "extra": dict(extra) if extra is not None else None,
+            }
+        )
+        response = await self._client.request_json(
+            "POST",
+            f"/drive/v1/files/{file_token}/copy",
+            params=params,
+            payload=payload,
+        )
+        return _unwrap_data(response)
+
+    async def move_file(
+        self,
+        file_token: str,
+        *,
+        type: Optional[str] = None,
+        folder_token: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        payload = _drop_none({"type": type, "folder_token": folder_token})
+        response = await self._client.request_json(
+            "POST",
+            f"/drive/v1/files/{file_token}/move",
+            payload=payload,
+        )
+        return _unwrap_data(response)
+
+    async def delete_file(
+        self,
+        file_token: str,
+        *,
+        type: str,
+    ) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "DELETE",
+            f"/drive/v1/files/{file_token}",
+            params={"type": type},
+        )
+        return _unwrap_data(response)
+
+    async def create_shortcut(
+        self,
+        *,
+        parent_token: str,
+        refer_token: str,
+        refer_type: str,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        response = await self._client.request_json(
+            "POST",
+            "/drive/v1/files/create_shortcut",
+            params=params,
+            payload={
+                "parent_token": parent_token,
+                "refer_entity": {
+                    "refer_token": refer_token,
+                    "refer_type": refer_type,
+                },
+            },
+        )
+        return _unwrap_data(response)
+
+    async def create_version(
+        self,
+        file_token: str,
+        *,
+        name: str,
+        obj_type: str,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        response = await self._client.request_json(
+            "POST",
+            f"/drive/v1/files/{file_token}/versions",
+            params=params,
+            payload={"name": name, "obj_type": obj_type},
+        )
+        return _unwrap_data(response)
+
+    async def list_versions(
+        self,
+        file_token: str,
+        *,
+        obj_type: str,
+        page_size: int,
+        page_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none(
+            {
+                "obj_type": obj_type,
+                "page_size": page_size,
+                "page_token": page_token,
+                "user_id_type": user_id_type,
+            }
+        )
+        response = await self._client.request_json(
+            "GET",
+            f"/drive/v1/files/{file_token}/versions",
+            params=params,
+        )
+        return _unwrap_data(response)
+
+    async def get_version(
+        self,
+        file_token: str,
+        version_id: str,
+        *,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "GET",
+            f"/drive/v1/files/{file_token}/versions/{version_id}",
+            params=_drop_none({"user_id_type": user_id_type}),
+        )
+        return _unwrap_data(response)
+
+    async def delete_version(
+        self,
+        file_token: str,
+        version_id: str,
+        *,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "DELETE",
+            f"/drive/v1/files/{file_token}/versions/{version_id}",
+            params=_drop_none({"user_id_type": user_id_type}),
+        )
+        return _unwrap_data(response)
 
     async def create_import_task(self, task: Mapping[str, object]) -> Mapping[str, Any]:
         response = await self._client.request_json(
@@ -643,6 +1124,62 @@ class AsyncDriveFileService:
             "GET",
             "/drive/v1/medias/batch_get_tmp_download_url",
             params=params,
+        )
+        return _unwrap_data(response)
+
+    async def list_files(
+        self,
+        *,
+        folder_token: Optional[str] = None,
+        page_size: Optional[int] = None,
+        page_token: Optional[str] = None,
+        order_by: Optional[str] = None,
+        direction: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({
+            "folder_token": folder_token,
+            "page_size": page_size,
+            "page_token": page_token,
+            "order_by": order_by,
+            "direction": direction,
+            "user_id_type": user_id_type,
+        })
+        response = await self._client.request_json("GET", "/drive/v1/files", params=params)
+        return _unwrap_data(response)
+
+    async def iter_files(
+        self,
+        *,
+        folder_token: Optional[str] = None,
+        page_size: int = 50,
+        order_by: Optional[str] = None,
+        direction: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> AsyncIterator[Mapping[str, Any]]:
+        page_token: Optional[str] = None
+        while True:
+            data = await self.list_files(
+                folder_token=folder_token,
+                page_size=page_size,
+                page_token=page_token,
+                order_by=order_by,
+                direction=direction,
+                user_id_type=user_id_type,
+            )
+            for item in _iter_page_files(data):
+                yield item
+            if not _has_more(data):
+                return
+            page_token = _next_page_token(data)
+            if not page_token:
+                return
+
+    async def create_folder(self, *, name: str, folder_token: str) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "POST",
+            "/drive/v1/files/create_folder",
+            payload={"name": name, "folder_token": folder_token},
         )
         return _unwrap_data(response)
 

@@ -1,88 +1,242 @@
+from __future__ import annotations
+
+import copy
 import os
-import re
 import uuid
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 from urllib.parse import urlparse
 
 import httpx
 
+from .docs_content import AsyncDocContentService, DocContentService
+from .docx_blocks import AsyncDocxBlockService, DocxBlockService
+from .docx_document import AsyncDocxDocumentService, DocxDocumentService
 from .drive_acl import AsyncDrivePermissionService, DrivePermissionService
+from .drive_files import AsyncDriveFileService, DriveFileService
 from .exceptions import FeishuError
 from .feishu import AsyncFeishuClient, FeishuClient
 from .types import DriveResourceType, MemberIdType
 
 
-_BLOCK_BATCH_SIZE = 200
+_INSERT_BATCH_LIMIT = 1000
 
 
 @dataclass(frozen=True)
-class _ImageSpec:
-    temp_block_id: str
-    url: str
-    alt_text: str
+class _DownloadedAsset:
+    content: bytes
+    file_name: str
+    content_type: Optional[str]
 
 
-@dataclass
-class _BlockGroup:
+@dataclass(frozen=True)
+class _InsertBatch:
     root_ids: List[str]
-    blocks: List[Dict[str, object]]
-    images: List[_ImageSpec]
-
-
-_IMAGE_PATTERN = re.compile(r"^\s*!\[(.*?)\]\((\S+?)(?:\s+\"(.*?)\")?\)\s*$")
-_INLINE_IMAGE_RE = re.compile(r"!\[(.*?)\]\((\S+?)(?:\s+\"(.*?)\")?\)")
-_TABLE_SEPARATOR_RE = re.compile(r"^:?-+:?$")
+    blocks: List[Dict[str, Any]]
+    image_urls: Dict[str, str]
 
 
 class DocxService:
     def __init__(self, feishu_client: FeishuClient) -> None:
         self._client = feishu_client
+        self._documents = DocxDocumentService(feishu_client)
+        self._blocks = DocxBlockService(feishu_client)
+        self._content = DocContentService(feishu_client)
+        self._drive_files = DriveFileService(feishu_client)
         self._drive_permissions = DrivePermissionService(feishu_client)
 
-    def create_document(self, title: str) -> Tuple[str, Optional[str]]:
-        payload: Dict[str, str] = {"title": title}
-        if self._client.config.doc_folder_token:
-            payload["folder_token"] = self._client.config.doc_folder_token
-        resp = self._client.request_json("POST", "/docx/v1/documents", payload=payload)
-        document_id = resp["data"]["document"]["document_id"]
-        url_prefix = self._client.config.doc_url_prefix
-        if url_prefix:
-            return document_id, url_prefix.rstrip("/") + f"/{document_id}"
-        return document_id, None
+    def create_document(
+        self,
+        title: str,
+        *,
+        folder_token: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        data = self._documents.create_document(title, folder_token=folder_token)
+        document_id = _extract_document_id(data)
+        result = dict(data)
+        result["document_id"] = document_id
+        result["url"] = _build_document_url(self._client, document_id)
+        return result
 
-    def append_markdown(self, document_id: str, markdown_text: str) -> None:
-        groups = _markdown_to_groups(markdown_text)
-        if not groups:
-            groups = [_text_group(" ")]
-        for batch in _chunked_groups(groups, _BLOCK_BATCH_SIZE):
-            descendants: List[Dict[str, object]] = []
-            children_id: List[str] = []
-            images_by_temp: Dict[str, _ImageSpec] = {}
-            for group in batch:
-                descendants.extend(group.blocks)
-                children_id.extend(group.root_ids)
-                for image in group.images:
-                    images_by_temp[image.temp_block_id] = image
-            payload = {
-                "index": -1,
-                "children_id": children_id,
-                "descendants": descendants,
-            }
-            resp = self._client.request_json(
-                "POST",
-                f"/docx/v1/documents/{document_id}/blocks/{document_id}/descendant",
-                payload=payload,
-                params={"document_revision_id": -1},
+    def append_markdown(self, document_id: str, markdown_text: str) -> Mapping[str, Any]:
+        return self.insert_content(
+            document_id,
+            markdown_text,
+            content_type="markdown",
+        )
+
+    def insert_content(
+        self,
+        document_id: str,
+        content: str,
+        *,
+        block_id: Optional[str] = None,
+        content_type: str = "markdown",
+        index: int = -1,
+        document_revision_id: Optional[int] = None,
+        client_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        if not content:
+            raise ValueError("content must not be empty")
+        converted = self._blocks.convert_content(content, content_type=content_type)
+        target_block_id = block_id or document_id
+        batches = _build_insert_batches(converted, limit=_INSERT_BATCH_LIMIT)
+        if not batches:
+            raise FeishuError("docx convert returned no insertable blocks")
+
+        current_index = index
+        inserted_batches: List[Mapping[str, Any]] = []
+        image_replacements: List[Mapping[str, Any]] = []
+        for batch in batches:
+            inserted = self._blocks.create_descendant(
+                document_id,
+                target_block_id,
+                children_id=batch.root_ids,
+                descendants=batch.blocks,
+                index=current_index,
+                document_revision_id=document_revision_id,
+                client_token=client_token,
+                user_id_type=user_id_type,
             )
-            if images_by_temp:
-                relations = resp.get("data", {}).get("block_id_relations", [])
-                _replace_images(
-                    self._client,
-                    document_id,
-                    relations,
-                    images_by_temp,
+            inserted_batches.append(inserted)
+            if batch.image_urls:
+                image_replacements.extend(
+                    self._replace_inserted_images(
+                        document_id,
+                        inserted,
+                        batch.image_urls,
+                        document_revision_id=document_revision_id,
+                        client_token=client_token,
+                        user_id_type=user_id_type,
+                    )
                 )
+            if current_index >= 0:
+                current_index += len(batch.root_ids)
+
+        return {
+            "document_id": document_id,
+            "block_id": target_block_id,
+            "content_type": content_type,
+            "batch_count": len(inserted_batches),
+            "converted": converted,
+            "inserted_batches": inserted_batches,
+            "image_replacements": image_replacements,
+        }
+
+    def set_title(
+        self,
+        document_id: str,
+        title: str,
+        *,
+        document_revision_id: Optional[int] = None,
+        client_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self.set_block_text(
+            document_id,
+            document_id,
+            title,
+            document_revision_id=document_revision_id,
+            client_token=client_token,
+            user_id_type=user_id_type,
+        )
+
+    def set_block_text(
+        self,
+        document_id: str,
+        block_id: str,
+        text: str,
+        *,
+        document_revision_id: Optional[int] = None,
+        client_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        if not text:
+            raise ValueError("text must not be empty")
+        return self._blocks.update_block(
+            document_id,
+            block_id,
+            operations={"update_text_elements": {"elements": _text_elements(text)}},
+            document_revision_id=document_revision_id,
+            client_token=client_token,
+            user_id_type=user_id_type,
+        )
+
+    def replace_image(
+        self,
+        document_id: str,
+        block_id: str,
+        *,
+        file_path: Optional[str] = None,
+        content: Optional[bytes] = None,
+        file_name: Optional[str] = None,
+        checksum: Optional[str] = None,
+        content_type: Optional[str] = None,
+        document_revision_id: Optional[int] = None,
+        client_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self._replace_asset(
+            document_id,
+            block_id,
+            operation_name="replace_image",
+            parent_type="docx_image",
+            default_file_name="image.png",
+            file_path=file_path,
+            content=content,
+            file_name=file_name,
+            checksum=checksum,
+            content_type=content_type,
+            document_revision_id=document_revision_id,
+            client_token=client_token,
+            user_id_type=user_id_type,
+        )
+
+    def replace_file(
+        self,
+        document_id: str,
+        block_id: str,
+        *,
+        file_path: Optional[str] = None,
+        content: Optional[bytes] = None,
+        file_name: Optional[str] = None,
+        checksum: Optional[str] = None,
+        content_type: Optional[str] = None,
+        document_revision_id: Optional[int] = None,
+        client_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self._replace_asset(
+            document_id,
+            block_id,
+            operation_name="replace_file",
+            parent_type="docx_file",
+            default_file_name="attachment.bin",
+            file_path=file_path,
+            content=content,
+            file_name=file_name,
+            checksum=checksum,
+            content_type=content_type,
+            document_revision_id=document_revision_id,
+            client_token=client_token,
+            user_id_type=user_id_type,
+        )
+
+    def get_content(
+        self,
+        doc_token: str,
+        *,
+        doc_type: str = "docx",
+        content_type: str = "markdown",
+        lang: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return self._content.get_content(
+            doc_token,
+            doc_type=doc_type,
+            content_type=content_type,
+            lang=lang,
+        )
 
     def grant_edit_permission(
         self,
@@ -98,55 +252,303 @@ class DocxService:
             permission=self._client.config.member_permission,
         )
 
+    def _replace_inserted_images(
+        self,
+        document_id: str,
+        inserted: Mapping[str, Any],
+        image_urls_by_temp_id: Mapping[str, str],
+        *,
+        document_revision_id: Optional[int],
+        client_token: Optional[str],
+        user_id_type: Optional[str],
+    ) -> List[Mapping[str, Any]]:
+        relations = _extract_relation_map(inserted)
+        replacements: List[Mapping[str, Any]] = []
+        for temp_block_id, image_url in image_urls_by_temp_id.items():
+            block_id = relations.get(temp_block_id)
+            if not block_id:
+                raise FeishuError(f"docx insert response missing block relation for image block {temp_block_id}")
+            downloaded = _download_binary(image_url)
+            replacement = self.replace_image(
+                document_id,
+                block_id,
+                content=downloaded.content,
+                file_name=downloaded.file_name,
+                content_type=downloaded.content_type,
+                document_revision_id=document_revision_id,
+                client_token=client_token,
+                user_id_type=user_id_type,
+            )
+            item = {
+                "temporary_block_id": temp_block_id,
+                "block_id": block_id,
+                "image_url": image_url,
+                "result": replacement,
+            }
+            file_token = replacement.get("file_token")
+            if isinstance(file_token, str) and file_token:
+                item["file_token"] = file_token
+            replacements.append(item)
+        return replacements
+
+    def _replace_asset(
+        self,
+        document_id: str,
+        block_id: str,
+        *,
+        operation_name: str,
+        parent_type: str,
+        default_file_name: str,
+        file_path: Optional[str],
+        content: Optional[bytes],
+        file_name: Optional[str],
+        checksum: Optional[str],
+        content_type: Optional[str],
+        document_revision_id: Optional[int],
+        client_token: Optional[str],
+        user_id_type: Optional[str],
+    ) -> Mapping[str, Any]:
+        if bool(file_path) == bool(content is not None):
+            raise ValueError("exactly one of file_path or content is required")
+
+        if file_path is not None:
+            upload = self._drive_files.upload_media(
+                file_path,
+                parent_type=parent_type,
+                parent_node=block_id,
+                file_name=file_name,
+                checksum=checksum,
+                content_type=content_type,
+            )
+        else:
+            upload = self._drive_files.upload_media_bytes(
+                file_name or default_file_name,
+                content or b"",
+                parent_type=parent_type,
+                parent_node=block_id,
+                checksum=checksum,
+                content_type=content_type,
+            )
+
+        file_token = _extract_file_token(upload)
+        update = self._blocks.update_block(
+            document_id,
+            block_id,
+            operations={operation_name: {"token": file_token}},
+            document_revision_id=document_revision_id,
+            client_token=client_token,
+            user_id_type=user_id_type,
+        )
+        return {
+            "document_id": document_id,
+            "block_id": block_id,
+            "file_token": file_token,
+            "upload": upload,
+            "update": update,
+        }
+
 
 class AsyncDocxService:
     def __init__(self, feishu_client: AsyncFeishuClient) -> None:
         self._client = feishu_client
+        self._documents = AsyncDocxDocumentService(feishu_client)
+        self._blocks = AsyncDocxBlockService(feishu_client)
+        self._content = AsyncDocContentService(feishu_client)
+        self._drive_files = AsyncDriveFileService(feishu_client)
         self._drive_permissions = AsyncDrivePermissionService(feishu_client)
 
-    async def create_document(self, title: str) -> Tuple[str, Optional[str]]:
-        payload: Dict[str, str] = {"title": title}
-        if self._client.config.doc_folder_token:
-            payload["folder_token"] = self._client.config.doc_folder_token
-        resp = await self._client.request_json("POST", "/docx/v1/documents", payload=payload)
-        document_id = resp["data"]["document"]["document_id"]
-        url_prefix = self._client.config.doc_url_prefix
-        if url_prefix:
-            return document_id, url_prefix.rstrip("/") + f"/{document_id}"
-        return document_id, None
+    async def create_document(
+        self,
+        title: str,
+        *,
+        folder_token: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        data = await self._documents.create_document(title, folder_token=folder_token)
+        document_id = _extract_document_id(data)
+        result = dict(data)
+        result["document_id"] = document_id
+        result["url"] = _build_document_url(self._client, document_id)
+        return result
 
-    async def append_markdown(self, document_id: str, markdown_text: str) -> None:
-        groups = _markdown_to_groups(markdown_text)
-        if not groups:
-            groups = [_text_group(" ")]
-        for batch in _chunked_groups(groups, _BLOCK_BATCH_SIZE):
-            descendants: List[Dict[str, object]] = []
-            children_id: List[str] = []
-            images_by_temp: Dict[str, _ImageSpec] = {}
-            for group in batch:
-                descendants.extend(group.blocks)
-                children_id.extend(group.root_ids)
-                for image in group.images:
-                    images_by_temp[image.temp_block_id] = image
-            payload = {
-                "index": -1,
-                "children_id": children_id,
-                "descendants": descendants,
-            }
-            resp = await self._client.request_json(
-                "POST",
-                f"/docx/v1/documents/{document_id}/blocks/{document_id}/descendant",
-                payload=payload,
-                params={"document_revision_id": -1},
+    async def append_markdown(self, document_id: str, markdown_text: str) -> Mapping[str, Any]:
+        return await self.insert_content(
+            document_id,
+            markdown_text,
+            content_type="markdown",
+        )
+
+    async def insert_content(
+        self,
+        document_id: str,
+        content: str,
+        *,
+        block_id: Optional[str] = None,
+        content_type: str = "markdown",
+        index: int = -1,
+        document_revision_id: Optional[int] = None,
+        client_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        if not content:
+            raise ValueError("content must not be empty")
+        converted = await self._blocks.convert_content(content, content_type=content_type)
+        target_block_id = block_id or document_id
+        batches = _build_insert_batches(converted, limit=_INSERT_BATCH_LIMIT)
+        if not batches:
+            raise FeishuError("docx convert returned no insertable blocks")
+
+        current_index = index
+        inserted_batches: List[Mapping[str, Any]] = []
+        image_replacements: List[Mapping[str, Any]] = []
+        for batch in batches:
+            inserted = await self._blocks.create_descendant(
+                document_id,
+                target_block_id,
+                children_id=batch.root_ids,
+                descendants=batch.blocks,
+                index=current_index,
+                document_revision_id=document_revision_id,
+                client_token=client_token,
+                user_id_type=user_id_type,
             )
-            if images_by_temp:
-                relations = resp.get("data", {}).get("block_id_relations", [])
-                await _replace_images_async(
-                    self._client,
-                    document_id,
-                    relations,
-                    images_by_temp,
+            inserted_batches.append(inserted)
+            if batch.image_urls:
+                image_replacements.extend(
+                    await self._replace_inserted_images(
+                        document_id,
+                        inserted,
+                        batch.image_urls,
+                        document_revision_id=document_revision_id,
+                        client_token=client_token,
+                        user_id_type=user_id_type,
+                    )
                 )
+            if current_index >= 0:
+                current_index += len(batch.root_ids)
+
+        return {
+            "document_id": document_id,
+            "block_id": target_block_id,
+            "content_type": content_type,
+            "batch_count": len(inserted_batches),
+            "converted": converted,
+            "inserted_batches": inserted_batches,
+            "image_replacements": image_replacements,
+        }
+
+    async def set_title(
+        self,
+        document_id: str,
+        title: str,
+        *,
+        document_revision_id: Optional[int] = None,
+        client_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self.set_block_text(
+            document_id,
+            document_id,
+            title,
+            document_revision_id=document_revision_id,
+            client_token=client_token,
+            user_id_type=user_id_type,
+        )
+
+    async def set_block_text(
+        self,
+        document_id: str,
+        block_id: str,
+        text: str,
+        *,
+        document_revision_id: Optional[int] = None,
+        client_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        if not text:
+            raise ValueError("text must not be empty")
+        return await self._blocks.update_block(
+            document_id,
+            block_id,
+            operations={"update_text_elements": {"elements": _text_elements(text)}},
+            document_revision_id=document_revision_id,
+            client_token=client_token,
+            user_id_type=user_id_type,
+        )
+
+    async def replace_image(
+        self,
+        document_id: str,
+        block_id: str,
+        *,
+        file_path: Optional[str] = None,
+        content: Optional[bytes] = None,
+        file_name: Optional[str] = None,
+        checksum: Optional[str] = None,
+        content_type: Optional[str] = None,
+        document_revision_id: Optional[int] = None,
+        client_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self._replace_asset(
+            document_id,
+            block_id,
+            operation_name="replace_image",
+            parent_type="docx_image",
+            default_file_name="image.png",
+            file_path=file_path,
+            content=content,
+            file_name=file_name,
+            checksum=checksum,
+            content_type=content_type,
+            document_revision_id=document_revision_id,
+            client_token=client_token,
+            user_id_type=user_id_type,
+        )
+
+    async def replace_file(
+        self,
+        document_id: str,
+        block_id: str,
+        *,
+        file_path: Optional[str] = None,
+        content: Optional[bytes] = None,
+        file_name: Optional[str] = None,
+        checksum: Optional[str] = None,
+        content_type: Optional[str] = None,
+        document_revision_id: Optional[int] = None,
+        client_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self._replace_asset(
+            document_id,
+            block_id,
+            operation_name="replace_file",
+            parent_type="docx_file",
+            default_file_name="attachment.bin",
+            file_path=file_path,
+            content=content,
+            file_name=file_name,
+            checksum=checksum,
+            content_type=content_type,
+            document_revision_id=document_revision_id,
+            client_token=client_token,
+            user_id_type=user_id_type,
+        )
+
+    async def get_content(
+        self,
+        doc_token: str,
+        *,
+        doc_type: str = "docx",
+        content_type: str = "markdown",
+        lang: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        return await self._content.get_content(
+            doc_token,
+            doc_type=doc_type,
+            content_type=content_type,
+            lang=lang,
+        )
 
     async def grant_edit_permission(
         self,
@@ -162,413 +564,322 @@ class AsyncDocxService:
             permission=self._client.config.member_permission,
         )
 
+    async def _replace_inserted_images(
+        self,
+        document_id: str,
+        inserted: Mapping[str, Any],
+        image_urls_by_temp_id: Mapping[str, str],
+        *,
+        document_revision_id: Optional[int],
+        client_token: Optional[str],
+        user_id_type: Optional[str],
+    ) -> List[Mapping[str, Any]]:
+        relations = _extract_relation_map(inserted)
+        replacements: List[Mapping[str, Any]] = []
+        for temp_block_id, image_url in image_urls_by_temp_id.items():
+            block_id = relations.get(temp_block_id)
+            if not block_id:
+                raise FeishuError(f"docx insert response missing block relation for image block {temp_block_id}")
+            downloaded = await _download_binary_async(image_url)
+            replacement = await self.replace_image(
+                document_id,
+                block_id,
+                content=downloaded.content,
+                file_name=downloaded.file_name,
+                content_type=downloaded.content_type,
+                document_revision_id=document_revision_id,
+                client_token=client_token,
+                user_id_type=user_id_type,
+            )
+            item = {
+                "temporary_block_id": temp_block_id,
+                "block_id": block_id,
+                "image_url": image_url,
+                "result": replacement,
+            }
+            file_token = replacement.get("file_token")
+            if isinstance(file_token, str) and file_token:
+                item["file_token"] = file_token
+            replacements.append(item)
+        return replacements
 
-def _markdown_to_groups(markdown_text: str) -> List[_BlockGroup]:
-    groups: List[_BlockGroup] = []
-    in_code = False
-    code_lang: Optional[str] = None
-    code_lines: List[str] = []
-    para_lines: List[str] = []
+    async def _replace_asset(
+        self,
+        document_id: str,
+        block_id: str,
+        *,
+        operation_name: str,
+        parent_type: str,
+        default_file_name: str,
+        file_path: Optional[str],
+        content: Optional[bytes],
+        file_name: Optional[str],
+        checksum: Optional[str],
+        content_type: Optional[str],
+        document_revision_id: Optional[int],
+        client_token: Optional[str],
+        user_id_type: Optional[str],
+    ) -> Mapping[str, Any]:
+        if bool(file_path) == bool(content is not None):
+            raise ValueError("exactly one of file_path or content is required")
 
-    def flush_paragraph() -> None:
-        if not para_lines:
-            return
-        text = " ".join(part.strip() for part in para_lines).strip()
-        if text:
-            groups.append(_text_group(text))
-        para_lines.clear()
+        if file_path is not None:
+            upload = await self._drive_files.upload_media(
+                file_path,
+                parent_type=parent_type,
+                parent_node=block_id,
+                file_name=file_name,
+                checksum=checksum,
+                content_type=content_type,
+            )
+        else:
+            upload = await self._drive_files.upload_media_bytes(
+                file_name or default_file_name,
+                content or b"",
+                parent_type=parent_type,
+                parent_node=block_id,
+                checksum=checksum,
+                content_type=content_type,
+            )
 
-    lines = markdown_text.splitlines()
-    idx = 0
-    while idx < len(lines):
-        line = lines[idx].rstrip("\n")
-        fence_match = re.match(r"^```(.*)$", line.strip())
-        if fence_match:
-            if in_code:
-                groups.append(_code_group("\n".join(code_lines), code_lang))
-                in_code = False
-                code_lang = None
-                code_lines = []
-            else:
-                flush_paragraph()
-                in_code = True
-                lang = fence_match.group(1).strip()
-                code_lang = lang or None
-            idx += 1
-            continue
-
-        if in_code:
-            code_lines.append(line)
-            idx += 1
-            continue
-
-        table_group, next_idx = _parse_table(lines, idx)
-        if table_group:
-            flush_paragraph()
-            groups.append(table_group)
-            idx = next_idx
-            continue
-
-        list_group, next_idx = _parse_list(lines, idx)
-        if list_group:
-            flush_paragraph()
-            groups.append(list_group)
-            idx = next_idx
-            continue
-
-        image_match = _IMAGE_PATTERN.match(line)
-        if image_match:
-            flush_paragraph()
-            alt_text = (image_match.group(1) or "").strip()
-            url = (image_match.group(2) or "").strip()
-            if url:
-                groups.append(_image_group(url, alt_text))
-            idx += 1
-            continue
-
-        if not line.strip():
-            flush_paragraph()
-            idx += 1
-            continue
-
-        heading_match = re.match(r"^(#{1,9})\s+(.*)$", line)
-        if heading_match:
-            flush_paragraph()
-            level = len(heading_match.group(1))
-            text = heading_match.group(2).strip()
-            if text:
-                groups.append(_heading_group(level, text))
-            idx += 1
-            continue
-
-        quote_match = re.match(r"^>\s?(.*)$", line)
-        if quote_match:
-            flush_paragraph()
-            groups.append(_quote_group(quote_match.group(1).strip()))
-            idx += 1
-            continue
-
-        para_lines.append(line.strip())
-        idx += 1
-
-    if in_code:
-        groups.append(_code_group("\n".join(code_lines), code_lang))
-    flush_paragraph()
-    return groups
-
-
-def _text_group(text: str) -> _BlockGroup:
-    block = _text_block(text)
-    block_id = _get_block_id(block)
-    return _BlockGroup(root_ids=[block_id], blocks=[block], images=[])
+        file_token = _extract_file_token(upload)
+        update = await self._blocks.update_block(
+            document_id,
+            block_id,
+            operations={operation_name: {"token": file_token}},
+            document_revision_id=document_revision_id,
+            client_token=client_token,
+            user_id_type=user_id_type,
+        )
+        return {
+            "document_id": document_id,
+            "block_id": block_id,
+            "file_token": file_token,
+            "upload": upload,
+            "update": update,
+        }
 
 
-def _heading_group(level: int, text: str) -> _BlockGroup:
-    block = _heading_block(level, text)
-    block_id = _get_block_id(block)
-    return _BlockGroup(root_ids=[block_id], blocks=[block], images=[])
-
-
-def _bullet_group(text: str) -> _BlockGroup:
-    block = _bullet_block(text)
-    block_id = _get_block_id(block)
-    return _BlockGroup(root_ids=[block_id], blocks=[block], images=[])
-
-
-def _ordered_group(text: str) -> _BlockGroup:
-    block = _ordered_block(text)
-    block_id = _get_block_id(block)
-    return _BlockGroup(root_ids=[block_id], blocks=[block], images=[])
-
-
-def _quote_group(text: str) -> _BlockGroup:
-    block = _quote_block(text)
-    block_id = _get_block_id(block)
-    return _BlockGroup(root_ids=[block_id], blocks=[block], images=[])
-
-
-def _code_group(text: str, language: Optional[str]) -> _BlockGroup:
-    block = _code_block(text, language)
-    block_id = _get_block_id(block)
-    return _BlockGroup(root_ids=[block_id], blocks=[block], images=[])
-
-
-def _image_group(url: str, alt_text: str) -> _BlockGroup:
-    block, image = _image_block(url, alt_text)
-    block_id = _get_block_id(block)
-    return _BlockGroup(root_ids=[block_id], blocks=[block], images=[image])
-
-
-def _parse_table(lines: List[str], start_index: int) -> Tuple[Optional[_BlockGroup], int]:
-    if start_index + 1 >= len(lines):
-        return None, start_index
-    header_line = lines[start_index].rstrip("\n")
-    divider_line = lines[start_index + 1].rstrip("\n")
-    if "|" not in header_line or not _is_table_separator(divider_line):
-        return None, start_index
-    header_cells = _split_table_row(header_line)
-    divider_cells = _split_table_row(divider_line)
-    if not header_cells or len(divider_cells) < len(header_cells):
-        return None, start_index
-    rows: List[List[str]] = []
-    idx = start_index + 2
-    while idx < len(lines):
-        row_line = lines[idx].rstrip("\n")
-        if not row_line.strip() or "|" not in row_line or _is_table_separator(row_line):
-            break
-        rows.append(_split_table_row(row_line))
-        idx += 1
-    return _table_group(header_cells, rows), idx
-
-
-def _parse_list(lines: List[str], start_index: int) -> Tuple[Optional[_BlockGroup], int]:
-    items: List[Tuple[int, str, str]] = []
-    idx = start_index
-    while idx < len(lines):
-        line = lines[idx].rstrip("\n")
-        if not line.strip():
-            break
-        parsed = _parse_list_item_line(line)
-        if not parsed:
-            break
-        items.append(parsed)
-        idx += 1
-    if not items:
-        return None, start_index
-    return _list_group(items), idx
-
-
-def _parse_list_item_line(line: str) -> Optional[Tuple[int, str, str]]:
-    bullet_match = re.match(r"^(\s*)([-*+])\s+(.*)$", line)
-    if bullet_match:
-        indent = _indent_level(bullet_match.group(1))
-        return indent, "bullet", bullet_match.group(3).strip()
-    ordered_match = re.match(r"^(\s*)(\d+)\.\s+(.*)$", line)
-    if ordered_match:
-        indent = _indent_level(ordered_match.group(1))
-        return indent, "ordered", ordered_match.group(3).strip()
+def _build_document_url(client: FeishuClient | AsyncFeishuClient, document_id: str) -> Optional[str]:
+    url_prefix = getattr(client.config, "doc_url_prefix", None)
+    if isinstance(url_prefix, str) and url_prefix:
+        return url_prefix.rstrip("/") + f"/{document_id}"
     return None
 
 
-def _indent_level(indent: str) -> int:
-    spaces = 0
-    for ch in indent:
-        spaces += 4 if ch == "\t" else 1
-    if spaces >= 4:
-        return spaces // 4
-    return spaces // 2
+def _extract_document_id(data: Mapping[str, Any]) -> str:
+    document = data.get("document")
+    if isinstance(document, Mapping):
+        document_id = document.get("document_id")
+        if isinstance(document_id, str) and document_id:
+            return document_id
+    document_id = data.get("document_id")
+    if isinstance(document_id, str) and document_id:
+        return document_id
+    raise FeishuError("docx response missing document_id")
 
 
-def _list_group(items: List[Tuple[int, str, str]]) -> _BlockGroup:
-    blocks: List[Dict[str, object]] = []
-    images: List[_ImageSpec] = []
-    root_ids: List[str] = []
-    block_by_id: Dict[str, Dict[str, object]] = {}
-    stack: List[Tuple[int, str]] = []
-
-    for indent_level, list_type, content in items:
-        cleaned, inline_images = _extract_inline_images(content)
-        text_content = cleaned.strip() or " "
-        if list_type == "ordered":
-            block = _ordered_block(text_content)
-        else:
-            block = _bullet_block(text_content)
-        block_id = _get_block_id(block)
-        children: List[str] = []
-        block["children"] = children
-        block_by_id[block_id] = block
-        blocks.append(block)
-
-        for url, alt_text in inline_images:
-            image_block, image_spec = _image_block(url, alt_text)
-            children.append(_get_block_id(image_block))
-            blocks.append(image_block)
-            images.append(image_spec)
-
-        while stack and stack[-1][0] >= indent_level:
-            stack.pop()
-        if stack:
-            parent_id = stack[-1][1]
-            parent_block = block_by_id[parent_id]
-            parent_children = parent_block.setdefault("children", [])
-            cast(List[str], parent_children).append(block_id)
-        else:
-            root_ids.append(block_id)
-        stack.append((indent_level, block_id))
-
-    return _BlockGroup(root_ids=root_ids, blocks=blocks, images=images)
+def _extract_file_token(data: Mapping[str, Any]) -> str:
+    file_token = data.get("file_token")
+    if isinstance(file_token, str) and file_token:
+        return file_token
+    raise FeishuError("drive upload response missing file_token")
 
 
-def _extract_inline_images(text: str) -> Tuple[str, List[Tuple[str, str]]]:
-    images: List[Tuple[str, str]] = []
-    parts: List[str] = []
-    last = 0
-    for match in _INLINE_IMAGE_RE.finditer(text):
-        parts.append(text[last : match.start()])
-        alt_text = (match.group(1) or "").strip()
-        url = (match.group(2) or "").strip()
-        if url:
-            images.append((url, alt_text))
-        last = match.end()
-    parts.append(text[last:])
-    cleaned = "".join(parts)
-    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
-    return cleaned, images
+def _build_insert_batches(
+    converted: Mapping[str, Any],
+    *,
+    limit: int,
+) -> List[_InsertBatch]:
+    first_level_block_ids = _extract_string_list(converted.get("first_level_block_ids"))
+    blocks = _extract_block_list(converted.get("blocks"))
+    image_url_map = _extract_image_url_map(converted.get("block_id_to_image_urls"))
+    if not first_level_block_ids or not blocks:
+        return []
 
-
-def _image_block(url: str, alt_text: str) -> Tuple[Dict[str, object], _ImageSpec]:
-    block_id = _new_block_id()
-    image_payload: Dict[str, object] = {}
-    if alt_text:
-        image_payload["caption"] = {"content": alt_text}
-    block = {
-        "block_id": block_id,
-        "block_type": 27,
-        "image": image_payload,
-        "children": [],
-    }
-    image = _ImageSpec(temp_block_id=block_id, url=url, alt_text=alt_text)
-    return block, image
-
-
-def _split_table_row(line: str) -> List[str]:
-    parts = re.split(r"(?<!\\)\|", line)
-    if parts and not parts[0].strip():
-        parts = parts[1:]
-    if parts and not parts[-1].strip():
-        parts = parts[:-1]
-    cleaned = []
-    for part in parts:
-        text = part.replace("\\|", "|").replace("\\\\", "\\").strip()
-        cleaned.append(text)
-    return cleaned
-
-
-def _is_table_separator(line: str) -> bool:
-    if "|" not in line:
-        return False
-    cells = _split_table_row(line)
-    if not cells:
-        return False
-    return all(_TABLE_SEPARATOR_RE.match(cell.strip() or "-") for cell in cells)
-
-
-def _table_group(header_cells: List[str], rows: List[List[str]]) -> _BlockGroup:
-    all_rows = [header_cells] + rows
-    row_size = len(all_rows)
-    column_size = max((len(row) for row in all_rows), default=0)
-    if column_size == 0:
-        return _text_group(" ")
-    column_widths: List[int] = []
-    for col_idx in range(column_size):
-        max_len = 0
-        for row in all_rows:
-            if col_idx < len(row):
-                max_len = max(max_len, len(row[col_idx]))
-        width = max(160, min(360, max_len * 14))
-        column_widths.append(width)
-    cell_ids: List[str] = []
-    blocks: List[Dict[str, object]] = []
-    for row in all_rows:
-        padded = row + [""] * (column_size - len(row))
-        for cell_text in padded:
-            text_block = _text_block(cell_text)
-            cell_block_id = _new_block_id()
-            cell_block = {
-                "block_id": cell_block_id,
-                "block_type": 32,
-                "table_cell": {},
-                "children": [text_block["block_id"]],
-            }
-            blocks.append(cell_block)
-            blocks.append(text_block)
-            cell_ids.append(cell_block_id)
-    table_id = _new_block_id()
-    table_block = {
-        "block_id": table_id,
-        "block_type": 31,
-        "table": {
-            "property": {
-                "row_size": row_size,
-                "column_size": column_size,
-                "column_width": column_widths,
-                "header_row": True,
-            }
-        },
-        "children": cell_ids,
-    }
-    blocks.insert(0, table_block)
-    return _BlockGroup(root_ids=[table_id], blocks=blocks, images=[])
-
-
-def _get_block_id(block: Dict[str, object]) -> str:
-    return cast(str, block["block_id"])
-
-
-def _replace_images(
-    client: FeishuClient,
-    document_id: str,
-    relations: List[Dict[str, str]],
-    images_by_temp: Dict[str, _ImageSpec],
-) -> None:
-    for relation in relations:
-        temp_id = relation.get("temporary_block_id")
-        block_id = relation.get("block_id")
-        if not temp_id or not block_id:
+    block_map = {_extract_block_id(block): block for block in blocks}
+    group_batches: List[_InsertBatch] = []
+    for root_id in first_level_block_ids:
+        subtree_ids = _collect_subtree_ids(root_id, block_map)
+        group_blocks: List[Dict[str, Any]] = []
+        for block in blocks:
+            block_id = _extract_block_id(block)
+            if block_id not in subtree_ids:
+                continue
+            copied = copy.deepcopy(block)
+            _strip_table_merge_info(copied)
+            group_blocks.append(copied)
+        if not group_blocks:
             continue
-        image_spec = images_by_temp.get(temp_id)
-        if not image_spec:
+        group_images = {block_id: url for block_id, url in image_url_map.items() if block_id in subtree_ids}
+        group_batches.append(_InsertBatch(root_ids=[root_id], blocks=group_blocks, image_urls=group_images))
+
+    batches: List[_InsertBatch] = []
+    current_root_ids: List[str] = []
+    current_blocks: List[Dict[str, Any]] = []
+    current_image_urls: Dict[str, str] = {}
+    for group in group_batches:
+        group_size = len(group.blocks)
+        if group_size > limit:
+            raise FeishuError(f"converted subtree rooted at {group.root_ids[0]} exceeds insert limit {limit}")
+        if current_blocks and len(current_blocks) + group_size > limit:
+            batches.append(
+                _InsertBatch(
+                    root_ids=list(current_root_ids),
+                    blocks=list(current_blocks),
+                    image_urls=dict(current_image_urls),
+                )
+            )
+            current_root_ids = []
+            current_blocks = []
+            current_image_urls = {}
+        current_root_ids.extend(group.root_ids)
+        current_blocks.extend(group.blocks)
+        current_image_urls.update(group.image_urls)
+    if current_blocks:
+        batches.append(
+            _InsertBatch(
+                root_ids=list(current_root_ids),
+                blocks=list(current_blocks),
+                image_urls=dict(current_image_urls),
+            )
+        )
+    return batches
+
+
+def _extract_string_list(value: Any) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    result: List[str] = []
+    for item in value:
+        if isinstance(item, str) and item:
+            result.append(item)
+    return result
+
+
+def _extract_block_list(value: Any) -> List[Dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    result: List[Dict[str, Any]] = []
+    for item in value:
+        if isinstance(item, Mapping):
+            normalized = _to_plain_data(item)
+            if isinstance(normalized, dict):
+                result.append(normalized)
+    return result
+
+
+def _extract_block_id(block: Mapping[str, Any]) -> str:
+    block_id = block.get("block_id")
+    if isinstance(block_id, str) and block_id:
+        return block_id
+    raise FeishuError("docx block payload missing block_id")
+
+
+def _extract_children(block: Mapping[str, Any]) -> List[str]:
+    children = block.get("children")
+    if not isinstance(children, list):
+        return []
+    result: List[str] = []
+    for item in children:
+        if isinstance(item, str) and item:
+            result.append(item)
+    return result
+
+
+def _collect_subtree_ids(root_id: str, blocks_by_id: Mapping[str, Mapping[str, Any]]) -> set[str]:
+    ids: set[str] = set()
+    stack = [root_id]
+    while stack:
+        block_id = stack.pop()
+        if block_id in ids:
             continue
-        image_bytes, file_name = _download_image(image_spec.url)
-        file_token = _upload_docx_image(client, block_id, image_bytes, file_name)
-        _replace_image_block(client, document_id, block_id, file_token)
-
-
-async def _replace_images_async(
-    client: AsyncFeishuClient,
-    document_id: str,
-    relations: List[Dict[str, str]],
-    images_by_temp: Dict[str, _ImageSpec],
-) -> None:
-    for relation in relations:
-        temp_id = relation.get("temporary_block_id")
-        block_id = relation.get("block_id")
-        if not temp_id or not block_id:
+        ids.add(block_id)
+        block = blocks_by_id.get(block_id)
+        if not isinstance(block, Mapping):
             continue
-        image_spec = images_by_temp.get(temp_id)
-        if not image_spec:
+        stack.extend(_extract_children(block))
+    return ids
+
+
+def _extract_image_url_map(value: Any) -> Dict[str, str]:
+    if not isinstance(value, list):
+        return {}
+    result: Dict[str, str] = {}
+    for item in value:
+        if not isinstance(item, Mapping):
             continue
-        image_bytes, file_name = await _download_image_async(image_spec.url)
-        file_token = await _upload_docx_image_async(client, block_id, image_bytes, file_name)
-        await _replace_image_block_async(client, document_id, block_id, file_token)
+        block_id = item.get("block_id")
+        image_url = item.get("image_url")
+        if isinstance(block_id, str) and block_id and isinstance(image_url, str) and image_url:
+            result[block_id] = image_url
+    return result
 
 
-def _download_image(url: str) -> Tuple[bytes, str]:
-    resp = httpx.get(url, timeout=60)
-    resp.raise_for_status()
-    file_name = _image_file_name(url, resp.headers.get("Content-Type"))
-    return resp.content, file_name
+def _extract_relation_map(inserted: Mapping[str, Any]) -> Dict[str, str]:
+    relations = inserted.get("block_id_relations")
+    if not isinstance(relations, list):
+        return {}
+    result: Dict[str, str] = {}
+    for item in relations:
+        if not isinstance(item, Mapping):
+            continue
+        temporary_block_id = item.get("temporary_block_id")
+        block_id = item.get("block_id")
+        if isinstance(temporary_block_id, str) and temporary_block_id and isinstance(block_id, str) and block_id:
+            result[temporary_block_id] = block_id
+    return result
 
 
-async def _download_image_async(url: str) -> Tuple[bytes, str]:
-    async with httpx.AsyncClient(timeout=60) as async_client:
-        resp = await async_client.get(url)
-    resp.raise_for_status()
-    file_name = _image_file_name(url, resp.headers.get("Content-Type"))
-    return resp.content, file_name
+def _strip_table_merge_info(block: Dict[str, Any]) -> None:
+    table = block.get("table")
+    if not isinstance(table, dict):
+        return
+    property_data = table.get("property")
+    if isinstance(property_data, dict):
+        property_data.pop("merge_info", None)
 
 
-def _image_file_name(url: str, content_type: Optional[str]) -> str:
+def _download_binary(url: str) -> _DownloadedAsset:
+    normalized_url = _normalize_download_url(url)
+    response = httpx.get(normalized_url, timeout=60)
+    response.raise_for_status()
+    return _DownloadedAsset(
+        content=response.content,
+        file_name=_guess_file_name(normalized_url, response.headers.get("Content-Type")),
+        content_type=response.headers.get("Content-Type"),
+    )
+
+
+async def _download_binary_async(url: str) -> _DownloadedAsset:
+    normalized_url = _normalize_download_url(url)
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.get(normalized_url)
+    response.raise_for_status()
+    return _DownloadedAsset(
+        content=response.content,
+        file_name=_guess_file_name(normalized_url, response.headers.get("Content-Type")),
+        content_type=response.headers.get("Content-Type"),
+    )
+
+
+def _normalize_download_url(url: str) -> str:
+    if url.startswith("//"):
+        return f"https:{url}"
+    return url
+
+
+def _guess_file_name(url: str, content_type: Optional[str]) -> str:
     parsed = urlparse(url)
-    base_name = os.path.basename(parsed.path)
-    if not base_name:
-        base_name = f"image-{uuid.uuid4().hex}"
-    _, ext = os.path.splitext(base_name)
+    file_name = os.path.basename(parsed.path)
+    if not file_name:
+        file_name = f"asset-{uuid.uuid4().hex}"
+    _, ext = os.path.splitext(file_name)
     if not ext:
         ext = _content_type_extension(content_type)
         if ext:
-            base_name = f"{base_name}{ext}"
-    return base_name
+            file_name = f"{file_name}{ext}"
+    return file_name
 
 
 def _content_type_extension(content_type: Optional[str]) -> str:
@@ -583,220 +894,23 @@ def _content_type_extension(content_type: Optional[str]) -> str:
         return ".gif"
     if mime == "image/webp":
         return ".webp"
+    if mime == "application/pdf":
+        return ".pdf"
     return ""
 
 
-def _upload_docx_image(
-    client: FeishuClient,
-    image_block_id: str,
-    image_bytes: bytes,
-    file_name: str,
-) -> str:
-    token = client.get_access_token()
-    url = f"{client.config.base_url}/drive/v1/medias/upload_all"
-    data = {
-        "file_name": file_name,
-        "parent_type": "docx_image",
-        "parent_node": image_block_id,
-        "size": str(len(image_bytes)),
-    }
-    files = {"file": (file_name, image_bytes)}
-    resp = httpx.post(
-        url,
-        headers={"Authorization": f"Bearer {token}"},
-        data=data,
-        files=files,
-        timeout=60,
-    )
-    if resp.status_code >= 400:
-        raise FeishuError(f"Feishu image upload failed: {resp.status_code} {resp.text}")
-    payload = resp.json()
-    if payload.get("code") != 0:
-        raise FeishuError(f"feishu image upload failed: {payload}")
-    return payload["data"]["file_token"]
+def _text_elements(text: str) -> List[Dict[str, Dict[str, str]]]:
+    return [{"text_run": {"content": text}}]
 
 
-async def _upload_docx_image_async(
-    client: AsyncFeishuClient,
-    image_block_id: str,
-    image_bytes: bytes,
-    file_name: str,
-) -> str:
-    token = await client.get_access_token()
-    url = f"{client.config.base_url}/drive/v1/medias/upload_all"
-    data = {
-        "file_name": file_name,
-        "parent_type": "docx_image",
-        "parent_node": image_block_id,
-        "size": str(len(image_bytes)),
-    }
-    files = {"file": (file_name, image_bytes)}
-    async with httpx.AsyncClient(timeout=60) as async_client:
-        resp = await async_client.post(
-            url,
-            headers={"Authorization": f"Bearer {token}"},
-            data=data,
-            files=files,
-        )
-    if resp.status_code >= 400:
-        raise FeishuError(f"Feishu image upload failed: {resp.status_code} {resp.text}")
-    payload = resp.json()
-    if payload.get("code") != 0:
-        raise FeishuError(f"feishu image upload failed: {payload}")
-    return payload["data"]["file_token"]
-
-
-def _replace_image_block(
-    client: FeishuClient,
-    document_id: str,
-    block_id: str,
-    file_token: str,
-) -> None:
-    payload = {"replace_image": {"token": file_token}}
-    client.request_json(
-        "PATCH",
-        f"/docx/v1/documents/{document_id}/blocks/{block_id}",
-        payload=payload,
-    )
-
-
-async def _replace_image_block_async(
-    client: AsyncFeishuClient,
-    document_id: str,
-    block_id: str,
-    file_token: str,
-) -> None:
-    payload = {"replace_image": {"token": file_token}}
-    await client.request_json(
-        "PATCH",
-        f"/docx/v1/documents/{document_id}/blocks/{block_id}",
-        payload=payload,
-    )
-
-
-def _text_elements(text: str, parse_inline: bool = False) -> List[Dict[str, Dict[str, object]]]:
-    if not parse_inline:
-        return [{"text_run": {"content": text}}]
-    elements: List[Dict[str, Dict[str, object]]] = []
-    buffer: List[str] = []
-
-    def flush_plain() -> None:
-        if not buffer:
-            return
-        content = "".join(buffer)
-        elements.append({"text_run": {"content": content}})
-        buffer.clear()
-
-    def append_run(content: str, style: Dict[str, bool]) -> None:
-        if not content:
-            return
-        run: Dict[str, object] = {"content": content, "text_element_style": style}
-        elements.append({"text_run": run})
-
-    idx = 0
-    while idx < len(text):
-        ch = text[idx]
-        if ch == "\\" and idx + 1 < len(text):
-            buffer.append(text[idx + 1])
-            idx += 2
-            continue
-        if text.startswith("**", idx) or text.startswith("__", idx):
-            delim = text[idx : idx + 2]
-            end = text.find(delim, idx + 2)
-            if end != -1:
-                flush_plain()
-                append_run(text[idx + 2 : end], {"bold": True})
-                idx = end + 2
-                continue
-        if ch == "`":
-            end = text.find("`", idx + 1)
-            if end != -1:
-                flush_plain()
-                append_run(text[idx + 1 : end], {"inline_code": True})
-                idx = end + 1
-                continue
-        buffer.append(ch)
-        idx += 1
-
-    flush_plain()
-    if not elements:
-        return [{"text_run": {"content": ""}}]
-    return elements
-
-
-def _new_block_id() -> str:
-    return uuid.uuid4().hex
-
-
-def _text_block(text: str, parse_inline: bool = True) -> Dict[str, object]:
-    return {
-        "block_id": _new_block_id(),
-        "block_type": 2,
-        "text": {"elements": _text_elements(text, parse_inline=parse_inline)},
-        "children": [],
-    }
-
-
-def _heading_block(level: int, text: str) -> Dict[str, object]:
-    level = max(1, min(level, 9))
-    block_type = 2 + level
-    key = f"heading{level}"
-    return {
-        "block_id": _new_block_id(),
-        "block_type": block_type,
-        key: {"elements": _text_elements(text, parse_inline=True)},
-        "children": [],
-    }
-
-
-def _bullet_block(text: str) -> Dict[str, object]:
-    return {
-        "block_id": _new_block_id(),
-        "block_type": 12,
-        "bullet": {"elements": _text_elements(text, parse_inline=True)},
-        "children": [],
-    }
-
-
-def _ordered_block(text: str) -> Dict[str, object]:
-    return {
-        "block_id": _new_block_id(),
-        "block_type": 13,
-        "ordered": {"elements": _text_elements(text, parse_inline=True)},
-        "children": [],
-    }
-
-
-def _quote_block(text: str) -> Dict[str, object]:
-    return {
-        "block_id": _new_block_id(),
-        "block_type": 15,
-        "quote": {"elements": _text_elements(text, parse_inline=True)},
-        "children": [],
-    }
-
-
-def _code_block(text: str, _language: Optional[str]) -> Dict[str, object]:
-    return {
-        "block_id": _new_block_id(),
-        "block_type": 14,
-        "code": {"elements": _text_elements(text, parse_inline=False), "language": 1, "wrap": True},
-        "children": [],
-    }
-
-
-def _chunked_groups(
-    groups: List[_BlockGroup], size: int
-) -> Iterable[List[_BlockGroup]]:
-    batch: List[_BlockGroup] = []
-    count = 0
-    for group in groups:
-        group_size = len(group.blocks)
-        if batch and count + group_size > size:
-            yield batch
-            batch = []
-            count = 0
-        batch.append(group)
-        count += group_size
-    if batch:
-        yield batch
+def _to_plain_data(value: Any) -> Any:
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        return _to_plain_data(to_dict())
+    if isinstance(value, Mapping):
+        return {str(key): _to_plain_data(inner) for key, inner in value.items()}
+    if isinstance(value, list):
+        return [_to_plain_data(item) for item in value]
+    if isinstance(value, tuple):
+        return [_to_plain_data(item) for item in value]
+    return value

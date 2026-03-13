@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import Any, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional
 
 from ...calendar import CalendarService
 from ...contact import ContactService
@@ -12,6 +12,7 @@ from ..runtime import (
     _extract_response_data,
     _merge_calendar_attachment,
     _normalize_calendar_attachments,
+    _parse_json_array,
     _parse_json_object,
 )
 
@@ -418,6 +419,127 @@ def _cmd_contact_scope_get(args: argparse.Namespace) -> Mapping[str, Any]:
         department_id_type=getattr(args, "department_id_type", None),
         page_size=getattr(args, "page_size", None),
         page_token=getattr(args, "page_token", None),
+    )
+
+
+def _next_page_token(data: Mapping[str, Any]) -> str | None:
+    token = data.get("page_token")
+    if isinstance(token, str) and token:
+        return token
+    return None
+
+
+def _has_more(data: Mapping[str, Any]) -> bool:
+    return bool(data.get("has_more"))
+
+
+def _collect_all_pages(
+    fetch_page: Callable[..., Mapping[str, Any]],
+    *,
+    page_size: int | None,
+    page_token: str | None,
+    default_page_size: int,
+) -> Mapping[str, Any]:
+    collected: list[Any] = []
+    current_token = page_token
+    while True:
+        data = fetch_page(page_size=page_size, page_token=current_token)
+        items = data.get("items")
+        if isinstance(items, list):
+            collected.extend(items)
+        if not _has_more(data):
+            break
+        current_token = _next_page_token(data)
+        if not current_token:
+            break
+    return {"all": True, "has_more": False, "count": len(collected), "items": collected}
+
+
+def _cmd_calendar_create_attendees(args: argparse.Namespace) -> Mapping[str, Any]:
+    attendees = _parse_json_array(
+        json_text=getattr(args, "attendees_json", None),
+        file_path=getattr(args, "attendees_file", None),
+        stdin_enabled=bool(getattr(args, "attendees_stdin", False)),
+        name="attendees",
+        required=True,
+    )
+    raw_need_notification = getattr(args, "need_notification", None)
+    need_notification: Optional[bool] = None
+    if raw_need_notification is not None:
+        need_notification = str(raw_need_notification).lower() == "true"
+    service = CalendarService(_build_client(args))
+    return service.create_event_attendees(
+        str(args.calendar_id),
+        str(args.event_id),
+        attendees,
+        user_id_type=getattr(args, "user_id_type", None),
+        need_notification=need_notification,
+    )
+
+
+def _cmd_calendar_list_attendees(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = CalendarService(_build_client(args))
+    page_size = getattr(args, "page_size", None)
+    page_token = getattr(args, "page_token", None)
+    user_id_type = getattr(args, "user_id_type", None)
+    if not bool(getattr(args, "all", False)):
+        return service.list_event_attendees(
+            str(args.calendar_id),
+            str(args.event_id),
+            page_size=page_size,
+            page_token=page_token,
+            user_id_type=user_id_type,
+        )
+    return _collect_all_pages(
+        lambda *, page_size, page_token: service.list_event_attendees(
+            str(args.calendar_id),
+            str(args.event_id),
+            page_size=page_size,
+            page_token=page_token,
+            user_id_type=user_id_type,
+        ),
+        page_size=page_size,
+        page_token=page_token,
+        default_page_size=50,
+    )
+
+
+def _cmd_calendar_batch_delete_attendees(args: argparse.Namespace) -> Mapping[str, Any]:
+    attendee_ids = list(getattr(args, "attendee_ids", []) or [])
+    raw_need_notification = getattr(args, "need_notification", None)
+    need_notification: Optional[bool] = None
+    if raw_need_notification is not None:
+        need_notification = str(raw_need_notification).lower() == "true"
+    service = CalendarService(_build_client(args))
+    return service.batch_delete_event_attendees(
+        str(args.calendar_id),
+        str(args.event_id),
+        attendee_ids,
+        need_notification=need_notification,
+    )
+
+
+def _cmd_calendar_list_instances(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = CalendarService(_build_client(args))
+    page_size = getattr(args, "page_size", None)
+    page_token = getattr(args, "page_token", None)
+    if not bool(getattr(args, "all", False)):
+        return service.list_event_instances(
+            str(args.calendar_id),
+            str(args.event_id),
+            page_size=page_size,
+            page_token=page_token,
+        )
+    return _collect_all_pages(
+        lambda *, page_size, page_token: service.list_event_instances(
+            str(args.calendar_id),
+            str(args.event_id),
+            page_size=page_size,
+            page_token=page_token,
+        ),
+        page_size=page_size,
+        page_token=page_token,
+        default_page_size=50,
     )
 
 

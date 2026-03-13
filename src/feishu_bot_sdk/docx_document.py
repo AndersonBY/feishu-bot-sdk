@@ -48,8 +48,17 @@ class DocxDocumentService:
         response = self._client.request_json("GET", f"/docx/v1/documents/{document_id}")
         return _unwrap_data(response)
 
-    def get_raw_content(self, document_id: str) -> Mapping[str, Any]:
-        response = self._client.request_json("GET", f"/docx/v1/documents/{document_id}/raw_content")
+    def get_raw_content(
+        self,
+        document_id: str,
+        *,
+        lang: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "GET",
+            f"/docx/v1/documents/{document_id}/raw_content",
+            params=_drop_none({"lang": lang}),
+        )
         return _unwrap_data(response)
 
     def list_blocks(
@@ -122,10 +131,16 @@ class AsyncDocxDocumentService:
         response = await self._client.request_json("GET", f"/docx/v1/documents/{document_id}")
         return _unwrap_data(response)
 
-    async def get_raw_content(self, document_id: str) -> Mapping[str, Any]:
+    async def get_raw_content(
+        self,
+        document_id: str,
+        *,
+        lang: Optional[str] = None,
+    ) -> Mapping[str, Any]:
         response = await self._client.request_json(
             "GET",
             f"/docx/v1/documents/{document_id}/raw_content",
+            params=_drop_none({"lang": lang}),
         )
         return _unwrap_data(response)
 

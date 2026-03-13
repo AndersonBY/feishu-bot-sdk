@@ -4,7 +4,9 @@ import argparse
 
 from ..commands import (
     _cmd_calendar_attach_material,
+    _cmd_calendar_batch_delete_attendees,
     _cmd_calendar_batch_freebusy,
+    _cmd_calendar_create_attendees,
     _cmd_calendar_create_calendar,
     _cmd_calendar_create_event,
     _cmd_calendar_delete_calendar,
@@ -12,9 +14,11 @@ from ..commands import (
     _cmd_calendar_generate_caldav_conf,
     _cmd_calendar_get_calendar,
     _cmd_calendar_get_event,
+    _cmd_calendar_list_attendees,
     _cmd_calendar_list_calendars,
     _cmd_calendar_list_events,
     _cmd_calendar_list_freebusy,
+    _cmd_calendar_list_instances,
     _cmd_calendar_primary,
     _cmd_calendar_reply_event,
     _cmd_calendar_search_calendars,
@@ -71,8 +75,14 @@ def _build_calendar_commands(
     get_calendar.add_argument("--calendar-id", required=True, help="Calendar id")
     get_calendar.set_defaults(handler=_cmd_calendar_get_calendar)
 
-    create_calendar = calendar_sub.add_parser("create-calendar", help="Create calendar", parents=[shared])
-    create_calendar.add_argument("--calendar-json", help="Calendar JSON object string")
+    create_calendar = calendar_sub.add_parser(
+        "create-calendar",
+        help="Create calendar",
+        parents=[shared],
+        description="Create a new calendar. Returns: calendar with 'calendar_id'",
+        formatter_class=_HELP_FORMATTER,
+    )
+    create_calendar.add_argument("--calendar-json", help='Calendar JSON, e.g. {"summary":"Team Calendar","permissions":"public"}')
     create_calendar.add_argument("--calendar-file", help="Calendar JSON file path")
     create_calendar.add_argument("--calendar-stdin", action="store_true", help="Read calendar JSON from stdin")
     create_calendar.set_defaults(handler=_cmd_calendar_create_calendar)
@@ -120,7 +130,8 @@ def _build_calendar_commands(
         parents=[shared],
         description=(
             "Create a calendar event on specified calendar_id.\n"
-            "Payload must include at least summary/start_time/end_time."
+            "Payload must include at least summary/start_time/end_time.\n"
+            "Returns: event with 'event_id'"
         ),
         formatter_class=_HELP_FORMATTER,
         epilog=(
@@ -177,7 +188,7 @@ def _build_calendar_commands(
     attach_material.add_argument(
         "--need-notification",
         choices=("true", "false"),
-        help="Whether to notify attendees on update",
+        help="Notify attendees (true/false). Omit = server default",
     )
     attach_material.add_argument("--user-id-type", help="Optional user_id_type")
     attach_material.set_defaults(handler=_cmd_calendar_attach_material)
@@ -188,14 +199,14 @@ def _build_calendar_commands(
     delete_event.add_argument(
         "--need-notification",
         choices=("true", "false"),
-        help="Whether to notify attendees",
+        help="Notify attendees (true/false). Omit = server default",
     )
     delete_event.set_defaults(handler=_cmd_calendar_delete_event)
 
     search_events = calendar_sub.add_parser("search-events", help="Search events in a calendar", parents=[shared])
     search_events.add_argument("--calendar-id", required=True, help="Calendar id")
     search_events.add_argument("--query", required=True, help="Search query")
-    search_events.add_argument("--filter-json", help="Search filter JSON object string")
+    search_events.add_argument("--filter-json", help='Search filter JSON, e.g. {"start_time":{"timestamp":"1704067200"},"end_time":{"timestamp":"1704153600"}}')
     search_events.add_argument("--filter-file", help="Search filter JSON file path")
     search_events.add_argument("--filter-stdin", action="store_true", help="Read search filter JSON from stdin")
     search_events.add_argument("--page-size", type=int, help="Page size")
@@ -206,20 +217,20 @@ def _build_calendar_commands(
     reply_event = calendar_sub.add_parser("reply-event", help="Reply to an event", parents=[shared])
     reply_event.add_argument("--calendar-id", required=True, help="Calendar id")
     reply_event.add_argument("--event-id", required=True, help="Event id")
-    reply_event.add_argument("--reply-json", help="Reply JSON object string")
+    reply_event.add_argument("--reply-json", help='Reply JSON, e.g. {"rsvp_status":"accept"}')
     reply_event.add_argument("--reply-file", help="Reply JSON file path")
     reply_event.add_argument("--reply-stdin", action="store_true", help="Read reply JSON from stdin")
     reply_event.set_defaults(handler=_cmd_calendar_reply_event)
 
     freebusy = calendar_sub.add_parser("list-freebusy", help="Query freebusy", parents=[shared])
-    freebusy.add_argument("--request-json", help="Request JSON object string")
+    freebusy.add_argument("--request-json", help='Request JSON, e.g. {"time_min":"1704067200","time_max":"1704153600","user_id":"ou_xxx"}')
     freebusy.add_argument("--request-file", help="Request JSON file path")
     freebusy.add_argument("--request-stdin", action="store_true", help="Read request JSON from stdin")
     freebusy.add_argument("--user-id-type", help="Optional user_id_type")
     freebusy.set_defaults(handler=_cmd_calendar_list_freebusy)
 
     batch_freebusy = calendar_sub.add_parser("batch-freebusy", help="Query freebusy in batch", parents=[shared])
-    batch_freebusy.add_argument("--request-json", help="Request JSON object string")
+    batch_freebusy.add_argument("--request-json", help='Request JSON, e.g. {"time_min":"1704067200","time_max":"1704153600","user_ids":["ou_xxx"]}')
     batch_freebusy.add_argument("--request-file", help="Request JSON file path")
     batch_freebusy.add_argument("--request-stdin", action="store_true", help="Read request JSON from stdin")
     batch_freebusy.add_argument("--user-id-type", help="Optional user_id_type")
@@ -230,6 +241,40 @@ def _build_calendar_commands(
     caldav.add_argument("--request-file", help="Request JSON file path")
     caldav.add_argument("--request-stdin", action="store_true", help="Read request JSON from stdin")
     caldav.set_defaults(handler=_cmd_calendar_generate_caldav_conf)
+
+    create_attendees = calendar_sub.add_parser("create-attendees", help="Add attendees to event", parents=[shared])
+    create_attendees.add_argument("--calendar-id", required=True, help="Calendar id")
+    create_attendees.add_argument("--event-id", required=True, help="Event id")
+    create_attendees.add_argument("--attendees-json", help='Attendees JSON array, e.g. [{"type":"user","user_id":"ou_xxx"}]')
+    create_attendees.add_argument("--attendees-file", help="Attendees JSON file path")
+    create_attendees.add_argument("--attendees-stdin", action="store_true", help="Read attendees JSON from stdin")
+    create_attendees.add_argument("--user-id-type", help="Optional user_id_type")
+    create_attendees.add_argument("--need-notification", choices=("true", "false"), help="Notify attendees (true/false). Omit = server default")
+    create_attendees.set_defaults(handler=_cmd_calendar_create_attendees)
+
+    list_attendees = calendar_sub.add_parser("list-attendees", help="List event attendees", parents=[shared])
+    list_attendees.add_argument("--calendar-id", required=True, help="Calendar id")
+    list_attendees.add_argument("--event-id", required=True, help="Event id")
+    list_attendees.add_argument("--page-size", type=int, help="Page size")
+    list_attendees.add_argument("--page-token", help="Page token")
+    list_attendees.add_argument("--user-id-type", help="Optional user_id_type")
+    list_attendees.add_argument("--all", action="store_true", help="Auto paginate and return all items")
+    list_attendees.set_defaults(handler=_cmd_calendar_list_attendees)
+
+    delete_attendees = calendar_sub.add_parser("delete-attendees", help="Batch delete event attendees", parents=[shared])
+    delete_attendees.add_argument("--calendar-id", required=True, help="Calendar id")
+    delete_attendees.add_argument("--event-id", required=True, help="Event id")
+    delete_attendees.add_argument("--attendee-id", action="append", dest="attendee_ids", required=True, help="Attendee id, repeatable")
+    delete_attendees.add_argument("--need-notification", choices=("true", "false"), help="Notify attendees (true/false). Omit = server default")
+    delete_attendees.set_defaults(handler=_cmd_calendar_batch_delete_attendees)
+
+    list_instances = calendar_sub.add_parser("list-instances", help="List recurring event instances", parents=[shared])
+    list_instances.add_argument("--calendar-id", required=True, help="Calendar id")
+    list_instances.add_argument("--event-id", required=True, help="Event id")
+    list_instances.add_argument("--page-size", type=int, help="Page size")
+    list_instances.add_argument("--page-token", help="Page token")
+    list_instances.add_argument("--all", action="store_true", help="Auto paginate and return all items")
+    list_instances.set_defaults(handler=_cmd_calendar_list_instances)
 
 def _build_contact_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
@@ -293,7 +338,7 @@ def _build_contact_commands(
     user_get_id.add_argument(
         "--include-resigned",
         choices=("true", "false"),
-        help="Include resigned users",
+        help="Include resigned users (true/false). Omit = exclude",
     )
     user_get_id.add_argument("--user-id-type", help="Optional user_id_type")
     user_get_id.set_defaults(handler=_cmd_contact_user_get_id)
@@ -343,7 +388,7 @@ def _build_contact_commands(
     department_children.add_argument("--department-id", required=True, help="Department id")
     department_children.add_argument("--user-id-type", help="Optional user_id_type")
     department_children.add_argument("--department-id-type", help="Optional department_id_type")
-    department_children.add_argument("--fetch-child", choices=("true", "false"), help="Recursive fetch")
+    department_children.add_argument("--fetch-child", choices=("true", "false"), help="Recursive fetch (true/false). Omit = direct children only")
     department_children.add_argument("--page-size", type=int, help="Page size")
     department_children.add_argument("--page-token", help="Page token")
     department_children.set_defaults(handler=_cmd_contact_department_children)

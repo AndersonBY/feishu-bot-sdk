@@ -314,6 +314,115 @@ class CalendarService:
         )
         return _unwrap_data(response)
 
+    def create_event_attendees(
+        self,
+        calendar_id: str,
+        event_id: str,
+        attendees: list[Mapping[str, object]],
+        *,
+        user_id_type: Optional[str] = None,
+        need_notification: Optional[bool] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        payload: dict[str, object] = {"attendees": [dict(a) for a in attendees]}
+        if need_notification is not None:
+            payload["need_notification"] = need_notification
+        response = self._client.request_json(
+            "POST",
+            f"/calendar/v4/calendars/{calendar_id}/events/{event_id}/attendees",
+            params=params,
+            payload=payload,
+        )
+        return _unwrap_data(response)
+
+    def list_event_attendees(
+        self,
+        calendar_id: str,
+        event_id: str,
+        *,
+        page_size: Optional[int] = None,
+        page_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"page_size": page_size, "page_token": page_token, "user_id_type": user_id_type})
+        response = self._client.request_json(
+            "GET",
+            f"/calendar/v4/calendars/{calendar_id}/events/{event_id}/attendees",
+            params=params,
+        )
+        return _unwrap_data(response)
+
+    def iter_event_attendees(
+        self,
+        calendar_id: str,
+        event_id: str,
+        *,
+        page_size: int = 50,
+        user_id_type: Optional[str] = None,
+    ) -> Iterator[Mapping[str, Any]]:
+        page_token: Optional[str] = None
+        while True:
+            data = self.list_event_attendees(
+                calendar_id, event_id, page_size=page_size, page_token=page_token, user_id_type=user_id_type,
+            )
+            yield from _iter_page_items(data)
+            if not _has_more(data):
+                return
+            page_token = _next_page_token(data)
+            if not page_token:
+                return
+
+    def batch_delete_event_attendees(
+        self,
+        calendar_id: str,
+        event_id: str,
+        attendee_ids: list[str],
+        *,
+        need_notification: Optional[bool] = None,
+    ) -> Mapping[str, Any]:
+        payload: dict[str, object] = {"attendee_ids": list(attendee_ids)}
+        if need_notification is not None:
+            payload["need_notification"] = need_notification
+        response = self._client.request_json(
+            "POST",
+            f"/calendar/v4/calendars/{calendar_id}/events/{event_id}/attendees/batch_delete",
+            payload=payload,
+        )
+        return _unwrap_data(response)
+
+    def list_event_instances(
+        self,
+        calendar_id: str,
+        event_id: str,
+        *,
+        page_size: Optional[int] = None,
+        page_token: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"page_size": page_size, "page_token": page_token})
+        response = self._client.request_json(
+            "GET",
+            f"/calendar/v4/calendars/{calendar_id}/events/{event_id}/instances",
+            params=params,
+        )
+        return _unwrap_data(response)
+
+    def iter_event_instances(
+        self,
+        calendar_id: str,
+        event_id: str,
+        *,
+        page_size: int = 50,
+    ) -> Iterator[Mapping[str, Any]]:
+        page_token: Optional[str] = None
+        while True:
+            data = self.list_event_instances(calendar_id, event_id, page_size=page_size, page_token=page_token)
+            yield from _iter_page_items(data)
+            if not _has_more(data):
+                return
+            page_token = _next_page_token(data)
+            if not page_token:
+                return
+
     def generate_caldav_conf(self, request: Mapping[str, object]) -> Mapping[str, Any]:
         response = self._client.request_json(
             "POST",
@@ -610,6 +719,117 @@ class AsyncCalendarService:
             payload=dict(request),
         )
         return _unwrap_data(response)
+
+    async def create_event_attendees(
+        self,
+        calendar_id: str,
+        event_id: str,
+        attendees: list[Mapping[str, object]],
+        *,
+        user_id_type: Optional[str] = None,
+        need_notification: Optional[bool] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        payload: dict[str, object] = {"attendees": [dict(a) for a in attendees]}
+        if need_notification is not None:
+            payload["need_notification"] = need_notification
+        response = await self._client.request_json(
+            "POST",
+            f"/calendar/v4/calendars/{calendar_id}/events/{event_id}/attendees",
+            params=params,
+            payload=payload,
+        )
+        return _unwrap_data(response)
+
+    async def list_event_attendees(
+        self,
+        calendar_id: str,
+        event_id: str,
+        *,
+        page_size: Optional[int] = None,
+        page_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"page_size": page_size, "page_token": page_token, "user_id_type": user_id_type})
+        response = await self._client.request_json(
+            "GET",
+            f"/calendar/v4/calendars/{calendar_id}/events/{event_id}/attendees",
+            params=params,
+        )
+        return _unwrap_data(response)
+
+    async def iter_event_attendees(
+        self,
+        calendar_id: str,
+        event_id: str,
+        *,
+        page_size: int = 50,
+        user_id_type: Optional[str] = None,
+    ) -> AsyncIterator[Mapping[str, Any]]:
+        page_token: Optional[str] = None
+        while True:
+            data = await self.list_event_attendees(
+                calendar_id, event_id, page_size=page_size, page_token=page_token, user_id_type=user_id_type,
+            )
+            for item in _iter_page_items(data):
+                yield item
+            if not _has_more(data):
+                return
+            page_token = _next_page_token(data)
+            if not page_token:
+                return
+
+    async def batch_delete_event_attendees(
+        self,
+        calendar_id: str,
+        event_id: str,
+        attendee_ids: list[str],
+        *,
+        need_notification: Optional[bool] = None,
+    ) -> Mapping[str, Any]:
+        payload: dict[str, object] = {"attendee_ids": list(attendee_ids)}
+        if need_notification is not None:
+            payload["need_notification"] = need_notification
+        response = await self._client.request_json(
+            "POST",
+            f"/calendar/v4/calendars/{calendar_id}/events/{event_id}/attendees/batch_delete",
+            payload=payload,
+        )
+        return _unwrap_data(response)
+
+    async def list_event_instances(
+        self,
+        calendar_id: str,
+        event_id: str,
+        *,
+        page_size: Optional[int] = None,
+        page_token: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"page_size": page_size, "page_token": page_token})
+        response = await self._client.request_json(
+            "GET",
+            f"/calendar/v4/calendars/{calendar_id}/events/{event_id}/instances",
+            params=params,
+        )
+        return _unwrap_data(response)
+
+    async def iter_event_instances(
+        self,
+        calendar_id: str,
+        event_id: str,
+        *,
+        page_size: int = 50,
+    ) -> AsyncIterator[Mapping[str, Any]]:
+        page_token: Optional[str] = None
+        while True:
+            data = await self.list_event_instances(calendar_id, event_id, page_size=page_size, page_token=page_token)
+            for item in _iter_page_items(data):
+                yield item
+            if not _has_more(data):
+                return
+            page_token = _next_page_token(data)
+            if not page_token:
+                return
 
     async def generate_caldav_conf(self, request: Mapping[str, object]) -> Mapping[str, Any]:
         response = await self._client.request_json(

@@ -10,46 +10,59 @@
 ## Quick Example
 
 ```python
-from feishu_bot_sdk import FeishuClient, FeishuConfig, DriveFileService, DrivePermissionService
+from feishu_bot_sdk import FeishuClient, FeishuConfig, DriveFileService
 
 client = FeishuClient(FeishuConfig(app_id="cli_xxx", app_secret="xxx"))
 drive = DriveFileService(client)
-perm = DrivePermissionService(client)
 
 uploaded = drive.upload_file(
     "final.csv",
     parent_type="explorer",
     parent_node="fld_xxx",
 )
-print(uploaded.file_token)
 
-task = drive.create_import_task(
-    {
-        "file_extension": "csv",
-        "file_token": uploaded.file_token,
-        "type": "bitable",
-        "file_name": "Import Result",
-        "point": {"mount_type": 1, "mount_key": "fld_xxx"},
-    }
+meta = drive.batch_query_metas(
+    [{"doc_token": uploaded["file_token"], "doc_type": "file"}],
+    with_url=True,
 )
+stats = drive.get_file_statistics(uploaded["file_token"], file_type="file")
 
-# Usually poll by get_import_task(task.ticket), then grant with the imported resource token.
-perm.add_member(
-    task.token,
-    resource_type="bitable",
-    member_id="ou_xxx",
-    member_id_type="open_id",
-    perm="edit",
-)
+print(meta)
+print(stats)
 ```
 
 ## `DriveFileService` API Summary
 
 - File upload/download: `upload_file`, `upload_file_bytes`, `download_file`
 - Multipart upload: `upload_prepare`, `upload_part`, `upload_finish`
-- Import/export tasks: `create_import_task`, `get_import_task`, `create_export_task`, `get_export_task`, `download_export_file`
-- Media upload/download: `upload_media`, `upload_media_bytes`, `upload_media_prepare`, `upload_media_part`, `upload_media_finish`, `download_media`
-- Temp media URLs: `batch_get_media_tmp_download_urls`
+- Metadata and analytics:
+  - `batch_query_metas`
+  - `get_file_statistics`
+  - `list_file_view_records`
+- File operations:
+  - `copy_file`
+  - `move_file`
+  - `delete_file`
+  - `create_shortcut`
+- Version APIs:
+  - `create_version`
+  - `list_versions`
+  - `get_version`
+  - `delete_version`
+- Import/export tasks:
+  - `create_import_task`
+  - `get_import_task`
+  - `create_export_task`
+  - `get_export_task`
+  - `download_export_file`
+- Media upload/download:
+  - `upload_media`
+  - `upload_media_bytes`
+  - `upload_media_prepare`
+  - `upload_media_part`
+  - `upload_media_finish`
+  - `download_media`
+  - `batch_get_media_tmp_download_urls`
 
 ## `DrivePermissionService` API Summary
 
@@ -61,11 +74,14 @@ perm.add_member(
 
 ## Common Parameters
 
-- `resource_type`: usually `bitable` or `docx`.
-- `member_id_type`: `open_id` / `user_id` / `union_id`.
-- `perm`: commonly `view` / `edit` / `full_access`.
+- `user_id_type`: typically `open_id` / `user_id` / `union_id`
+- `viewer_id_type`: user id type used by view-record APIs
+- `type` / `file_type` / `obj_type`: follow the official Drive API resource type
+- `resource_type`: permission APIs commonly use `bitable` / `docx`
 
-## Notes
+## Practical Guidance
 
-- `upload_file`/`upload_media` only send `checksum` when explicitly provided.
-- Some APIs are tenant-policy dependent and may return business errors even with valid SDK calls.
+- Prefer `batch_query_metas` when you need metadata for multiple tokens in one request
+- For template-copy workflows, call file APIs first, then apply permission APIs
+- Keep document version workflows on `create_version`, `list_versions`, `get_version`, and `delete_version`
+- `upload_file` / `upload_media` only send `checksum` when you explicitly provide it

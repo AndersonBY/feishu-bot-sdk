@@ -19,12 +19,14 @@ This directory contains module-based SDK documentation. Each module has a standa
 - [11 Calendar](./en/11-calendar.md)
 - [12 Contact](./en/12-contact.md)
 - [13 Search](./en/13-search.md)
+- [14 Cloud Doc Workflows](./en/14-cloud-doc-workflows.md)
 
 ## Suggested Reading Path
 
 - Start with [01 Core Client and Config](./en/01-core-client.md).
 - For bot conversations, read [02 IM Messaging and Media](./en/02-im.md) and [08 FeishuBotServer](./en/08-bot-server.md).
 - For result delivery workflows, focus on [03 Drive](./en/03-drive.md), [04 Bitable](./en/04-bitable.md), and [05 Docx/Docs Content](./en/05-docx-and-docs.md).
+- For full doc workflows such as create, partial edit, asset replacement, and version management, go straight to [14 Cloud Doc Workflows](./en/14-cloud-doc-workflows.md).
 - For scheduling workflows, focus on [11 Calendar](./en/11-calendar.md).
 - For org-structure and user lookup workflows, focus on [12 Contact](./en/12-contact.md).
 - For app/message/doc discovery workflows, focus on [13 Search](./en/13-search.md).

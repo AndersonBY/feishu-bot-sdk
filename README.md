@@ -12,7 +12,7 @@
 - 通讯录能力（用户/部门/授权范围查询 + 分页迭代）
 - 日历能力（日历 CRUD、日程 CRUD、忙闲查询、CalDAV 配置）
 - 搜索能力（应用搜索、消息搜索、文档/Wiki 搜索）
-- Markdown 追加写入 Docx
+- 云文档官方 convert/insert 写入、块级编辑、图片/附件替换
 - 事件回调（Webhook）与长连接（WebSocket）
 - 事件类型模型（IM、卡片、URL 预览、多维表格 record/field changed）
 - IM 接收消息内容自动解析（按 `message_type` 输出强类型 `event.content`）
@@ -86,11 +86,13 @@ feishu bitable create-from-csv ./final.csv --app-name "任务结果" --table-nam
 feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
 
 # 7) 创建并写入 Docx
-feishu docx create-from-markdown --title "日报" --markdown-file ./report.md
-feishu docx get-markdown --doc-token doccn_xxx --doc-type docx --format json
+feishu docx create --title "日报" --folder-token fld_xxx --format json
+feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
+feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --format json
 
 # 8) 上传云空间文件
 feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx
+feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
 
 # 9) 搜索 Wiki 节点
@@ -149,6 +151,7 @@ cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --fo
 - 日历（Calendar）：[`docs/zh/11-calendar.md`](./docs/zh/11-calendar.md)
 - 通讯录（Contact）：[`docs/zh/12-contact.md`](./docs/zh/12-contact.md)
 - 搜索（Search）：[`docs/zh/13-search.md`](./docs/zh/13-search.md)
+- 云文档工作流速查：[`docs/zh/14-cloud-doc-workflows.md`](./docs/zh/14-cloud-doc-workflows.md)
 
 ## 响应模型（重要）
 
@@ -201,12 +204,13 @@ bitable.update_record(app_token, "tbl_xxx", record.record.record_id, {"任务名
 for item in bitable.iter_records(app_token, "tbl_xxx", page_size=100):
     print(item.record_id)
 
-# 3) Markdown -> Docx
+# 3) Markdown / HTML -> Docx
 docx = DocxService(client)
-doc_id, doc_url = docx.create_document("任务报告")
-docx.append_markdown(doc_id, "# 标题\n\n这是正文。")
+created = docx.create_document("任务报告")
+doc_id = created["document_id"]
+docx.insert_content(doc_id, "# 标题\n\n这是正文。", content_type="markdown")
 docx.grant_edit_permission(doc_id, "ou_xxx", "open_id")
-print(doc_url or doc_id)
+print(created["url"] or doc_id)
 ```
 
 ## 异步用法

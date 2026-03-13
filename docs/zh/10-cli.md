@@ -62,8 +62,12 @@ feishu media download-file img_v3_xxx ./downloads/image.jpg --format json
 feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx --resource-type image --format json
 feishu bitable create-from-csv ./final.csv --app-name "任务结果" --table-name "结果表"
 feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
-feishu docx create-from-markdown --title "日报" --markdown-file ./report.md
-feishu docx get-markdown --doc-token doccn_xxx --doc-type docx --format json
+feishu docx create --title "日报" --folder-token fld_xxx --format json
+feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
+feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --output ./report.md --format json
+feishu docx list-blocks --document-id doccn_xxx --all --format json
+feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
+feishu drive version-list doccn_xxx --obj-type docx --page-size 50 --all --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
 
 # Wiki
@@ -104,9 +108,10 @@ feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path 
 ## 内容类命令（Agent 建议）
 
 - 分页查询优先使用 `--all`：`bitable list-records`、`wiki list-spaces`、`wiki search-nodes`、`wiki list-nodes`
+- `docx list-blocks`、`docx list-children`、`drive view-records`、`drive version-list` 也支持 `--all`
 - `bitable list-records` 现已支持 `--view-id`、`--filter`、`--sort`、`--field-names`、`--text-field-as-array`
 - 授权参数已做强约束：`--member-id-type`、`--resource-type`、`--permission`，可减少参数拼写错误
-- `docx get-markdown --doc-type` 已限制官方支持值，避免无效文档类型
+- 云文档写入建议直接用 `docx insert-content`，不要再自己拼 markdown 块
 
 ## 日历附件（Agent 强烈建议）
 

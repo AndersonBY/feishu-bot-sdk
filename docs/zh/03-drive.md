@@ -10,46 +10,59 @@
 ## 快速示例
 
 ```python
-from feishu_bot_sdk import FeishuClient, FeishuConfig, DriveFileService, DrivePermissionService
+from feishu_bot_sdk import FeishuClient, FeishuConfig, DriveFileService
 
 client = FeishuClient(FeishuConfig(app_id="cli_xxx", app_secret="xxx"))
 drive = DriveFileService(client)
-perm = DrivePermissionService(client)
 
 uploaded = drive.upload_file(
     "final.csv",
     parent_type="explorer",
     parent_node="fld_xxx",
 )
-print(uploaded.file_token)
 
-task = drive.create_import_task(
-    {
-        "file_extension": "csv",
-        "file_token": uploaded.file_token,
-        "type": "bitable",
-        "file_name": "导入结果",
-        "point": {"mount_type": 1, "mount_key": "fld_xxx"},
-    }
+meta = drive.batch_query_metas(
+    [{"doc_token": uploaded["file_token"], "doc_type": "file"}],
+    with_url=True,
 )
+stats = drive.get_file_statistics(uploaded["file_token"], file_type="file")
 
-# 一般先通过 get_import_task(task.ticket) 轮询完成，再取导入结果资源 token 进行授权
-perm.add_member(
-    task.token,
-    resource_type="bitable",
-    member_id="ou_xxx",
-    member_id_type="open_id",
-    perm="edit",
-)
+print(meta)
+print(stats)
 ```
 
 ## `DriveFileService` API 一览
 
-- 上传下载文件：`upload_file`、`upload_file_bytes`、`download_file`
-- 分片上传文件：`upload_prepare`、`upload_part`、`upload_finish`
-- 导入导出任务：`create_import_task`、`get_import_task`、`create_export_task`、`get_export_task`、`download_export_file`
-- 媒体上传下载：`upload_media`、`upload_media_bytes`、`upload_media_prepare`、`upload_media_part`、`upload_media_finish`、`download_media`
-- 媒体临时下载链接：`batch_get_media_tmp_download_urls`
+- 文件上传下载：`upload_file`、`upload_file_bytes`、`download_file`
+- 分片上传：`upload_prepare`、`upload_part`、`upload_finish`
+- 文件元数据与统计：
+  - `batch_query_metas`
+  - `get_file_statistics`
+  - `list_file_view_records`
+- 文件操作：
+  - `copy_file`
+  - `move_file`
+  - `delete_file`
+  - `create_shortcut`
+- 文档版本：
+  - `create_version`
+  - `list_versions`
+  - `get_version`
+  - `delete_version`
+- 导入导出任务：
+  - `create_import_task`
+  - `get_import_task`
+  - `create_export_task`
+  - `get_export_task`
+  - `download_export_file`
+- 媒体上传下载：
+  - `upload_media`
+  - `upload_media_bytes`
+  - `upload_media_prepare`
+  - `upload_media_part`
+  - `upload_media_finish`
+  - `download_media`
+  - `batch_get_media_tmp_download_urls`
 
 ## `DrivePermissionService` API 一览
 
@@ -61,11 +74,14 @@ perm.add_member(
 
 ## 常见参数
 
-- `resource_type`: 推荐使用 `bitable` 或 `docx`。
-- `member_id_type`: `open_id` / `user_id` / `union_id`。
-- `perm`: 常见 `view` / `edit` / `full_access`。
+- `user_id_type`：常见 `open_id` / `user_id` / `union_id`
+- `viewer_id_type`：访问记录接口使用的用户 ID 类型
+- `type` / `file_type` / `obj_type`：按飞书官方接口要求填写资源类型
+- `resource_type`：权限接口常用 `bitable` / `docx`
 
-## 注意事项
+## 实践建议
 
-- `upload_file`/`upload_media` 的 `checksum` 仅在你显式传入时才会提交，默认不自动补。
-- 某些接口（如公开密码、短信/电话加急等）可能受租户策略或应用权限限制，返回业务错误码属平台策略行为。
+- 元数据查询优先用 `batch_query_metas`，便于一次查多个 token
+- 做“复制模板 -> 移动 -> 授权”这类流程时，先调用文件接口，再补权限接口
+- 版本管理场景统一走 `create_version` / `list_versions` / `get_version` / `delete_version`
+- `upload_file` / `upload_media` 只有在显式传入 `checksum` 时才会提交校验值

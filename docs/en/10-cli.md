@@ -62,8 +62,12 @@ feishu media download-file img_v3_xxx ./downloads/image.jpg --format json
 feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx --resource-type image --format json
 feishu bitable create-from-csv ./final.csv --app-name "Task Result" --table-name "Result"
 feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
-feishu docx create-from-markdown --title "Daily Report" --markdown-file ./report.md
-feishu docx get-markdown --doc-token doccn_xxx --doc-type docx --format json
+feishu docx create --title "Daily Report" --folder-token fld_xxx --format json
+feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
+feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --output ./report.md --format json
+feishu docx list-blocks --document-id doccn_xxx --all --format json
+feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
+feishu drive version-list doccn_xxx --obj-type docx --page-size 50 --all --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
 
 # wiki
@@ -104,9 +108,10 @@ Automatic behavior:
 ## Content Commands (Agent Tips)
 
 - Prefer `--all` for paged queries: `bitable list-records`, `wiki list-spaces`, `wiki search-nodes`, `wiki list-nodes`
+- `docx list-blocks`, `docx list-children`, `drive view-records`, and `drive version-list` also support `--all`
 - `bitable list-records` now supports `--view-id`, `--filter`, `--sort`, `--field-names`, and `--text-field-as-array`
 - Permission-related flags now use strict choices: `--member-id-type`, `--resource-type`, `--permission`
-- `docx get-markdown --doc-type` is now restricted to official supported values
+- For doc writes, prefer `docx insert-content` instead of building markdown blocks manually
 
 ## Calendar Attachments (Strongly Recommended for Agents)
 

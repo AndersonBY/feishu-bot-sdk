@@ -72,6 +72,8 @@ from .rate_limit import (
 from .response import DataResponse, Struct
 from .search import AsyncSearchService, SearchService
 from .server import FeishuBotServer, FeishuBotServerStatus
+from .sheets import AsyncSheetsService, SheetsService
+from .task import AsyncTaskService, TaskService
 from .wiki import AsyncWikiService, WikiService
 from .webhook import (
     WebhookReceiver,
@@ -107,6 +109,8 @@ __all__ = [
     "AsyncMediaService",
     "AsyncMessageService",
     "AsyncSearchService",
+    "AsyncSheetsService",
+    "AsyncTaskService",
     "AsyncAdaptiveRateLimiter",
     "AsyncWikiService",
     "AdaptiveRateLimiter",
@@ -164,6 +168,7 @@ __all__ = [
     "RateLimitTuning",
     "ReconnectPolicy",
     "SearchService",
+    "SheetsService",
     "SDKError",
     "ShareChatMessageContent",
     "ShareUserMessageContent",
@@ -178,6 +183,7 @@ __all__ = [
     "WSEndpoint",
     "WSRemoteConfig",
     "WikiService",
+    "TaskService",
     "WebhookReceiver",
     "build_challenge_response",
     "build_event_context",

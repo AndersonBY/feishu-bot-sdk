@@ -12,7 +12,7 @@ A lightweight Python SDK for Feishu bot integrations, including:
 - Contact APIs (user/department/scope query + pagination iterators)
 - Calendar APIs (calendar/event CRUD, freebusy, CalDAV config)
 - Search APIs (app search, message search, doc/wiki search)
-- Markdown append to Docx
+- Official Docx convert/insert writes, block editing, and image/file replacement
 - Webhook callbacks and long connections (WebSocket)
 - Typed event models (IM/card/URL preview/Bitable record & field changed)
 - Automatic typed parsing for incoming IM content (`event.content` by `message_type`)
@@ -85,12 +85,14 @@ feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx 
 feishu bitable create-from-csv ./final.csv --app-name "Task Result" --table-name "Result" --grant-member-id ou_xxx
 feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
 
-# 7) Create and append markdown to Docx
-feishu docx create-from-markdown --title "Daily Report" --markdown-file ./report.md
-feishu docx get-markdown --doc-token doccn_xxx --doc-type docx --format json
+# 7) Create and write Docx
+feishu docx create --title "Daily Report" --folder-token fld_xxx --format json
+feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
+feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --format json
 
 # 8) Upload file to Drive
 feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx
+feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
 
 # 9) Search wiki nodes
@@ -149,6 +151,7 @@ cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --fo
 - Calendar: [`docs/en/11-calendar.md`](./docs/en/11-calendar.md)
 - Contact: [`docs/en/12-contact.md`](./docs/en/12-contact.md)
 - Search: [`docs/en/13-search.md`](./docs/en/13-search.md)
+- Cloud doc workflows: [`docs/en/14-cloud-doc-workflows.md`](./docs/en/14-cloud-doc-workflows.md)
 
 ## Response Model (Important)
 
@@ -201,12 +204,13 @@ bitable.update_record(app_token, "tbl_xxx", record.record.record_id, {"Task": "D
 for item in bitable.iter_records(app_token, "tbl_xxx", page_size=100):
     print(item.record_id)
 
-# 3) Markdown -> Docx
+# 3) Markdown / HTML -> Docx
 docx = DocxService(client)
-doc_id, doc_url = docx.create_document("Task Report")
-docx.append_markdown(doc_id, "# Title\n\nBody text.")
+created = docx.create_document("Task Report")
+doc_id = created["document_id"]
+docx.insert_content(doc_id, "# Title\n\nBody text.", content_type="markdown")
 docx.grant_edit_permission(doc_id, "ou_xxx", "open_id")
-print(doc_url or doc_id)
+print(created["url"] or doc_id)
 ```
 
 ## Async Example

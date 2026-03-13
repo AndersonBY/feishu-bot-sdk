@@ -727,19 +727,21 @@ def test_bitable_list_records_all(monkeypatch: Any, capsys: Any) -> None:
     assert [item["record_id"] for item in payload["items"]] == ["rec_1", "rec_2"]
 
 
-def test_docx_get_markdown_json_output(monkeypatch: Any, capsys: Any) -> None:
+def test_docx_get_content_json_output(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
 
     monkeypatch.setattr(
-        "feishu_bot_sdk.docs_content.DocContentService.get_markdown",
-        lambda _self, doc_token, doc_type="docx", lang=None: f"{doc_token}:{doc_type}:{lang}",
+        "feishu_bot_sdk.docs_content.DocContentService.get_content",
+        lambda _self, doc_token, doc_type="docx", content_type="markdown", lang=None: {
+            "content": f"{doc_token}:{doc_type}:{content_type}:{lang}"
+        },
     )
 
     code = cli.main(
         [
             "docx",
-            "get-markdown",
+            "get-content",
             "--doc-token",
             "doccn_xxx",
             "--format",
@@ -748,14 +750,145 @@ def test_docx_get_markdown_json_output(monkeypatch: Any, capsys: Any) -> None:
     )
     assert code == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["markdown"] == "doccn_xxx:docx:None"
+    assert payload["content"] == "doccn_xxx:docx:markdown:None"
 
 
-def test_docx_get_markdown_rejects_invalid_doc_type(capsys: Any) -> None:
+def test_docx_get_content_writes_output(monkeypatch: Any, tmp_path: Path, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.docs_content.DocContentService.get_content",
+        lambda _self, doc_token, doc_type="docx", content_type="markdown", lang=None: {
+            "content": "# hello"
+        },
+    )
+
+    output = tmp_path / "report.md"
     code = cli.main(
         [
             "docx",
-            "get-markdown",
+            "get-content",
+            "--doc-token",
+            "doccn_xxx",
+            "--output",
+            str(output),
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert output.read_text(encoding="utf-8") == "# hello"
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True
+    assert payload["output"] == str(output)
+
+
+def test_docx_insert_content_from_file(monkeypatch: Any, tmp_path: Path, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    captured: dict[str, Any] = {}
+
+    def _fake_insert_content(
+        _self: Any,
+        document_id: str,
+        content: str,
+        *,
+        block_id: str | None = None,
+        content_type: str = "markdown",
+        index: int = -1,
+        document_revision_id: int | None = None,
+        client_token: str | None = None,
+        user_id_type: str | None = None,
+    ) -> dict[str, Any]:
+        captured["document_id"] = document_id
+        captured["content"] = content
+        captured["block_id"] = block_id
+        captured["content_type"] = content_type
+        captured["index"] = index
+        captured["document_revision_id"] = document_revision_id
+        captured["client_token"] = client_token
+        captured["user_id_type"] = user_id_type
+        return {"ok": True}
+
+    monkeypatch.setattr("feishu_bot_sdk.docx.DocxService.insert_content", _fake_insert_content)
+
+    content_file = tmp_path / "content.md"
+    content_file.write_text("## hi", encoding="utf-8")
+
+    code = cli.main(
+        [
+            "docx",
+            "insert-content",
+            "--document-id",
+            "doc_1",
+            "--block-id",
+            "blk_1",
+            "--content-file",
+            str(content_file),
+            "--document-revision-id",
+            "-1",
+            "--client-token",
+            "ct_1",
+            "--user-id-type",
+            "open_id",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert captured == {
+        "document_id": "doc_1",
+        "content": "## hi",
+        "block_id": "blk_1",
+        "content_type": "markdown",
+        "index": -1,
+        "document_revision_id": -1,
+        "client_token": "ct_1",
+        "user_id_type": "open_id",
+    }
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True
+
+
+def test_docx_list_blocks_all(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    calls: list[str | None] = []
+
+    def _fake_list_blocks(
+        _self: Any,
+        document_id: str,
+        *,
+        page_size: int | None = None,
+        page_token: str | None = None,
+        document_revision_id: int | None = None,
+        user_id_type: str | None = None,
+    ) -> dict[str, Any]:
+        assert document_id == "doc_1"
+        calls.append(page_token)
+        if page_token == "next_1":
+            return {"items": [{"block_id": "b2"}], "has_more": False}
+        return {"items": [{"block_id": "b1"}], "has_more": True, "page_token": "next_1"}
+
+    monkeypatch.setattr("feishu_bot_sdk.docx_document.DocxDocumentService.list_blocks", _fake_list_blocks)
+
+    code = cli.main(["docx", "list-blocks", "--document-id", "doc_1", "--all", "--format", "json"])
+    assert code == 0
+    assert calls == [None, "next_1"]
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["all"] is True
+    assert payload["count"] == 2
+    assert [item["block_id"] for item in payload["items"]] == ["b1", "b2"]
+
+
+def test_docx_get_content_rejects_invalid_doc_type(capsys: Any) -> None:
+    code = cli.main(
+        [
+            "docx",
+            "get-content",
             "--doc-token",
             "doccn_xxx",
             "--doc-type",
@@ -764,6 +897,124 @@ def test_docx_get_markdown_rejects_invalid_doc_type(capsys: Any) -> None:
     )
     assert code == 2
     assert "invalid choice" in capsys.readouterr().err
+
+
+def test_drive_meta_command(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    captured: dict[str, Any] = {}
+
+    def _fake_batch_query_metas(
+        _self: Any,
+        request_docs: list[dict[str, Any]],
+        *,
+        with_url: bool | None = None,
+        user_id_type: str | None = None,
+    ) -> dict[str, Any]:
+        captured["request_docs"] = request_docs
+        captured["with_url"] = with_url
+        captured["user_id_type"] = user_id_type
+        return {"metas": [{"doc_token": "doc_1"}]}
+
+    monkeypatch.setattr("feishu_bot_sdk.drive_files.DriveFileService.batch_query_metas", _fake_batch_query_metas)
+
+    code = cli.main(
+        [
+            "drive",
+            "meta",
+            "--request-docs-json",
+            '[{"doc_token":"doc_1","doc_type":"docx"}]',
+            "--with-url",
+            "true",
+            "--user-id-type",
+            "open_id",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert captured == {
+        "request_docs": [{"doc_token": "doc_1", "doc_type": "docx"}],
+        "with_url": True,
+        "user_id_type": "open_id",
+    }
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["metas"][0]["doc_token"] == "doc_1"
+
+
+def test_drive_download_file_writes_output(monkeypatch: Any, tmp_path: Path, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.drive_files.DriveFileService.download_file",
+        lambda _self, file_token: b"downloaded-bytes",
+    )
+
+    output = tmp_path / "download.bin"
+    code = cli.main(
+        [
+            "drive",
+            "download-file",
+            "file_1",
+            "--output",
+            str(output),
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert output.read_bytes() == b"downloaded-bytes"
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True
+    assert payload["size"] == len(b"downloaded-bytes")
+
+
+def test_drive_version_list_all(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    calls: list[str | None] = []
+
+    def _fake_list_versions(
+        _self: Any,
+        file_token: str,
+        *,
+        obj_type: str,
+        page_size: int,
+        page_token: str | None = None,
+        user_id_type: str | None = None,
+    ) -> dict[str, Any]:
+        assert file_token == "doc_1"
+        assert obj_type == "docx"
+        calls.append(page_token)
+        if page_token == "next_v":
+            return {"items": [{"version_id": "v2"}], "has_more": False}
+        return {"items": [{"version_id": "v1"}], "has_more": True, "page_token": "next_v"}
+
+    monkeypatch.setattr("feishu_bot_sdk.drive_files.DriveFileService.list_versions", _fake_list_versions)
+
+    code = cli.main(
+        [
+            "drive",
+            "version-list",
+            "doc_1",
+            "--obj-type",
+            "docx",
+            "--page-size",
+            "1",
+            "--all",
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0
+    assert calls == [None, "next_v"]
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["all"] is True
+    assert payload["count"] == 2
+    assert [item["version_id"] for item in payload["items"]] == ["v1", "v2"]
 
 
 def test_drive_grant_edit(monkeypatch: Any, capsys: Any) -> None:

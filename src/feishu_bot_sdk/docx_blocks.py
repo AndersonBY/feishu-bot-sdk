@@ -65,6 +65,7 @@ class DocxBlockService:
         page_size: Optional[int] = None,
         page_token: Optional[str] = None,
         document_revision_id: Optional[int] = None,
+        with_descendants: Optional[bool] = None,
         user_id_type: Optional[str] = None,
     ) -> Mapping[str, Any]:
         params = _drop_none(
@@ -72,6 +73,7 @@ class DocxBlockService:
                 "page_size": page_size,
                 "page_token": page_token,
                 "document_revision_id": document_revision_id,
+                "with_descendants": with_descendants,
                 "user_id_type": user_id_type,
             }
         )
@@ -89,6 +91,7 @@ class DocxBlockService:
         *,
         page_size: int = 500,
         document_revision_id: Optional[int] = None,
+        with_descendants: Optional[bool] = None,
         user_id_type: Optional[str] = None,
     ) -> Iterator[Mapping[str, Any]]:
         page_token: Optional[str] = None
@@ -99,6 +102,7 @@ class DocxBlockService:
                 page_size=page_size,
                 page_token=page_token,
                 document_revision_id=document_revision_id,
+                with_descendants=with_descendants,
                 user_id_type=user_id_type,
             )
             yield from _iter_items(data)
@@ -289,6 +293,7 @@ class AsyncDocxBlockService:
         page_size: Optional[int] = None,
         page_token: Optional[str] = None,
         document_revision_id: Optional[int] = None,
+        with_descendants: Optional[bool] = None,
         user_id_type: Optional[str] = None,
     ) -> Mapping[str, Any]:
         params = _drop_none(
@@ -296,6 +301,7 @@ class AsyncDocxBlockService:
                 "page_size": page_size,
                 "page_token": page_token,
                 "document_revision_id": document_revision_id,
+                "with_descendants": with_descendants,
                 "user_id_type": user_id_type,
             }
         )
@@ -313,6 +319,7 @@ class AsyncDocxBlockService:
         *,
         page_size: int = 500,
         document_revision_id: Optional[int] = None,
+        with_descendants: Optional[bool] = None,
         user_id_type: Optional[str] = None,
     ) -> AsyncIterator[Mapping[str, Any]]:
         page_token: Optional[str] = None
@@ -323,6 +330,7 @@ class AsyncDocxBlockService:
                 page_size=page_size,
                 page_token=page_token,
                 document_revision_id=document_revision_id,
+                with_descendants=with_descendants,
                 user_id_type=user_id_type,
             )
             for item in _iter_items(data):

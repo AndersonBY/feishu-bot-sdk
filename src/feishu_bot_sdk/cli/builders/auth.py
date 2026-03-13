@@ -64,7 +64,7 @@ def _build_auth_commands(
             "  - Token precedence remains: env > flags > local store."
         ),
     )
-    login_parser.add_argument("--scope", help="OAuth scope string")
+    login_parser.add_argument("--scope", help='OAuth scope string, e.g. "offline_access contact:user:search search:docs:read drive:drive"')
     login_parser.add_argument("--state", help="OAuth state. Auto-generated when omitted")
     login_parser.add_argument("--redirect-uri", help="OAuth redirect URI. Default: local callback URI")
     login_parser.add_argument("--redirect-host", default=_DEFAULT_OAUTH_CALLBACK_HOST, help="Local callback host")

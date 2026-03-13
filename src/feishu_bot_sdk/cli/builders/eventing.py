@@ -16,12 +16,21 @@ from ..commands import (
     _cmd_ws_run,
 )
 from .common import _add_webhook_body_args
+from ..settings import HELP_FORMATTER as _HELP_FORMATTER
 
 def _build_webhook_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
     shared: argparse.ArgumentParser,
 ) -> None:
-    webhook_parser = subparsers.add_parser("webhook", help="Webhook utility commands")
+    webhook_parser = subparsers.add_parser(
+        "webhook",
+        help="Webhook utility commands",
+        description=(
+            "Webhook utility commands for decoding, verifying, and serving Feishu webhooks.\n"
+            "Use 'serve' for local development webhook server."
+        ),
+        formatter_class=_HELP_FORMATTER,
+    )
     webhook_sub = webhook_parser.add_subparsers(dest="webhook_command")
     webhook_sub.required = True
 
@@ -114,7 +123,15 @@ def _build_ws_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
     shared: argparse.ArgumentParser,
 ) -> None:
-    ws_parser = subparsers.add_parser("ws", help="WebSocket long-connection utilities")
+    ws_parser = subparsers.add_parser(
+        "ws",
+        help="WebSocket long-connection utilities",
+        description=(
+            "WebSocket long-connection utilities for Feishu event subscription.\n"
+            "Use 'run' to start a low-level WS listener for events."
+        ),
+        formatter_class=_HELP_FORMATTER,
+    )
     ws_sub = ws_parser.add_subparsers(dest="ws_command")
     ws_sub.required = True
 
@@ -161,7 +178,15 @@ def _build_server_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
     shared: argparse.ArgumentParser,
 ) -> None:
-    server_parser = subparsers.add_parser("server", help="Feishu bot long-connection server")
+    server_parser = subparsers.add_parser(
+        "server",
+        help="Feishu bot long-connection server",
+        description=(
+            "Feishu bot long-connection server for persistent event handling.\n"
+            "Use 'run' for foreground, 'start/stop/status' for background management."
+        ),
+        formatter_class=_HELP_FORMATTER,
+    )
     server_sub = server_parser.add_subparsers(dest="server_command")
     server_sub.required = True
 

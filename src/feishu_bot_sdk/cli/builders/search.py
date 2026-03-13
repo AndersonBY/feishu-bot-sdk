@@ -68,10 +68,10 @@ def _build_search_commands(
 
     doc_wiki = search_sub.add_parser("doc-wiki", help="Search docs and wiki", parents=[shared])
     doc_wiki.add_argument("--query", required=True, help="Search query")
-    doc_wiki.add_argument("--doc-filter-json", help="Doc filter JSON object string")
+    doc_wiki.add_argument("--doc-filter-json", help='Doc filter JSON, e.g. {"search_obj_type":"doc","doc_type":"docx","only_title":true}')
     doc_wiki.add_argument("--doc-filter-file", help="Doc filter JSON file path")
     doc_wiki.add_argument("--doc-filter-stdin", action="store_true", help="Read doc filter JSON from stdin")
-    doc_wiki.add_argument("--wiki-filter-json", help="Wiki filter JSON object string")
+    doc_wiki.add_argument("--wiki-filter-json", help='Wiki filter JSON, e.g. {"space_id":"spc_xxx"}')
     doc_wiki.add_argument("--wiki-filter-file", help="Wiki filter JSON file path")
     doc_wiki.add_argument("--wiki-filter-stdin", action="store_true", help="Read wiki filter JSON from stdin")
     doc_wiki.add_argument("--page-size", type=int, help="Page size")
