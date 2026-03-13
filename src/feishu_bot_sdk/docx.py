@@ -4,7 +4,7 @@ import copy
 import os
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, cast
 from urllib.parse import urlparse
 
 import httpx
@@ -93,7 +93,7 @@ class DocxService:
                 document_id,
                 target_block_id,
                 children_id=batch.root_ids,
-                descendants=batch.blocks,
+                descendants=cast(List[Mapping[str, object]], batch.blocks),
                 index=current_index,
                 document_revision_id=document_revision_id,
                 client_token=client_token,
@@ -405,7 +405,7 @@ class AsyncDocxService:
                 document_id,
                 target_block_id,
                 children_id=batch.root_ids,
-                descendants=batch.blocks,
+                descendants=cast(List[Mapping[str, object]], batch.blocks),
                 index=current_index,
                 document_revision_id=document_revision_id,
                 client_token=client_token,

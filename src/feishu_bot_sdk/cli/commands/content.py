@@ -646,7 +646,7 @@ def _cmd_drive_view_records(args: argparse.Namespace) -> Mapping[str, Any]:
     service = DriveFileService(_build_client(args))
     file_token = str(args.file_token)
     file_type = str(args.file_type)
-    page_size = getattr(args, "page_size", None)
+    page_size: int = args.page_size
     page_token = getattr(args, "page_token", None)
     viewer_id_type = getattr(args, "viewer_id_type", None)
     if not bool(getattr(args, "all", False)):
@@ -772,7 +772,7 @@ def _cmd_drive_version_list(args: argparse.Namespace) -> Mapping[str, Any]:
     service = DriveFileService(_build_client(args))
     file_token = str(args.file_token)
     obj_type = str(args.obj_type)
-    page_size = getattr(args, "page_size", None)
+    page_size: int = args.page_size
     page_token = getattr(args, "page_token", None)
     user_id_type = getattr(args, "user_id_type", None)
     if not bool(getattr(args, "all", False)):

@@ -330,9 +330,10 @@ def test_async_drive_file_new_operations_and_download_export(monkeypatch: Any):
     binary = asyncio.run(run())
 
     assert binary == b"export-bytes"
-    assert service._client.calls[0]["path"] == "/drive/v1/metas/batch_query"
-    assert service._client.calls[1]["path"] == "/drive/v1/files/file_1/versions"
-    assert service._client.calls[1]["params"] == {
+    stub = cast(_AsyncClientStub, service._client)
+    assert stub.calls[0]["path"] == "/drive/v1/metas/batch_query"
+    assert stub.calls[1]["path"] == "/drive/v1/files/file_1/versions"
+    assert stub.calls[1]["params"] == {
         "obj_type": "docx",
         "page_size": 10,
         "user_id_type": "open_id",
