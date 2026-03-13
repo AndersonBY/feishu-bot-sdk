@@ -4,7 +4,7 @@ import copy
 import os
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional
 from urllib.parse import urlparse
 
 import httpx

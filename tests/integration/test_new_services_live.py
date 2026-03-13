@@ -342,7 +342,8 @@ class TestBitableAppAndViews:
             #    Actually the simplest way: use the drive API to create a bitable.
             #    But DriveFileService has no "create_bitable".  Let's use
             #    create_from_csv with a minimal CSV.
-            import tempfile, os
+            import tempfile
+            import os
 
             csv_content = "Name,Score\nAlice,100\nBob,90\n"
             with tempfile.NamedTemporaryFile(
