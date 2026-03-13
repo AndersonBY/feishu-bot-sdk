@@ -1,5 +1,7 @@
 # feishu-bot-sdk
 
+English | [中文](./README.md)
+
 A lightweight Python SDK for Feishu bot integrations, including:
 
 - Access token retrieval and caching for both `tenant` and `user` modes

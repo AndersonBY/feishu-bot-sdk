@@ -1,5 +1,7 @@
 # feishu-bot-sdk
 
+[English](./README_EN.md) | 中文
+
 面向飞书机器人的轻量 Python SDK，提供：
 
 - 飞书 access token 获取与缓存（`tenant` / `user` 双模式）
@@ -409,8 +411,6 @@ print(docs.res_units)
 - `MessageService` / `AsyncMessageService`：消息管理
 - `MediaService` / `AsyncMediaService`：媒体资源
 - `FeishuBotServer`：长连接服务封装（回调注册 + 启停 + 状态管理）
-
-英文说明见 `README_EN.md`。
 
 ## 示例脚本
 
