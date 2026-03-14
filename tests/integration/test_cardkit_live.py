@@ -17,7 +17,7 @@ import time
 _examples_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "examples")
 sys.path.insert(0, _examples_dir)
 
-from _settings import load_settings  # noqa: E402
+from _settings import load_settings  # noqa: E402  # type: ignore[import-not-found]
 
 from feishu_bot_sdk import (  # noqa: E402
     CardCallbackResponse,
