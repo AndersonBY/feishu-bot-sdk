@@ -292,8 +292,15 @@ class P2CardActionTrigger:
     app_id: Optional[str]
     open_id: Optional[str]
     user_id: Optional[str]
+    union_id: Optional[str]
     action_tag: Optional[str]
     action_value: Mapping[str, Any]
+    action: Mapping[str, Any] = field(default_factory=dict)
+    operator: Mapping[str, Any] = field(default_factory=dict)
+    open_message_id: Optional[str] = None
+    open_chat_id: Optional[str] = None
+    trigger_time: Optional[str] = None
+    token: Optional[str] = None
     raw: Mapping[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -302,14 +309,25 @@ class P2CardActionTrigger:
         operator = _as_mapping(event.get("operator"))
         action = _as_mapping(event.get("action"))
         action_value = _as_mapping(action.get("value"))
+        event_context = _as_mapping(event.get("context"))
         return cls(
             event_id=context.envelope.event_id,
             tenant_key=context.envelope.tenant_key,
             app_id=context.envelope.app_id,
             open_id=_as_optional_str(operator.get("open_id")),
             user_id=_as_optional_str(operator.get("user_id")),
+            union_id=_as_optional_str(operator.get("union_id")),
             action_tag=_as_optional_str(action.get("tag")),
             action_value=dict(action_value),
+            action=dict(action),
+            operator=dict(operator),
+            open_message_id=_as_optional_str(event_context.get("open_message_id"))
+            or _as_optional_str(event.get("open_message_id")),
+            open_chat_id=_as_optional_str(event_context.get("open_chat_id"))
+            or _as_optional_str(event.get("open_chat_id")),
+            trigger_time=_as_optional_str(event.get("action_time"))
+            or context.envelope.create_time,
+            token=context.envelope.token,
             raw=dict(context.payload),
         )
 

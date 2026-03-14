@@ -6,6 +6,7 @@
 
 - 飞书 access token 获取与缓存（`tenant` / `user` 双模式）
 - IM 消息能力（发送/回复/编辑/撤回/转发/合并转发/reaction/pin/批量/加急/卡片）
+- CardKit 卡片实体（创建/流式更新/streaming_mode/配置更新）与卡片回调响应构造
 - 图片、文件、消息资源上传下载
 - 云空间文件/素材上传下载、导入导出任务
 - Drive 权限管理（成员、公开设置、密码、owner transfer）
@@ -409,6 +410,7 @@ print(docs.res_units)
 - `ContactService` / `AsyncContactService`：通讯录用户、部门、授权范围
 - `SearchService` / `AsyncSearchService`：应用、消息、文档/Wiki 搜索
 - `MessageService` / `AsyncMessageService`：消息管理
+- `CardKitService` / `AsyncCardKitService`：CardKit 卡片实体创建、流式更新、配置管理
 - `MediaService` / `AsyncMediaService`：媒体资源
 - `FeishuBotServer`：长连接服务封装（回调注册 + 启停 + 状态管理）
 
@@ -421,6 +423,7 @@ uv run python examples/webhook_server.py
 uv run python examples/ws_listener.py
 uv run python examples/bot_server_demo.py
 uv run python examples/card_callback.py
+uv run python examples/cardkit_streaming_demo.py
 uv run python examples/im_media_demo.py --receive-id ou_xxx --receive-id-type open_id --image ./demo.png
 uv run python examples/im_advanced_demo.py --receive-id ou_xxx --receive-id-type open_id --urgent-user-id ou_xxx
 uv run python examples/drive_demo.py --resource-token doccn_xxx --resource-type docx --member-id ou_xxx

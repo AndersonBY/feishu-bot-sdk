@@ -158,6 +158,65 @@ doc_content = DocContentService(client)
 doc_content.get_doc_content(doc_token="docXXX", doc_type="docx")  # -> markdown
 ```
 
+## CardKitService
+
+CardKit 卡片实体 API，用于创建卡片实体、流式更新内容、控制 streaming_mode。
+
+```python
+from feishu_bot_sdk import CardKitService, MessageContent
+
+cardkit = CardKitService(client)
+
+# 1. Create card entity (card JSON must have "schema": "2.0" and use body.elements)
+card_json = {
+    "schema": "2.0",
+    "config": {"wide_screen_mode": True, "streaming_mode": True},
+    "header": {"title": {"tag": "plain_text", "content": "Title"}, "template": "blue"},
+    "body": {"elements": [{"tag": "markdown", "element_id": "el_1", "content": ""}]},
+}
+resp = cardkit.create(card=card_json)  # -> CardKitCreateResponse (card_id, ok, code, msg)
+
+# 2. Send card as interactive message
+content = MessageContent.interactive_card(resp.card_id)
+msg.send(receive_id_type="open_id", receive_id="ou_xxx", msg_type="interactive", content=content)
+
+# 3. Stream content (打字机效果, sequence 必须严格递增)
+cardkit.set_element_content(resp.card_id, element_id="el_1", content="Hello", sequence=1)
+cardkit.set_element_content(resp.card_id, element_id="el_1", content="Hello, world!", sequence=2)
+
+# 4. Toggle streaming mode
+cardkit.set_streaming_mode(resp.card_id, enabled=False, sequence=3)
+
+# 5. Full card update
+cardkit.update(resp.card_id, card=final_card_json, sequence=4)
+
+# 6. Update card settings (generic)
+cardkit.set_settings(resp.card_id, settings={"config": {"streaming_mode": True}}, sequence=5)
+```
+
+Typed responses:
+- `CardKitCreateResponse`: `card_id`, `ok`, `code`, `msg`, `raw`
+- `CardKitResponse`: `ok`, `code`, `msg`, `raw`
+
+## CardCallbackResponse
+
+card.action.trigger 回调响应构造 helper：
+
+```python
+from feishu_bot_sdk import CardCallbackResponse
+
+# Toast (即时响应)
+CardCallbackResponse.toast("Done!", type="success")
+# -> {"toast": {"type": "success", "content": "Done!"}}
+
+# Return updated card inline
+CardCallbackResponse.card({"elements": [...]})
+# -> {"card": {"elements": [...]}}
+
+# Arbitrary inline payload
+CardCallbackResponse.inline(toast={"type": "info"}, card={...})
+```
+
 ## MessageContent Builder
 
 ```python

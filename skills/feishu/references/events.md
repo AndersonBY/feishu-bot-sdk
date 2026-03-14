@@ -139,7 +139,44 @@ await ws_client.stop()
 |-----------|-----------|------------|
 | `on_im_message_receive` | `im.message.receive_v1` | `text`, `sender_open_id`, `chat_id`, `message_id`, `msg_type` |
 | `on_bot_menu` | `application.bot.menu_v6` | `event_key`, `operator_open_id` |
-| `on_card_action_trigger` | `card.action.trigger` | Card action payload; return dict for response |
+| `on_card_action_trigger` | `card.action.trigger` | `action_tag`, `action_value`, `open_id`, `user_id`, `union_id`, `open_message_id`, `open_chat_id`, `trigger_time`, `token`, `action` (raw dict), `operator` (raw dict); return dict for callback response |
 | `on_bitable_record_changed` | `drive.file.bitable_record_changed_v1` | `table_id`, `action_list` |
 | `on_bitable_field_changed` | `drive.file.bitable_field_changed_v1` | Field change details |
 | `on_url_preview_get` | `url.preview.get` | URL preview request |
+
+## CardKit + Callback Pattern
+
+即时响应 + 延迟更新的完整模式（card.action.trigger 回调必须 3 秒内返回）：
+
+```python
+from feishu_bot_sdk import (
+    FeishuBotServer, CardCallbackResponse, AsyncCardKitService, AsyncFeishuClient, FeishuConfig
+)
+import asyncio
+
+server = FeishuBotServer(app_id="cli_xxx", app_secret="xxx")
+
+# Prepare async CardKit client for delayed updates
+config = FeishuConfig(app_id="cli_xxx", app_secret="xxx")
+async_client = AsyncFeishuClient(config)
+cardkit = AsyncCardKitService(async_client)
+
+@server.on_card_action_trigger
+async def handle_card(event):
+    # event has: open_id, union_id, action_tag, action_value,
+    #            open_message_id, open_chat_id, trigger_time, token, action, operator
+    print(f"Action: {event.action_tag} from {event.open_id} in {event.open_chat_id}")
+
+    # Schedule delayed update (runs after callback returns)
+    asyncio.create_task(do_heavy_work(event))
+
+    # Return immediate toast (must be within 3 seconds)
+    return CardCallbackResponse.toast("Processing...", type="info")
+
+async def do_heavy_work(event):
+    await asyncio.sleep(2)
+    # Update card via CardKit after heavy work completes
+    # await cardkit.set_element_content(card_id, element_id="el", content="Done", sequence=N)
+
+server.run()
+```

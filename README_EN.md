@@ -6,6 +6,7 @@ A lightweight Python SDK for Feishu bot integrations, including:
 
 - Access token retrieval and caching for both `tenant` and `user` modes
 - IM messaging (send/reply/edit/recall/forward/merge-forward/reaction/pin/batch/urgent/cards)
+- CardKit card entities (create/streaming update/streaming_mode/settings) and card callback response helpers
 - Image/file/message-resource upload and download
 - Drive file/media upload & download with import/export tasks
 - Drive permissions (members, public settings, password, owner transfer)
@@ -409,6 +410,7 @@ print(docs.res_units)
 - `ContactService` / `AsyncContactService`: contact users, departments, and scopes
 - `SearchService` / `AsyncSearchService`: app, message, and doc/wiki search
 - `MessageService` / `AsyncMessageService`: message management
+- `CardKitService` / `AsyncCardKitService`: CardKit card entity create, streaming update, settings
 - `MediaService` / `AsyncMediaService`: media resources
 - `FeishuBotServer`: long-connection server wrapper (handlers + lifecycle + status)
 
@@ -421,6 +423,7 @@ uv run python examples/webhook_server.py
 uv run python examples/ws_listener.py
 uv run python examples/bot_server_demo.py
 uv run python examples/card_callback.py
+uv run python examples/cardkit_streaming_demo.py
 uv run python examples/im_media_demo.py --receive-id ou_xxx --receive-id-type open_id --image ./demo.png
 uv run python examples/im_advanced_demo.py --receive-id ou_xxx --receive-id-type open_id --urgent-user-id ou_xxx
 uv run python examples/drive_demo.py --resource-token doccn_xxx --resource-type docx --member-id ou_xxx

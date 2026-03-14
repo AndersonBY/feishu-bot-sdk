@@ -4,6 +4,7 @@ description: >
   飞书（Lark）开放平台 Python SDK 和 CLI 工具使用指南。
   当用户需要处理任何飞书相关任务时触发此 skill，包括但不限于：
   (1) 飞书消息发送（文本、Markdown、图片、卡片），
+  (2) 飞书 CardKit 卡片实体（创建、流式更新、streaming_mode、回调响应），
   (2) 飞书云文档操作（创建、编辑、导出文档内容），
   (3) 飞书多维表格/Bitable（创建表格、CSV导入、记录增删改查），
   (4) 飞书云盘/Drive（文件上传下载、权限管理），
@@ -168,6 +169,7 @@ msg.send_text(receive_id_type="open_id", receive_id="ou_xxx", text="hello")
 | 服务 | 用途 |
 |------|------|
 | `MessageService` | 消息发送/回复/编辑/撤回/反应/置顶 |
+| `CardKitService` | CardKit 卡片实体创建/流式更新/配置 |
 | `MediaService` | 图片/文件上传下载 |
 | `BitableService` | 多维表格应用/表/记录 CRUD |
 | `DocxService` | 云文档创建、Markdown 写入 |

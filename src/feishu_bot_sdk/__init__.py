@@ -1,6 +1,13 @@
 from .bitable import AsyncBitableService, BitableService
 from .bot import AsyncBotService, BotInfo, BotInfoResponse, BotService
 from .calendar import AsyncCalendarService, CalendarService
+from .callbacks import CardCallbackResponse
+from .cardkit import (
+    AsyncCardKitService,
+    CardKitCreateResponse,
+    CardKitResponse,
+    CardKitService,
+)
 from .config import FeishuConfig
 from .contact import AsyncContactService, ContactService
 from .docs_content import AsyncDocContentService, DocContentService
@@ -92,6 +99,7 @@ from .ws import (
 )
 
 __all__ = [
+    "AsyncCardKitService",
     "AsyncMemoryIdempotencyStore",
     "AsyncBitableService",
     "AsyncBotService",
@@ -120,6 +128,10 @@ __all__ = [
     "BotInfo",
     "BotInfoResponse",
     "CalendarService",
+    "CardCallbackResponse",
+    "CardKitCreateResponse",
+    "CardKitResponse",
+    "CardKitService",
     "ContactService",
     "ConfigurationError",
     "DocContentService",
