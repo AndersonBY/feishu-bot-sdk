@@ -145,7 +145,7 @@ def test_cardkit_service_set_streaming_mode():
 def test_async_cardkit_service_create():
     stub = _AsyncClientStub(resolver=_create_resolver)
     svc = AsyncCardKitService(stub)  # type: ignore[arg-type]
-    resp = asyncio.get_event_loop().run_until_complete(svc.create(card={"elements": []}))
+    resp = asyncio.run(svc.create(card={"elements": []}))
     assert resp.ok
     assert resp.card_id == "ck_new"
 
@@ -153,7 +153,7 @@ def test_async_cardkit_service_create():
 def test_async_cardkit_service_set_element_content():
     stub = _AsyncClientStub()
     svc = AsyncCardKitService(stub)  # type: ignore[arg-type]
-    resp = asyncio.get_event_loop().run_until_complete(
+    resp = asyncio.run(
         svc.set_element_content("ck_1", element_id="el_1", content="world", sequence=3)
     )
     assert resp.ok
