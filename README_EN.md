@@ -16,6 +16,7 @@ A lightweight Python SDK for Feishu bot integrations, including:
 - Wiki APIs (space/node/member/search/task) and Docs content export (`docs/v1/content`)
 - Contact APIs (user/department/scope query + pagination iterators)
 - Calendar APIs (calendar/event CRUD, freebusy, CalDAV config)
+- Mail APIs (user mailboxes, mail groups, public mailboxes, address status, rules, event subscription)
 - Search APIs (app search, message search, doc/wiki search)
 - Official Docx convert/insert writes, block editing, and image/file replacement
 - Webhook callbacks and long connections (WebSocket)
@@ -126,6 +127,14 @@ feishu calendar list-calendars --page-size 50 --format json
 feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json
 feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
 
+# 11.1) Mail APIs
+feishu mail address query-status --email ops@example.com --email alerts@example.com --format json
+feishu mail message list --user-mailbox-id me --folder-id INBOX --all --format json
+feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "Daily Report" --markdown-file ./report.md --format json
+feishu mail mailbox alias create --user-mailbox-id me --email-alias alias@example.com --format json
+feishu mail group create --mailgroup-json '{"email":"ops@example.com","name":"Ops Group"}' --format json
+feishu mail public-mailbox member batch-create --public-mailbox-id support@example.com --items-file ./members.json --format json
+
 # 12) Parse webhook envelope
 feishu webhook parse --body-file ./webhook.json --format json
 
@@ -165,6 +174,7 @@ cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --fo
 - Contact: [`docs/en/12-contact.md`](./docs/en/12-contact.md)
 - Search: [`docs/en/13-search.md`](./docs/en/13-search.md)
 - Cloud doc workflows: [`docs/en/14-cloud-doc-workflows.md`](./docs/en/14-cloud-doc-workflows.md)
+- Mail: [`docs/en/15-mail.md`](./docs/en/15-mail.md)
 
 ## Response Model (Important)
 
@@ -433,6 +443,39 @@ docs = search.search_doc_wiki("weekly report", doc_filter={"only_title": True}, 
 print(docs.res_units)
 ```
 
+## Mail
+
+```python
+from feishu_bot_sdk import (
+    MailAddressService,
+    MailGroupService,
+    MailMessageService,
+    PublicMailboxService,
+)
+
+address = MailAddressService(client)
+print(address.query_status(["ops@example.com"]).user_list)
+
+message = MailMessageService(client)
+inbox = message.list_messages("me", folder_id="INBOX", page_size=20)
+print(inbox.items)
+
+message.send_markdown(
+    "me",
+    subject="Daily Report",
+    to=["user@example.com"],
+    markdown="# Daily Report\n\nTask completed\n\n![Diagram](https://cdn.example.com/diagram.png)",
+)
+
+group = MailGroupService(client)
+created = group.create_mailgroup({"email": "ops@example.com", "name": "Ops Group"})
+print(created.mailgroup_id)
+
+public = PublicMailboxService(client)
+mailboxes = public.list_public_mailboxes(page_size=20)
+print(mailboxes.items)
+```
+
 ## Main Objects
 
 - `FeishuClient` / `AsyncFeishuClient`: base Feishu API client
@@ -445,6 +488,9 @@ print(docs.res_units)
 - `ChatService` / `AsyncChatService`: chats, announcements, members/managers, menu, and chat tabs
 - `CalendarService` / `AsyncCalendarService`: calendars, events, freebusy, and CalDAV config
 - `ContactService` / `AsyncContactService`: contact users, departments, and scopes
+- `MailMailboxService` / `AsyncMailMailboxService`, `MailMessageService` / `AsyncMailMessageService`, `MailFolderService` / `AsyncMailFolderService`, `MailContactService` / `AsyncMailContactService`, `MailRuleService` / `AsyncMailRuleService`, `MailEventService` / `AsyncMailEventService`, `MailAddressService` / `AsyncMailAddressService`: user mailboxes, messages, folders, contacts, rules, event subscription, and address status
+- `MailGroupService` / `AsyncMailGroupService`, `MailGroupAliasService` / `AsyncMailGroupAliasService`, `MailGroupMemberService` / `AsyncMailGroupMemberService`, `MailGroupPermissionMemberService` / `AsyncMailGroupPermissionMemberService`, `MailGroupManagerService` / `AsyncMailGroupManagerService`: mail groups, aliases, members, permission members, and managers
+- `PublicMailboxService` / `AsyncPublicMailboxService`, `PublicMailboxAliasService` / `AsyncPublicMailboxAliasService`, `PublicMailboxMemberService` / `AsyncPublicMailboxMemberService`: public mailboxes, aliases, and members
 - `SearchService` / `AsyncSearchService`: app, message, and doc/wiki search
 - `MessageService` / `AsyncMessageService`: message management
 - `CardKitService` / `AsyncCardKitService`: CardKit card entity create, streaming update, settings

@@ -16,6 +16,7 @@
 - Wiki 知识库（space/node/member/search/task）与云文档内容导出（`docs/v1/content`）
 - 通讯录能力（用户/部门/授权范围查询 + 分页迭代）
 - 日历能力（日历 CRUD、日程 CRUD、忙闲查询、CalDAV 配置）
+- 邮箱能力（用户邮箱、邮件组、公共邮箱、地址状态、规则、事件订阅）
 - 搜索能力（应用搜索、消息搜索、文档/Wiki 搜索）
 - 云文档官方 convert/insert 写入、块级编辑、图片/附件替换
 - 事件回调（Webhook）与长连接（WebSocket）
@@ -126,6 +127,14 @@ feishu calendar list-calendars --page-size 50 --format json
 feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json
 feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
 
+# 11.1) 邮箱能力
+feishu mail address query-status --email ops@example.com --email alerts@example.com --format json
+feishu mail message list --user-mailbox-id me --folder-id INBOX --all --format json
+feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
+feishu mail mailbox alias create --user-mailbox-id me --email-alias alias@example.com --format json
+feishu mail group create --mailgroup-json '{"email":"ops@example.com","name":"Ops Group"}' --format json
+feishu mail public-mailbox member batch-create --public-mailbox-id support@example.com --items-file ./members.json --format json
+
 # 12) 解析 webhook 事件信封
 feishu webhook parse --body-file ./webhook.json --format json
 
@@ -165,6 +174,7 @@ cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --fo
 - 通讯录（Contact）：[`docs/zh/12-contact.md`](./docs/zh/12-contact.md)
 - 搜索（Search）：[`docs/zh/13-search.md`](./docs/zh/13-search.md)
 - 云文档工作流速查：[`docs/zh/14-cloud-doc-workflows.md`](./docs/zh/14-cloud-doc-workflows.md)
+- 邮箱（Mail）：[`docs/zh/15-mail.md`](./docs/zh/15-mail.md)
 
 ## 响应模型（重要）
 
@@ -433,6 +443,39 @@ docs = search.search_doc_wiki("项目周报", doc_filter={"only_title": True}, p
 print(docs.res_units)
 ```
 
+## 邮箱（Mail）
+
+```python
+from feishu_bot_sdk import (
+    MailAddressService,
+    MailGroupService,
+    MailMessageService,
+    PublicMailboxService,
+)
+
+address = MailAddressService(client)
+print(address.query_status(["ops@example.com"]).user_list)
+
+message = MailMessageService(client)
+inbox = message.list_messages("me", folder_id="INBOX", page_size=20)
+print(inbox.items)
+
+message.send_markdown(
+    "me",
+    subject="日报",
+    to=["user@example.com"],
+    markdown="# 日报\n\n任务已完成\n\n![架构图](https://cdn.example.com/diagram.png)",
+)
+
+group = MailGroupService(client)
+created = group.create_mailgroup({"email": "ops@example.com", "name": "Ops Group"})
+print(created.mailgroup_id)
+
+public = PublicMailboxService(client)
+mailboxes = public.list_public_mailboxes(page_size=20)
+print(mailboxes.items)
+```
+
 ## 核心对象
 
 - `FeishuClient` / `AsyncFeishuClient`：飞书 API 基础客户端
@@ -445,6 +488,9 @@ print(docs.res_units)
 - `ChatService` / `AsyncChatService`：群组、群公告、成员/管理员、群菜单、会话标签页
 - `CalendarService` / `AsyncCalendarService`：日历、日程、忙闲和 CalDAV 配置
 - `ContactService` / `AsyncContactService`：通讯录用户、部门、授权范围
+- `MailMailboxService` / `AsyncMailMailboxService`、`MailMessageService` / `AsyncMailMessageService`、`MailFolderService` / `AsyncMailFolderService`、`MailContactService` / `AsyncMailContactService`、`MailRuleService` / `AsyncMailRuleService`、`MailEventService` / `AsyncMailEventService`、`MailAddressService` / `AsyncMailAddressService`：用户邮箱、邮件、文件夹、联系人、规则、事件订阅、地址状态
+- `MailGroupService` / `AsyncMailGroupService`、`MailGroupAliasService` / `AsyncMailGroupAliasService`、`MailGroupMemberService` / `AsyncMailGroupMemberService`、`MailGroupPermissionMemberService` / `AsyncMailGroupPermissionMemberService`、`MailGroupManagerService` / `AsyncMailGroupManagerService`：邮件组、别名、成员、权限成员、管理员
+- `PublicMailboxService` / `AsyncPublicMailboxService`、`PublicMailboxAliasService` / `AsyncPublicMailboxAliasService`、`PublicMailboxMemberService` / `AsyncPublicMailboxMemberService`：公共邮箱、别名、成员
 - `SearchService` / `AsyncSearchService`：应用、消息、文档/Wiki 搜索
 - `MessageService` / `AsyncMessageService`：消息管理
 - `CardKitService` / `AsyncCardKitService`：CardKit 卡片实体创建、流式更新、配置管理

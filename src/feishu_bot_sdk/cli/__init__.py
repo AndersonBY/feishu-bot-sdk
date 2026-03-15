@@ -17,6 +17,7 @@ from .builders import (
     _build_docx_commands,
     _build_drive_commands,
     _build_im_commands,
+    _build_mail_commands,
     _build_media_commands,
     _build_oauth_commands,
     _build_search_commands,
@@ -71,6 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
     _build_docx_commands(subparsers, shared)
     _build_drive_commands(subparsers, shared)
     _build_wiki_commands(subparsers, shared)
+    _build_mail_commands(subparsers, shared)
     _build_calendar_commands(subparsers, shared)
     _build_contact_commands(subparsers, shared)
     _build_search_commands(subparsers, shared)

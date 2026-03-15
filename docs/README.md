@@ -20,6 +20,7 @@
 - [12 通讯录（Contact）](./zh/12-contact.md)
 - [13 搜索（Search）](./zh/13-search.md)
 - [14 云文档工作流速查](./zh/14-cloud-doc-workflows.md)
+- [15 邮箱（Mail）](./zh/15-mail.md)
 
 ## 阅读建议
 
@@ -30,3 +31,4 @@
 - 如果你做日程协同，重点看 [11 日历（Calendar）](./zh/11-calendar.md)。
 - 如果你做组织架构或成员查询，重点看 [12 通讯录（Contact）](./zh/12-contact.md)。
 - 如果你要做应用/消息/文档检索，重点看 [13 搜索（Search）](./zh/13-search.md)。
+- 如果你要做用户邮箱、邮件组或公共邮箱管理，重点看 [15 邮箱（Mail）](./zh/15-mail.md)。

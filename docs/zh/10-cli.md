@@ -97,7 +97,17 @@ feishu contact scope get --page-size 100 --format json
 feishu calendar list-calendars --page-size 50 --format json
 feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json
 feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
+
+# 邮件
+feishu mail address query-status --email ops@example.com --email alerts@example.com --format json
+feishu mail message list --user-mailbox-id me --folder-id INBOX --all --format json
+feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
+feishu mail mailbox alias create --user-mailbox-id me --email-alias alias@example.com --format json
+feishu mail group create --mailgroup-json '{"email":"ops@example.com","name":"Ops Group"}' --format json
+feishu mail public-mailbox member batch-create --public-mailbox-id support@example.com --items-file ./members.json --format json
 ```
+
+`mail message send-markdown` 会自动把 Markdown 里的本地图片路径和可访问的远程图片 URL 转成内联 CID 图片，Agent 不需要先手动下载。
 
 ## User Auth（CLI 最佳实践）
 
@@ -147,6 +157,7 @@ feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path 
 ```bash
 # Markdown from stdin
 cat report.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --format json
+cat report.md | feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-stdin --format json
 
 # JSON from stdin
 echo '{"text":"hello"}' | feishu im send --receive-id ou_xxx --msg-type text --content-stdin --format json

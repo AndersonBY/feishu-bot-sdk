@@ -20,6 +20,7 @@ This directory contains module-based SDK documentation. Each module has a standa
 - [12 Contact](./en/12-contact.md)
 - [13 Search](./en/13-search.md)
 - [14 Cloud Doc Workflows](./en/14-cloud-doc-workflows.md)
+- [15 Mail](./en/15-mail.md)
 
 ## Suggested Reading Path
 
@@ -30,3 +31,4 @@ This directory contains module-based SDK documentation. Each module has a standa
 - For scheduling workflows, focus on [11 Calendar](./en/11-calendar.md).
 - For org-structure and user lookup workflows, focus on [12 Contact](./en/12-contact.md).
 - For app/message/doc discovery workflows, focus on [13 Search](./en/13-search.md).
+- For user mailbox, mail group, or public mailbox management, focus on [15 Mail](./en/15-mail.md).
