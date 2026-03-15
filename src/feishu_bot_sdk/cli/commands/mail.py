@@ -226,7 +226,7 @@ def _cmd_message_list(args: argparse.Namespace) -> Mapping[str, Any]:
         return service.list_messages(
             user_mailbox_id,
             folder_id=folder_id,
-            page_size=page_size,
+            page_size=page_size or 20,
             page_token=page_token,
             only_unread=only_unread,
         )
@@ -301,7 +301,7 @@ def _cmd_message_send_markdown(args: argparse.Namespace) -> Mapping[str, Any]:
         dedupe_key=getattr(args, "dedupe_key", None),
         head_from=head_from,
         base_dir=base_dir,
-        latex_mode=str(getattr(args, "latex_mode", "auto")),
+        latex_mode=getattr(args, "latex_mode", "auto"),  # type: ignore[arg-type]
     )
 
 
@@ -352,7 +352,7 @@ def _cmd_contact_list(args: argparse.Namespace) -> Mapping[str, Any]:
     page_size = getattr(args, "page_size", None)
     page_token = getattr(args, "page_token", None)
     if not bool(getattr(args, "all", False)):
-        return service.list_contacts(user_mailbox_id, page_size=page_size, page_token=page_token)
+        return service.list_contacts(user_mailbox_id, page_size=page_size or 20, page_token=page_token)
     return _collect_all_pages(
         lambda *, page_size, page_token: service.list_contacts(
             user_mailbox_id,
