@@ -2,12 +2,15 @@
 
 [English](../en/05-docx-and-docs.md) | [返回中文索引](../README.md)
 
-## 覆盖模块
+## 覆盖包
 
-- `feishu_bot_sdk.docx` -> `DocxService` / `AsyncDocxService`
-- `feishu_bot_sdk.docx_document` -> `DocxDocumentService` / `AsyncDocxDocumentService`
-- `feishu_bot_sdk.docx_blocks` -> `DocxBlockService` / `AsyncDocxBlockService`
-- `feishu_bot_sdk.docs_content` -> `DocContentService` / `AsyncDocContentService`
+- `feishu_bot_sdk.docx` 统一导出：
+  `DocxService` / `AsyncDocxService`、
+  `DocxDocumentService` / `AsyncDocxDocumentService`、
+  `DocxBlockService` / `AsyncDocxBlockService`、
+  `DocContentService` / `AsyncDocContentService`
+- 包内按职责拆分为 `service` / `document` / `blocks` / `content`
+- 日常使用建议直接从 `feishu_bot_sdk.docx` 导入，不需要记内部文件名
 
 ## 推荐写法
 
@@ -21,7 +24,8 @@
 ## 快速示例
 
 ```python
-from feishu_bot_sdk import FeishuClient, FeishuConfig, DocxService
+from feishu_bot_sdk import FeishuClient, FeishuConfig
+from feishu_bot_sdk.docx import DocxService
 
 client = FeishuClient(
     FeishuConfig(

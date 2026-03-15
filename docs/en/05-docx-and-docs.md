@@ -2,12 +2,15 @@
 
 [中文](../zh/05-docx-and-docs.md) | [Back to English Index](../README_EN.md)
 
-## Covered Modules
+## Covered Package
 
-- `feishu_bot_sdk.docx` -> `DocxService` / `AsyncDocxService`
-- `feishu_bot_sdk.docx_document` -> `DocxDocumentService` / `AsyncDocxDocumentService`
-- `feishu_bot_sdk.docx_blocks` -> `DocxBlockService` / `AsyncDocxBlockService`
-- `feishu_bot_sdk.docs_content` -> `DocContentService` / `AsyncDocContentService`
+- `feishu_bot_sdk.docx` re-exports:
+  `DocxService` / `AsyncDocxService`,
+  `DocxDocumentService` / `AsyncDocxDocumentService`,
+  `DocxBlockService` / `AsyncDocxBlockService`,
+  `DocContentService` / `AsyncDocContentService`
+- Internally the package is organized as `service` / `document` / `blocks` / `content`
+- For normal usage, import from `feishu_bot_sdk.docx` and ignore the internal file layout
 
 ## Recommended Split
 
@@ -21,7 +24,8 @@ Treat Docx workflows as two separate concerns:
 ## Quick Example
 
 ```python
-from feishu_bot_sdk import FeishuClient, FeishuConfig, DocxService
+from feishu_bot_sdk import FeishuClient, FeishuConfig
+from feishu_bot_sdk.docx import DocxService
 
 client = FeishuClient(
     FeishuConfig(

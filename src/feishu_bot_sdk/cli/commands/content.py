@@ -6,12 +6,8 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from ...bitable import BitableService
-from ...docs_content import DocContentService
-from ...docx import DocxService
-from ...docx_blocks import DocxBlockService
-from ...docx_document import DocxDocumentService
-from ...drive_files import DriveFileService
-from ...drive_permissions import DrivePermissionService
+from ...docx import DocContentService, DocxBlockService, DocxDocumentService, DocxService
+from ...drive import DriveFileService, DrivePermissionService
 from ...wiki import WikiService
 
 from ..runtime import _build_client, _parse_json_array, _parse_json_object, _resolve_text_input

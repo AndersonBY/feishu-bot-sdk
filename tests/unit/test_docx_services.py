@@ -2,9 +2,13 @@ import asyncio
 from types import SimpleNamespace
 from typing import Any, Mapping, Optional, cast
 
-from feishu_bot_sdk.docx import DocxService
-from feishu_bot_sdk.docx_blocks import AsyncDocxBlockService, DocxBlockService
-from feishu_bot_sdk.docx_document import AsyncDocxDocumentService, DocxDocumentService
+from feishu_bot_sdk.docx import (
+    AsyncDocxBlockService,
+    AsyncDocxDocumentService,
+    DocxBlockService,
+    DocxDocumentService,
+    DocxService,
+)
 from feishu_bot_sdk.feishu import AsyncFeishuClient, FeishuClient
 
 
@@ -246,9 +250,9 @@ def test_docx_service_insert_content_uses_convert_insert_and_replace_image(monke
         uploaded["content_type"] = content_type
         return {"file_token": "file_img_1"}
 
-    monkeypatch.setattr("feishu_bot_sdk.drive_files.DriveFileService.upload_media_bytes", fake_upload_media_bytes)
+    monkeypatch.setattr("feishu_bot_sdk.drive.DriveFileService.upload_media_bytes", fake_upload_media_bytes)
     monkeypatch.setattr(
-        "feishu_bot_sdk.docx._download_binary",
+        "feishu_bot_sdk.docx.service._download_binary",
         lambda url: SimpleNamespace(content=b"img-bytes", file_name="a.png", content_type="image/png"),
     )
 

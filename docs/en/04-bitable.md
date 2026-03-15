@@ -2,9 +2,11 @@
 
 [中文](../zh/04-bitable.md) | [Back to English Index](../README_EN.md)
 
-## Covered Module
+## Covered Package
 
-- `feishu_bot_sdk.bitable` -> `BitableService` / `AsyncBitableService`
+- `feishu_bot_sdk.bitable` re-exports `BitableService` / `AsyncBitableService`
+- Internally the package is organized as `sync` / `async_` / `_csv` / `_common`
+- For normal usage, import from `feishu_bot_sdk.bitable` and ignore the internal file layout
 
 ## Quick Example
 

@@ -54,6 +54,14 @@ feishu im push-follow-up om_xxx --follow-ups-json '[{"content":"continue"}]' --f
 feishu im forward-thread omt_xxx --receive-id-type chat_id --receive-id oc_xxx --format json
 feishu im update-url-previews --preview-token token_1 --preview-token token_2 --open-id ou_xxx --format json
 
+# chats and announcements
+feishu chat list --all --format json
+feishu chat create --chat-json '{"name":"Ops War Room","owner_id":"ou_xxx","user_id_list":["ou_xxx"],"chat_mode":"group","chat_type":"private"}' --user-id-type open_id --format json
+feishu group member add --chat-id oc_xxx --member-id ou_xxx --member-id-type open_id --format json
+feishu chat announcement get --chat-id oc_xxx --format json
+feishu chat announcement list-blocks --chat-id oc_xxx --revision-id -1 --all --format json
+feishu chat announcement batch-update --chat-id oc_xxx --requests-json '[{"update_text_elements":{"block_id":"doxxx","elements":[]}}]' --revision-id -1 --client-token token_1 --format json
+
 # file and docs
 feishu media upload-file ./final.csv --format json
 feishu media download-file file_xxx ./downloads/file.bin --format json
@@ -107,6 +115,9 @@ Automatic behavior:
 
 ## Content Commands (Agent Tips)
 
+- For announcements, start with `chat announcement get` to inspect `announcement_type` and `revision_id`, then continue with `list-blocks`, `get-block`, or `list-children`
+- For announcement edits, prefer `chat announcement batch-update`; use `create-children` to append blocks and `delete-children` to remove ranges
+- For member management, `feishu group member ...` is an alias of `feishu chat member ...`, which is often easier for agents to infer from plain-language prompts
 - Prefer `--all` for paged queries: `bitable list-records`, `wiki list-spaces`, `wiki search-nodes`, `wiki list-nodes`
 - `docx list-blocks`, `docx list-children`, `drive view-records`, and `drive version-list` also support `--all`
 - `bitable list-records` now supports `--view-id`, `--filter`, `--sort`, `--field-names`, and `--text-field-as-array`

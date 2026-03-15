@@ -9,14 +9,18 @@ from urllib.parse import urlparse
 
 import httpx
 
-from .docs_content import AsyncDocContentService, DocContentService
-from .docx_blocks import AsyncDocxBlockService, DocxBlockService
-from .docx_document import AsyncDocxDocumentService, DocxDocumentService
-from .drive_acl import AsyncDrivePermissionService, DrivePermissionService
-from .drive_files import AsyncDriveFileService, DriveFileService
-from .exceptions import FeishuError
-from .feishu import AsyncFeishuClient, FeishuClient
-from .types import DriveResourceType, MemberIdType
+from ..drive import (
+    AsyncDriveFileService,
+    AsyncDrivePermissionService,
+    DriveFileService,
+    DrivePermissionService,
+)
+from ..exceptions import FeishuError
+from ..feishu import AsyncFeishuClient, FeishuClient
+from ..types import DriveResourceType, MemberIdType
+from .blocks import AsyncDocxBlockService, DocxBlockService
+from .content import AsyncDocContentService, DocContentService
+from .document import AsyncDocxDocumentService, DocxDocumentService
 
 
 _INSERT_BATCH_LIMIT = 1000

@@ -6,6 +6,8 @@
 
 - 飞书 access token 获取与缓存（`tenant` / `user` 双模式）
 - IM 消息能力（发送/回复/编辑/撤回/转发/合并转发/reaction/pin/批量/加急/卡片）
+- 群组管理（建群、查群、搜索、成员/管理员、发言权限、置顶消息、会话标签页、群菜单）
+- 新版块式群公告（元数据、block 列表/子块读取、批量更新、插入、删除）
 - CardKit 卡片实体（创建/流式更新/streaming_mode/配置更新）与卡片回调响应构造
 - 图片、文件、消息资源上传下载
 - 云空间文件/素材上传下载、导入导出任务
@@ -75,6 +77,14 @@ feishu im push-follow-up om_xxx --follow-ups-json '[{"content":"继续处理"}]'
 feishu im forward-thread omt_xxx --receive-id-type chat_id --receive-id oc_xxx --format json
 feishu im update-url-previews --preview-token token_1 --preview-token token_2 --open-id ou_xxx --format json
 
+# 3.2) 群组与群公告
+feishu chat list --all --format json
+feishu chat create --chat-json '{"name":"Ops War Room","owner_id":"ou_xxx","user_id_list":["ou_xxx"],"chat_mode":"group","chat_type":"private"}' --user-id-type open_id --format json
+feishu group member add --chat-id oc_xxx --member-id ou_xxx --member-id-type open_id --format json
+feishu chat announcement get --chat-id oc_xxx --format json
+feishu chat announcement list-blocks --chat-id oc_xxx --revision-id -1 --all --format json
+feishu chat announcement batch-update --chat-id oc_xxx --requests-json '[{"update_text_elements":{"block_id":"doxxx","elements":[]}}]' --revision-id -1 --client-token token_1 --format json
+
 # 4) 回复 Markdown（JSON 输出）
 feishu im reply-markdown om_xxx --markdown "### 已收到" --format json
 
@@ -142,7 +152,7 @@ cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --fo
 - 文档索引（中文）：[`docs/README.md`](./docs/README.md)
 - 文档索引（英文）：[`docs/README_EN.md`](./docs/README_EN.md)
 - 核心客户端与配置：[`docs/zh/01-core-client.md`](./docs/zh/01-core-client.md)
-- IM 消息与媒体：[`docs/zh/02-im.md`](./docs/zh/02-im.md)
+- IM 消息、群组与媒体：[`docs/zh/02-im.md`](./docs/zh/02-im.md)
 - Drive 文件与权限：[`docs/zh/03-drive.md`](./docs/zh/03-drive.md)
 - 多维表格（Bitable）：[`docs/zh/04-bitable.md`](./docs/zh/04-bitable.md)
 - 云文档（Docx/Docs Content）：[`docs/zh/05-docx-and-docs.md`](./docs/zh/05-docx-and-docs.md)
@@ -231,7 +241,7 @@ app_token, app_url = await bitable.create_from_csv("final.csv", "异步结果", 
 await client.aclose()
 ```
 
-## IM 消息与媒体
+## IM 消息、群组与媒体
 
 ```python
 from feishu_bot_sdk import FeishuClient, FeishuConfig, MediaService, MessageService
@@ -253,6 +263,15 @@ message.send_markdown(
     receive_id="ou_xxx",
     markdown="### 日报\n\n任务完成",
 )
+```
+
+```python
+from feishu_bot_sdk import ChatService
+
+chat = ChatService(client)
+announcement = chat.get_announcement("oc_xxx", user_id_type="open_id")
+blocks = chat.list_announcement_blocks("oc_xxx", revision_id=-1, page_size=20)
+print(announcement.get("announcement_type"), len(blocks.items))
 ```
 
 ## IM 高级能力
@@ -355,6 +374,23 @@ markdown = docs.get_markdown("doccn_xxx")
 print(markdown[:200])
 ```
 
+## 群组（Chat）
+
+```python
+from feishu_bot_sdk import ChatService
+
+chat = ChatService(client)
+
+groups = chat.list_chats(user_id_type="open_id", page_size=10)
+print(groups.items)
+
+announcement = chat.get_announcement("oc_xxx", user_id_type="open_id")
+print(announcement.get("announcement_type"), announcement.get("revision_id"))
+
+blocks = chat.list_announcement_blocks("oc_xxx", revision_id=-1, page_size=20)
+print(blocks.items)
+```
+
 ## 日历（Calendar）
 
 ```python
@@ -406,6 +442,7 @@ print(docs.res_units)
 - `DocxBlockService` / `AsyncDocxBlockService`：块 CRUD、批量更新与内容转换
 - `DriveFileService` / `AsyncDriveFileService`：云空间文件、导入导出、素材接口
 - `DrivePermissionService` / `AsyncDrivePermissionService`：成员、公开设置、密码与 owner transfer
+- `ChatService` / `AsyncChatService`：群组、群公告、成员/管理员、群菜单、会话标签页
 - `CalendarService` / `AsyncCalendarService`：日历、日程、忙闲和 CalDAV 配置
 - `ContactService` / `AsyncContactService`：通讯录用户、部门、授权范围
 - `SearchService` / `AsyncSearchService`：应用、消息、文档/Wiki 搜索

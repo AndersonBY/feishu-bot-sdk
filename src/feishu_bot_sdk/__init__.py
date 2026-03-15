@@ -1,6 +1,7 @@
 from .bitable import AsyncBitableService, BitableService
 from .bot import AsyncBotService, BotInfo, BotInfoResponse, BotService
 from .calendar import AsyncCalendarService, CalendarService
+from .chat import AsyncChatService, ChatService
 from .callbacks import CardCallbackResponse
 from .cardkit import (
     AsyncCardKitService,
@@ -10,12 +11,17 @@ from .cardkit import (
 )
 from .config import FeishuConfig
 from .contact import AsyncContactService, ContactService
-from .docs_content import AsyncDocContentService, DocContentService
-from .docx_blocks import AsyncDocxBlockService, DocxBlockService
-from .docx_document import AsyncDocxDocumentService, DocxDocumentService
-from .docx import AsyncDocxService, DocxService
-from .drive_files import AsyncDriveFileService, DriveFileService
-from .drive_permissions import AsyncDrivePermissionService, DrivePermissionService
+from .docx import (
+    AsyncDocContentService,
+    AsyncDocxBlockService,
+    AsyncDocxDocumentService,
+    AsyncDocxService,
+    DocContentService,
+    DocxBlockService,
+    DocxDocumentService,
+    DocxService,
+)
+from .drive import AsyncDriveFileService, AsyncDrivePermissionService, DriveFileService, DrivePermissionService
 from .exceptions import (
     ConfigurationError,
     FeishuError,
@@ -104,6 +110,7 @@ __all__ = [
     "AsyncBitableService",
     "AsyncBotService",
     "AsyncCalendarService",
+    "AsyncChatService",
     "AsyncContactService",
     "AsyncDocxService",
     "AsyncDocxBlockService",
@@ -128,6 +135,7 @@ __all__ = [
     "BotInfo",
     "BotInfoResponse",
     "CalendarService",
+    "ChatService",
     "CardCallbackResponse",
     "CardKitCreateResponse",
     "CardKitResponse",

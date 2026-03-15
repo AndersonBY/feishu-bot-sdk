@@ -2,15 +2,19 @@
 
 [中文](../zh/03-drive.md) | [Back to English Index](../README_EN.md)
 
-## Covered Modules
+## Covered Package
 
-- `feishu_bot_sdk.drive_files` -> `DriveFileService` / `AsyncDriveFileService`
-- `feishu_bot_sdk.drive_permissions` -> `DrivePermissionService` / `AsyncDrivePermissionService`
+- `feishu_bot_sdk.drive` re-exports:
+  `DriveFileService` / `AsyncDriveFileService`,
+  `DrivePermissionService` / `AsyncDrivePermissionService`
+- Internally the package is organized as `files` / `permissions`
+- For normal usage, import from `feishu_bot_sdk.drive` and ignore the internal file layout
 
 ## Quick Example
 
 ```python
-from feishu_bot_sdk import FeishuClient, FeishuConfig, DriveFileService
+from feishu_bot_sdk import FeishuClient, FeishuConfig
+from feishu_bot_sdk.drive import DriveFileService
 
 client = FeishuClient(FeishuConfig(app_id="cli_xxx", app_secret="xxx"))
 drive = DriveFileService(client)

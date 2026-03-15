@@ -1,15 +1,7 @@
 from typing import Any, Mapping, Optional
 
-from .feishu import AsyncFeishuClient, FeishuClient
-from .response import DataResponse
-
-
-def _drop_none(params: Mapping[str, object]) -> dict[str, object]:
-    return {key: value for key, value in params.items() if value is not None}
-
-
-def _unwrap_data(response: Mapping[str, Any]) -> DataResponse:
-    return DataResponse.from_raw(response)
+from ..feishu import AsyncFeishuClient, FeishuClient
+from ._common import _drop_none, _unwrap_data
 
 
 def _extract_content(data: Mapping[str, Any]) -> str:

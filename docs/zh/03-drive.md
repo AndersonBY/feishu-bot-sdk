@@ -2,15 +2,19 @@
 
 [English](../en/03-drive.md) | [返回中文索引](../README.md)
 
-## 覆盖模块
+## 覆盖包
 
-- `feishu_bot_sdk.drive_files` -> `DriveFileService` / `AsyncDriveFileService`
-- `feishu_bot_sdk.drive_permissions` -> `DrivePermissionService` / `AsyncDrivePermissionService`
+- `feishu_bot_sdk.drive` 统一导出：
+  `DriveFileService` / `AsyncDriveFileService`、
+  `DrivePermissionService` / `AsyncDrivePermissionService`
+- 包内按职责拆分为 `files` / `permissions`
+- 日常使用建议直接从 `feishu_bot_sdk.drive` 导入，不需要记内部文件名
 
 ## 快速示例
 
 ```python
-from feishu_bot_sdk import FeishuClient, FeishuConfig, DriveFileService
+from feishu_bot_sdk import FeishuClient, FeishuConfig
+from feishu_bot_sdk.drive import DriveFileService
 
 client = FeishuClient(FeishuConfig(app_id="cli_xxx", app_secret="xxx"))
 drive = DriveFileService(client)

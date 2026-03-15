@@ -5,7 +5,7 @@ from typing import Any, Callable, Mapping, Optional
 
 from ...calendar import CalendarService
 from ...contact import ContactService
-from ...drive_files import DriveFileService
+from ...drive import DriveFileService
 
 from ..runtime import (
     _build_client,

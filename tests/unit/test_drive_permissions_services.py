@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any, Mapping, Optional, cast
 
-from feishu_bot_sdk.drive_permissions import AsyncDrivePermissionService, DrivePermissionService
+from feishu_bot_sdk.drive import AsyncDrivePermissionService, DrivePermissionService
 from feishu_bot_sdk.exceptions import FeishuError
 from feishu_bot_sdk.feishu import AsyncFeishuClient, FeishuClient
 

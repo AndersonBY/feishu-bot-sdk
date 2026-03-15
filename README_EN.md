@@ -6,6 +6,8 @@ A lightweight Python SDK for Feishu bot integrations, including:
 
 - Access token retrieval and caching for both `tenant` and `user` modes
 - IM messaging (send/reply/edit/recall/forward/merge-forward/reaction/pin/batch/urgent/cards)
+- Chat management (create/get/search/list chats, members/managers, moderation, top notice, tabs, and menu)
+- Block-based announcements (metadata, block listing/children traversal, batch update, insert, delete)
 - CardKit card entities (create/streaming update/streaming_mode/settings) and card callback response helpers
 - Image/file/message-resource upload and download
 - Drive file/media upload & download with import/export tasks
@@ -75,6 +77,14 @@ feishu im push-follow-up om_xxx --follow-ups-json '[{"content":"continue"}]' --f
 feishu im forward-thread omt_xxx --receive-id-type chat_id --receive-id oc_xxx --format json
 feishu im update-url-previews --preview-token token_1 --preview-token token_2 --open-id ou_xxx --format json
 
+# 3.2) Chats and announcements
+feishu chat list --all --format json
+feishu chat create --chat-json '{"name":"Ops War Room","owner_id":"ou_xxx","user_id_list":["ou_xxx"],"chat_mode":"group","chat_type":"private"}' --user-id-type open_id --format json
+feishu group member add --chat-id oc_xxx --member-id ou_xxx --member-id-type open_id --format json
+feishu chat announcement get --chat-id oc_xxx --format json
+feishu chat announcement list-blocks --chat-id oc_xxx --revision-id -1 --all --format json
+feishu chat announcement batch-update --chat-id oc_xxx --requests-json '[{"update_text_elements":{"block_id":"doxxx","elements":[]}}]' --revision-id -1 --client-token token_1 --format json
+
 # 4) Reply markdown (JSON output)
 feishu im reply-markdown om_xxx --markdown "### received" --format json
 
@@ -142,7 +152,7 @@ cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --fo
 - Docs index (Chinese): [`docs/README.md`](./docs/README.md)
 - Docs index (English): [`docs/README_EN.md`](./docs/README_EN.md)
 - Core client and config: [`docs/en/01-core-client.md`](./docs/en/01-core-client.md)
-- IM messaging and media: [`docs/en/02-im.md`](./docs/en/02-im.md)
+- IM messaging, chats, and media: [`docs/en/02-im.md`](./docs/en/02-im.md)
 - Drive files and permissions: [`docs/en/03-drive.md`](./docs/en/03-drive.md)
 - Bitable: [`docs/en/04-bitable.md`](./docs/en/04-bitable.md)
 - Docx and Docs content: [`docs/en/05-docx-and-docs.md`](./docs/en/05-docx-and-docs.md)
@@ -231,7 +241,7 @@ app_token, app_url = await bitable.create_from_csv("final.csv", "Async Result", 
 await client.aclose()
 ```
 
-## IM Message and Media
+## IM Messaging, Chats, and Media
 
 ```python
 from feishu_bot_sdk import FeishuClient, FeishuConfig, MediaService, MessageService
@@ -253,6 +263,15 @@ message.send_markdown(
     receive_id="ou_xxx",
     markdown="### Daily Report\n\nTask done",
 )
+```
+
+```python
+from feishu_bot_sdk import ChatService
+
+chat = ChatService(client)
+announcement = chat.get_announcement("oc_xxx", user_id_type="open_id")
+blocks = chat.list_announcement_blocks("oc_xxx", revision_id=-1, page_size=20)
+print(announcement.get("announcement_type"), len(blocks.items))
 ```
 
 ## Advanced IM Features
@@ -355,6 +374,23 @@ markdown = docs.get_markdown("doccn_xxx")
 print(markdown[:200])
 ```
 
+## Chats
+
+```python
+from feishu_bot_sdk import ChatService
+
+chat = ChatService(client)
+
+groups = chat.list_chats(user_id_type="open_id", page_size=10)
+print(groups.items)
+
+announcement = chat.get_announcement("oc_xxx", user_id_type="open_id")
+print(announcement.get("announcement_type"), announcement.get("revision_id"))
+
+blocks = chat.list_announcement_blocks("oc_xxx", revision_id=-1, page_size=20)
+print(blocks.items)
+```
+
 ## Calendar
 
 ```python
@@ -406,6 +442,7 @@ print(docs.res_units)
 - `DocxBlockService` / `AsyncDocxBlockService`: block CRUD, batch update, and content convert
 - `DriveFileService` / `AsyncDriveFileService`: drive files, import/export, and media APIs
 - `DrivePermissionService` / `AsyncDrivePermissionService`: members, public settings, password, and owner transfer
+- `ChatService` / `AsyncChatService`: chats, announcements, members/managers, menu, and chat tabs
 - `CalendarService` / `AsyncCalendarService`: calendars, events, freebusy, and CalDAV config
 - `ContactService` / `AsyncContactService`: contact users, departments, and scopes
 - `SearchService` / `AsyncSearchService`: app, message, and doc/wiki search

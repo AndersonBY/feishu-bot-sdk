@@ -20,7 +20,7 @@ import pytest
 from feishu_bot_sdk.bitable import BitableService
 from feishu_bot_sdk.calendar import CalendarService
 from feishu_bot_sdk.config import FeishuConfig
-from feishu_bot_sdk.drive_files import DriveFileService
+from feishu_bot_sdk.drive import DriveFileService
 from feishu_bot_sdk.exceptions import ConfigurationError, HTTPRequestError
 from feishu_bot_sdk.feishu import FeishuClient
 from feishu_bot_sdk.sheets import SheetsService

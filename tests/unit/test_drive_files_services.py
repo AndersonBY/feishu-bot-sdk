@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, Mapping, Optional, cast
 
-from feishu_bot_sdk.drive_files import AsyncDriveFileService, DriveFileService
+from feishu_bot_sdk.drive import AsyncDriveFileService, DriveFileService
 from feishu_bot_sdk.feishu import AsyncFeishuClient, FeishuClient
 
 

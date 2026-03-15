@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any, Mapping, Optional, cast
 
-from feishu_bot_sdk.docs_content import AsyncDocContentService, DocContentService
+from feishu_bot_sdk.docx import AsyncDocContentService, DocContentService
 from feishu_bot_sdk.feishu import AsyncFeishuClient, FeishuClient
 from feishu_bot_sdk.wiki import AsyncWikiService, WikiService
 

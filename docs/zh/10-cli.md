@@ -54,6 +54,14 @@ feishu im push-follow-up om_xxx --follow-ups-json '[{"content":"继续处理"}]'
 feishu im forward-thread omt_xxx --receive-id-type chat_id --receive-id oc_xxx --format json
 feishu im update-url-previews --preview-token token_1 --preview-token token_2 --open-id ou_xxx --format json
 
+# 群组与群公告
+feishu chat list --all --format json
+feishu chat create --chat-json '{"name":"Ops War Room","owner_id":"ou_xxx","user_id_list":["ou_xxx"],"chat_mode":"group","chat_type":"private"}' --user-id-type open_id --format json
+feishu group member add --chat-id oc_xxx --member-id ou_xxx --member-id-type open_id --format json
+feishu chat announcement get --chat-id oc_xxx --format json
+feishu chat announcement list-blocks --chat-id oc_xxx --revision-id -1 --all --format json
+feishu chat announcement batch-update --chat-id oc_xxx --requests-json '[{"update_text_elements":{"block_id":"doxxx","elements":[]}}]' --revision-id -1 --client-token token_1 --format json
+
 # 文件与文档
 feishu media upload-file ./final.csv --format json
 feishu media download-file file_xxx ./downloads/file.bin --format json
@@ -107,6 +115,9 @@ feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path 
 
 ## 内容类命令（Agent 建议）
 
+- 群公告建议先跑 `chat announcement get`，确认当前 `announcement_type` 与 `revision_id`，再继续 `list-blocks` / `get-block` / `list-children`
+- 修改群公告时优先使用 `chat announcement batch-update`；新增块用 `create-children`，删除块用 `delete-children`
+- 群组成员管理可直接使用 `feishu group member ...`，它是 `feishu chat member ...` 的别名，适合更接近自然语言的 Agent 提示
 - 分页查询优先使用 `--all`：`bitable list-records`、`wiki list-spaces`、`wiki search-nodes`、`wiki list-nodes`
 - `docx list-blocks`、`docx list-children`、`drive view-records`、`drive version-list` 也支持 `--all`
 - `bitable list-records` 现已支持 `--view-id`、`--filter`、`--sort`、`--field-names`、`--text-field-as-array`

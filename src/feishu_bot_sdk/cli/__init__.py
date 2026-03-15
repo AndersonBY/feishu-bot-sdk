@@ -12,6 +12,7 @@ from .builders import (
     _build_bitable_commands,
     _build_bot_commands,
     _build_calendar_commands,
+    _build_chat_commands,
     _build_contact_commands,
     _build_docx_commands,
     _build_drive_commands,
@@ -63,6 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
     _build_auth_commands(subparsers, shared)
     _build_oauth_commands(subparsers, shared)
     _build_bot_commands(subparsers, shared)
+    _build_chat_commands(subparsers, shared)
     _build_im_commands(subparsers, shared)
     _build_media_commands(subparsers, shared)
     _build_bitable_commands(subparsers, shared)

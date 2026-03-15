@@ -7,7 +7,7 @@ This directory contains module-based SDK documentation. Each module has a standa
 ## Contents
 
 - [01 Core Client and Config](./en/01-core-client.md)
-- [02 IM Messaging and Media](./en/02-im.md)
+- [02 IM Messaging, Chats, and Media](./en/02-im.md)
 - [03 Drive Files and Permissions](./en/03-drive.md)
 - [04 Bitable](./en/04-bitable.md)
 - [05 Docx and Docs Content](./en/05-docx-and-docs.md)
@@ -24,7 +24,7 @@ This directory contains module-based SDK documentation. Each module has a standa
 ## Suggested Reading Path
 
 - Start with [01 Core Client and Config](./en/01-core-client.md).
-- For bot conversations, read [02 IM Messaging and Media](./en/02-im.md) and [08 FeishuBotServer](./en/08-bot-server.md).
+- For bot conversations, chat management, announcements, menus, or chat tabs, read [02 IM Messaging, Chats, and Media](./en/02-im.md) and [08 FeishuBotServer](./en/08-bot-server.md).
 - For result delivery workflows, focus on [03 Drive](./en/03-drive.md), [04 Bitable](./en/04-bitable.md), and [05 Docx/Docs Content](./en/05-docx-and-docs.md).
 - For full doc workflows such as create, partial edit, asset replacement, and version management, go straight to [14 Cloud Doc Workflows](./en/14-cloud-doc-workflows.md).
 - For scheduling workflows, focus on [11 Calendar](./en/11-calendar.md).

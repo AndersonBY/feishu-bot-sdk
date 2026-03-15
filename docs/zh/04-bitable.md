@@ -2,9 +2,11 @@
 
 [English](../en/04-bitable.md) | [返回中文索引](../README.md)
 
-## 覆盖模块
+## 覆盖包
 
-- `feishu_bot_sdk.bitable` -> `BitableService` / `AsyncBitableService`
+- `feishu_bot_sdk.bitable` 统一导出：`BitableService` / `AsyncBitableService`
+- 包内按职责拆分为 `sync` / `async_` / `_csv` / `_common`
+- 日常使用直接从 `feishu_bot_sdk.bitable` 导入即可，不需要记内部文件名
 
 ## 快速示例
 
