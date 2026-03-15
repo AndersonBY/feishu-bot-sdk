@@ -388,7 +388,7 @@ def _cmd_rule_list(args: argparse.Namespace) -> Mapping[str, Any]:
     page_size = getattr(args, "page_size", None)
     page_token = getattr(args, "page_token", None)
     if not bool(getattr(args, "all", False)):
-        return service.list_rules(user_mailbox_id, page_size=page_size, page_token=page_token)
+        return service.list_rules(user_mailbox_id, page_size=page_size or 20, page_token=page_token)
     return _collect_all_pages(
         lambda *, page_size, page_token: service.list_rules(
             user_mailbox_id,
