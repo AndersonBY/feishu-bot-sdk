@@ -5,15 +5,16 @@ description: >
   当用户需要处理任何飞书相关任务时触发此 skill，包括但不限于：
   (1) 飞书消息发送（文本、Markdown、图片、卡片），
   (2) 飞书 CardKit 卡片实体（创建、流式更新、streaming_mode、回调响应），
-  (2) 飞书云文档操作（创建、编辑、导出文档内容），
-  (3) 飞书多维表格/Bitable（创建表格、CSV导入、记录增删改查），
-  (4) 飞书云盘/Drive（文件上传下载、权限管理），
-  (5) 飞书知识库/Wiki（搜索、空间管理），
-  (6) 飞书日历/Calendar（日程创建、查询、附件），
-  (7) 飞书通讯录/Contact（用户、部门查询），
-  (8) 飞书搜索（应用、消息、文档搜索），
-  (9) 飞书机器人开发（Webhook、WebSocket 事件处理），
-  (10) 任何涉及 `feishu` CLI 命令或 `feishu_bot_sdk` Python 导入的任务。
+  (3) 飞书云文档操作（创建、编辑、导出文档内容），
+  (4) 飞书多维表格/Bitable（创建表格、CSV导入、记录增删改查），
+  (5) 飞书云盘/Drive（文件上传下载、权限管理），
+  (6) 飞书知识库/Wiki（搜索、空间管理），
+  (7) 飞书日历/Calendar（日程创建、查询、附件），
+  (8) 飞书邮箱/Mail（用户邮箱、邮件组、公共邮箱、Markdown邮件发送），
+  (9) 飞书通讯录/Contact（用户、部门查询），
+  (10) 飞书搜索（应用、消息、文档搜索），
+  (11) 飞书机器人开发（Webhook、WebSocket 事件处理），
+  (12) 任何涉及 `feishu` CLI 命令或 `feishu_bot_sdk` Python 导入的任务。
   即使用户没有明确提到 feishu-bot-sdk，只要任务涉及飞书平台的 API 操作、
   飞书文档处理、飞书数据管理、飞书自动化，都应使用此 skill。
 ---
@@ -89,6 +90,7 @@ uv tool install feishu-bot-sdk
 | `drive` | 云盘文件/权限管理 | `feishu drive upload-file report.pdf --parent-type explorer --parent-node fld_xxx` |
 | `wiki` | 知识库搜索/管理 | `feishu wiki search-nodes --query "weekly"` |
 | `calendar` | 日历/日程管理 | `feishu calendar list-calendars --format json` |
+| `mail` | 邮箱/邮件组/公共邮箱 | `feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md` |
 | `contact` | 通讯录查询 | `feishu contact user get --user-id ou_xxx --format json` |
 | `search` | 搜索应用/消息/文档 | `feishu search doc-wiki --query "report" --auth-mode user --format json` |
 | `sheets` | 电子表格操作 | `feishu sheets ...` |
@@ -178,6 +180,21 @@ msg.send_text(receive_id_type="open_id", receive_id="ou_xxx", text="hello")
 | `WikiService` | 知识库空间/节点搜索管理 |
 | `DocContentService` | 文档内容导出为 Markdown |
 | `CalendarService` | 日历/日程 CRUD、忙闲查询 |
+| `MailMailboxService` | 用户邮箱别名、回收站管理 |
+| `MailMessageService` | 邮件发送/查询/Markdown 渲染 |
+| `MailFolderService` | 邮箱文件夹管理 |
+| `MailContactService` | 邮箱联系人管理 |
+| `MailRuleService` | 收信规则管理 |
+| `MailEventService` | 邮箱事件订阅 |
+| `MailAddressService` | 邮箱地址状态查询 |
+| `MailGroupService` | 邮件组管理 |
+| `MailGroupAliasService` | 邮件组别名管理 |
+| `MailGroupMemberService` | 邮件组成员管理 |
+| `MailGroupPermissionMemberService` | 邮件组权限成员管理 |
+| `MailGroupManagerService` | 邮件组管理员管理 |
+| `PublicMailboxService` | 公共邮箱管理 |
+| `PublicMailboxAliasService` | 公共邮箱别名管理 |
+| `PublicMailboxMemberService` | 公共邮箱成员管理 |
 | `ContactService` | 用户/部门查询 |
 | `SearchService` | 应用/消息/文档搜索 |
 | `SheetsService` | 电子表格操作 |
@@ -206,12 +223,14 @@ server.run()
 
 ## Agent 使用提示
 
-- 分页查询优先用 `--all`：`bitable list-records`、`wiki list-spaces`、`wiki search-nodes`、`docx list-blocks`
+- 分页查询优先用 `--all`：`bitable list-records`、`wiki list-spaces`、`wiki search-nodes`、`docx list-blocks`、`mail message list`、`mail group list`、`mail group member list`
 - 文档写入优先用 `docx insert-content --content-type markdown`，避免手动构建 block
 - 日历附件用 `calendar attach-material`，避免权限问题
+- 邮件发送优先用 `mail message send-markdown`，自动处理 Markdown 渲染和图片内联
 - 搜索类命令（`search app/message/doc-wiki`）需要 `--auth-mode user`
 - `bitable list-records` 支持 `--view-id`、`--filter`、`--sort`、`--field-names`
 - 权限相关参数使用严格选项：`--member-id-type`、`--resource-type`、`--permission`
+- 邮箱批量操作优先用 `--*-file` 或 `--*-stdin` 传递 JSON 数组
 
 ## 关键约定
 
@@ -220,3 +239,89 @@ server.run()
 - **msg_type**: `text`、`post`、`image`、`interactive`、`file`、`audio`、`media`、`share_chat`、`share_user`、`sticker`
 - **异常体系**: `SDKError` > `ConfigurationError`、`HTTPRequestError`、`FeishuError`
 - **速率限制**: 默认开启，自适应 QPS 调节
+
+## 邮箱功能（Mail）
+
+### CLI 命令示例
+
+```bash
+# 查询邮箱地址状态
+feishu mail address query-status --email ops@example.com --email alerts@example.com --format json
+
+# 列出收件箱邮件（自动翻页）
+feishu mail message list --user-mailbox-id me --folder-id INBOX --all --format json
+
+# 从 Markdown 文件渲染 HTML 邮件并发送
+feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
+
+# 创建用户邮箱别名
+feishu mail mailbox alias create --user-mailbox-id me --email-alias alias@example.com --format json
+
+# 永久删除回收站中的用户邮箱，并转移邮件
+feishu mail mailbox delete-from-recycle-bin --user-mailbox-id old@example.com --transfer-mailbox archive@example.com --format json
+
+# 创建邮件组
+feishu mail group create --mailgroup-json '{"email":"ops@example.com","name":"Ops Group"}' --format json
+
+# 批量添加公共邮箱成员
+feishu mail public-mailbox member batch-create --public-mailbox-id support@example.com --items-file ./members.json --format json
+```
+
+### SDK 使用示例
+
+```python
+from feishu_bot_sdk import (
+    FeishuClient,
+    FeishuConfig,
+    MailAddressService,
+    MailMessageService,
+    MailGroupService,
+    render_markdown_email,
+)
+
+client = FeishuClient(FeishuConfig(app_id="cli_xxx", app_secret="xxx"))
+
+# 查询邮箱地址状态
+address = MailAddressService(client)
+status = address.query_status(["ops@example.com", "alerts@example.com"])
+print(status.user_list)
+
+# 列出收件箱邮件
+message = MailMessageService(client)
+for item in message.iter_messages("me", folder_id="INBOX", page_size=50):
+    print(item.get("subject"))
+
+# Markdown 邮件渲染（自动处理图片内联）
+rendered = render_markdown_email(
+    "# 日报\n\n![图表](./chart.png)\n\n![远程图](https://cdn.example.com/chart.png)",
+    base_dir="."
+)
+print(rendered.html[:120], len(rendered.inline_images))
+
+# 发送 Markdown 邮件
+message.send_markdown(
+    "me",
+    subject="日报",
+    to=["user@example.com"],
+    markdown="# 日报\n\n任务已完成",
+)
+
+# 创建邮件组
+group = MailGroupService(client)
+created = group.create_mailgroup({"email": "ops@example.com", "name": "Ops Group"})
+print(created.mailgroup_id)
+```
+
+### 邮箱功能要点
+
+- **用户邮箱**：别名管理、邮件发送/查询、文件夹管理、联系人管理、收信规则、事件订阅
+- **邮件组**：邮件组 CRUD、别名管理、成员管理、权限成员管理、管理员管理
+- **公共邮箱**：公共邮箱 CRUD、别名管理、成员管理
+- **Markdown 邮件**：`send-markdown` 自动渲染 HTML、处理本地/远程图片内联、生成纯文本版本
+- **图片处理**：本地图片自动转 base64 内联，远程图片自动下载后内联，失败时保留原始 URL
+- **批量操作**：成员批量添加/删除支持 `--*-file` 或 `--*-stdin` 传递 JSON 数组
+- **分页查询**：`mail message list`、`mail group list`、`mail group member list` 等支持 `--all` 自动翻页
+- **邮箱删除**：永久删除用户邮箱时可用 `--transfer-mailbox` 转移邮件；移除公共邮箱到回收站时可用 `--to-mail-address` 指定接收地址
+
+详细 API 参考见 [references/mail.md](references/mail.md)。
+
