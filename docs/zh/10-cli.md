@@ -93,6 +93,7 @@ feishu docx list-blocks --document-id doccn_xxx --all --format json
 feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
 feishu drive version-list doccn_xxx --obj-type docx --page-size 50 --all --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
+feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id me --member-id-type open_id --permission edit --auth-mode user --format json
 
 # Wiki
 feishu wiki search-nodes --query "项目周报" --all --format json

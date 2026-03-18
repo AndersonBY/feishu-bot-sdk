@@ -89,6 +89,27 @@ def _count_inserted_relations(inserted_batches: Any) -> int:
     return total
 
 
+def _resolve_member_identity(
+    args: argparse.Namespace,
+    *,
+    member_id: Any,
+    member_id_type: Any,
+) -> str:
+    normalized_member_id = str(member_id or "").strip()
+    if normalized_member_id and normalized_member_id.lower() not in {"me", "self", "current_user"}:
+        return normalized_member_id
+
+    normalized_id_type = str(member_id_type or "open_id").strip().lower() or "open_id"
+    if normalized_id_type not in {"open_id", "user_id", "union_id"}:
+        raise ValueError(f"unsupported member_id_type for current user resolution: {normalized_id_type}")
+
+    user_info = _build_client(args, force_user_auth=True).get_user_info()
+    resolved = getattr(user_info, normalized_id_type, None)
+    if isinstance(resolved, str) and resolved.strip():
+        return resolved.strip()
+    raise ValueError(f"current authenticated user does not expose {normalized_id_type}; use another --member-id-type or pass explicit --member-id")
+
+
 def _summarize_docx_insert_result(data: Mapping[str, Any], *, content: str) -> Mapping[str, Any]:
     converted = data.get("converted")
     inserted_batches = data.get("inserted_batches")
@@ -151,7 +172,11 @@ def _cmd_bitable_create_from_csv(args: argparse.Namespace) -> Mapping[str, Any]:
     if member_id:
         service.grant_edit_permission(
             app_token,
-            str(member_id),
+            _resolve_member_identity(
+                args,
+                member_id=member_id,
+                member_id_type=getattr(args, "member_id_type", None),
+            ),
             str(args.member_id_type),
         )
         granted = True
@@ -236,7 +261,11 @@ def _cmd_bitable_grant_edit(args: argparse.Namespace) -> Mapping[str, bool]:
     service = BitableService(_build_client(args))
     service.grant_edit_permission(
         str(args.app_token),
-        str(args.member_id),
+        _resolve_member_identity(
+            args,
+            member_id=getattr(args, "member_id", None),
+            member_id_type=getattr(args, "member_id_type", None),
+        ),
         str(args.member_id_type),
     )
     return {"ok": True}
@@ -269,7 +298,10 @@ def _cmd_bitable_list_views(args: argparse.Namespace) -> Mapping[str, Any]:
         return service.list_views(str(args.app_token), str(args.table_id), page_size=page_size, page_token=page_token)
     return _collect_all_pages(
         lambda *, page_size, page_token: service.list_views(
-            str(args.app_token), str(args.table_id), page_size=page_size, page_token=page_token,
+            str(args.app_token),
+            str(args.table_id),
+            page_size=page_size,
+            page_token=page_token,
         ),
         page_size=page_size,
         page_token=page_token,
@@ -635,7 +667,11 @@ def _cmd_docx_grant_edit(args: argparse.Namespace) -> Mapping[str, bool]:
     service = DocxService(_build_client(args))
     service.grant_edit_permission(
         str(args.document_id),
-        str(args.member_id),
+        _resolve_member_identity(
+            args,
+            member_id=getattr(args, "member_id", None),
+            member_id_type=getattr(args, "member_id_type", None),
+        ),
         str(args.member_id_type),
     )
     return {"ok": True}
@@ -861,7 +897,11 @@ def _cmd_drive_grant_edit(args: argparse.Namespace) -> Mapping[str, bool]:
     service = DrivePermissionService(_build_client(args))
     service.grant_edit_permission(
         str(args.token),
-        str(args.member_id),
+        _resolve_member_identity(
+            args,
+            member_id=getattr(args, "member_id", None),
+            member_id_type=getattr(args, "member_id_type", None),
+        ),
         str(args.member_id_type),
         resource_type=str(args.resource_type),
         permission=str(args.permission),

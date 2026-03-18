@@ -140,12 +140,15 @@ def _build_bitable_commands(
     create_from_csv.add_argument("csv_path", help="CSV file path")
     create_from_csv.add_argument("--app-name", required=True, help="Bitable app name")
     create_from_csv.add_argument("--table-name", required=True, help="Bitable table name")
-    create_from_csv.add_argument("--grant-member-id", help="Optional member id to grant permission")
+    create_from_csv.add_argument(
+        "--grant-member-id",
+        help="Optional member id to grant permission; use `me` in user-auth mode to target the current authenticated user",
+    )
     create_from_csv.add_argument(
         "--member-id-type",
         default="open_id",
         choices=_ID_TYPE_CHOICES,
-        help="open_id/user_id/union_id (default: open_id)",
+        help="open_id/user_id/union_id (default: open_id); also controls how `--grant-member-id me` is resolved",
     )
     create_from_csv.set_defaults(handler=_cmd_bitable_create_from_csv)
 
@@ -191,12 +194,16 @@ def _build_bitable_commands(
 
     grant_edit = bitable_sub.add_parser("grant-edit", help="Grant edit permission on bitable", parents=[shared])
     grant_edit.add_argument("--app-token", required=True, help="Bitable app_token")
-    grant_edit.add_argument("--member-id", required=True, help="Member id")
+    grant_edit.add_argument(
+        "--member-id",
+        required=True,
+        help="Member id; use `me` in user-auth mode to target the current authenticated user",
+    )
     grant_edit.add_argument(
         "--member-id-type",
         default="open_id",
         choices=_ID_TYPE_CHOICES,
-        help="open_id/user_id/union_id (default: open_id)",
+        help="open_id/user_id/union_id (default: open_id); also controls how `--member-id me` is resolved",
     )
     grant_edit.set_defaults(handler=_cmd_bitable_grant_edit)
 
@@ -457,12 +464,16 @@ def _build_docx_commands(
 
     grant_edit = docx_sub.add_parser("grant-edit", help="Grant edit permission on docx", parents=[shared])
     grant_edit.add_argument("--document-id", required=True, help="Document token")
-    grant_edit.add_argument("--member-id", required=True, help="Member id")
+    grant_edit.add_argument(
+        "--member-id",
+        required=True,
+        help="Member id; use `me` in user-auth mode to target the current authenticated user",
+    )
     grant_edit.add_argument(
         "--member-id-type",
         default="open_id",
         choices=_ID_TYPE_CHOICES,
-        help="open_id/user_id/union_id (default: open_id)",
+        help="open_id/user_id/union_id (default: open_id); also controls how `--member-id me` is resolved",
     )
     grant_edit.set_defaults(handler=_cmd_docx_grant_edit)
 
@@ -612,12 +623,16 @@ def _build_drive_commands(
         choices=_DRIVE_RESOURCE_CHOICES,
         help="Resource type, e.g. bitable/docx",
     )
-    grant_edit.add_argument("--member-id", required=True, help="Member id")
+    grant_edit.add_argument(
+        "--member-id",
+        required=True,
+        help="Member id; use `me` in user-auth mode to target the current authenticated user",
+    )
     grant_edit.add_argument(
         "--member-id-type",
         default="open_id",
         choices=_ID_TYPE_CHOICES,
-        help="open_id/user_id/union_id (default: open_id)",
+        help="open_id/user_id/union_id (default: open_id); also controls how `--member-id me` is resolved",
     )
     grant_edit.add_argument(
         "--permission",

@@ -39,6 +39,9 @@ Agent rule:
 # Get tenant access token
 feishu auth token --format json
 
+# Inspect current authenticated user (requires user auth)
+feishu auth whoami --auth-mode user --format json
+
 # Raw API request
 feishu auth request GET /contact/v3/users/me
 feishu auth request POST /im/v1/messages --params-json '{"receive_id_type":"open_id"}' \
@@ -102,6 +105,7 @@ feishu bitable list-records --app-token bascnXXX --table-id tblXXX --all --forma
 
 # Grant edit permission
 feishu bitable grant-edit --app-token bascnXXX --member-id ou_xxx
+feishu bitable grant-edit --app-token bascnXXX --member-id me --member-id-type open_id --auth-mode user --format json
 ```
 
 ## docx - Documents
@@ -120,6 +124,7 @@ feishu docx insert-content --document-id docXXX --content-file content.md --cont
 
 # Grant edit permission
 feishu docx grant-edit --document-id docXXX --member-id ou_xxx --format json
+feishu docx grant-edit --document-id docXXX --member-id me --member-id-type open_id --auth-mode user --format json
 
 # Export document as markdown
 feishu docx get-content --doc-token docXXX --doc-type docx --content-type markdown --format json
@@ -141,6 +146,7 @@ feishu drive get-export-task TICKET_ID --token xxx
 
 # Permissions
 feishu drive grant-edit --token docXXX --resource-type docx --member-id ou_xxx --permission edit --format json
+feishu drive grant-edit --token docXXX --resource-type docx --member-id me --member-id-type open_id --permission edit --auth-mode user --format json
 feishu drive list-members --token docXXX --resource-type docx --format json
 feishu drive list-members --token docXXX --resource-type docx --save-output ./drive-members.json --format json
 ```

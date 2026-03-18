@@ -210,6 +210,51 @@ def test_docx_insert_content_full_response(
     assert payload == response
 
 
+def test_docx_grant_edit_self_uses_current_user(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+    monkeypatch.setenv("FEISHU_USER_ACCESS_TOKEN", "user_access_token_x")
+
+    called: dict[str, Any] = {}
+
+    def _fake_grant(
+        _self: Any,
+        document_id: str,
+        member_id: str,
+        member_id_type: str = "open_id",
+    ) -> None:
+        called["grant"] = (document_id, member_id, member_id_type)
+
+    class _FakeUserInfo:
+        open_id = "ou_current"
+        user_id = "cli_user_current"
+        union_id = "on_current"
+
+    monkeypatch.setattr("feishu_bot_sdk.docx.DocxService.grant_edit_permission", _fake_grant)
+    monkeypatch.setattr(
+        "feishu_bot_sdk.feishu.FeishuClient.get_user_info",
+        lambda _self, user_access_token=None: _FakeUserInfo(),
+    )
+
+    code = cli.main(
+        [
+            "docx",
+            "grant-edit",
+            "--document-id",
+            "doc_1",
+            "--member-id",
+            "self",
+            "--member-id-type",
+            "user_id",
+            "--auth-mode",
+            "user",
+        ]
+    )
+    assert code == 0
+    assert called["grant"] == ("doc_1", "cli_user_current", "user_id")
+    assert "ok" in capsys.readouterr().out
+
+
 def test_docx_list_blocks_all(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")

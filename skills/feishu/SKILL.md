@@ -62,6 +62,9 @@ export APP_SECRET="xxx"
 feishu im send-text --receive-id ou_xxx --text "hello"
 ```
 
+处理“给我权限 / 分享给我 / 把我加入”这类请求时，默认把“我”理解为当前操作者。
+优先用 `feishu auth whoami --auth-mode user --format json` 解析当前登录用户，再执行权限变更。
+
 ## 安装
 
 ```bash
@@ -148,6 +151,7 @@ feishu search message --query "incident" --chat-type group_chat --auth-mode user
 
 **通讯录：**
 ```bash
+feishu auth whoami --auth-mode user --format json
 feishu contact user get --user-id ou_xxx --user-id-type open_id --format json
 feishu contact department search --query "engineering" --format json
 ```
@@ -156,6 +160,7 @@ feishu contact department search --query "engineering" --format json
 ```bash
 feishu drive upload-file report.pdf --parent-type explorer --parent-node fld_xxx
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
+feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id me --permission edit --auth-mode user --format json
 ```
 
 ## Python SDK 速查
@@ -241,6 +246,8 @@ server.run()
 - 搜索类命令（`search app/message/doc-wiki`）需要 `--auth-mode user`
 - `bitable list-records` 支持 `--view-id`、`--filter`、`--sort`、`--field-names`
 - 权限相关参数使用严格选项：`--member-id-type`、`--resource-type`、`--permission`
+- 如果用户说“给我 / 分享给我 / 授权给我”，先用 `feishu auth whoami --auth-mode user --format json` 解析当前登录用户
+- `drive/docx/bitable grant-edit` 支持 `--member-id me`，会按 `--member-id-type` 解析当前登录用户的 `open_id` / `user_id` / `union_id`
 - 邮箱批量操作优先用 `--*-file` 或 `--*-stdin` 传递 JSON 数组
 
 ## 关键约定
@@ -338,4 +345,3 @@ print(created.mailgroup_id)
 - **邮箱删除**：永久删除用户邮箱时可用 `--transfer-mailbox` 转移邮件；移除公共邮箱到回收站时可用 `--to-mail-address` 指定接收地址
 
 详细 API 参考见 [references/mail.md](references/mail.md)。
-

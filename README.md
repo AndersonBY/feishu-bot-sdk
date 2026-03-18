@@ -108,6 +108,7 @@ feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type mar
 feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx
 feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
+feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id me --permission edit --auth-mode user --format json
 
 # 9) 搜索 Wiki 节点
 feishu wiki search-nodes --query "项目周报" --all --format json

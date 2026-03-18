@@ -52,9 +52,7 @@ def test_drive_meta_command(monkeypatch: Any, capsys: Any) -> None:
     assert payload["metas"][0]["doc_token"] == "doc_1"
 
 
-def test_drive_download_file_writes_output(
-    monkeypatch: Any, tmp_path: Path, capsys: Any
-) -> None:
+def test_drive_download_file_writes_output(monkeypatch: Any, tmp_path: Path, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
 
@@ -108,9 +106,7 @@ def test_drive_version_list_all(monkeypatch: Any, capsys: Any) -> None:
             "page_token": "next_v",
         }
 
-    monkeypatch.setattr(
-        "feishu_bot_sdk.drive.DriveFileService.list_versions", _fake_list_versions
-    )
+    monkeypatch.setattr("feishu_bot_sdk.drive.DriveFileService.list_versions", _fake_list_versions)
 
     code = cli.main(
         [
@@ -172,6 +168,61 @@ def test_drive_grant_edit(monkeypatch: Any, capsys: Any) -> None:
     )
     assert code == 0
     assert called["args"] == ("tok_1", "ou_1", "open_id", "docx", "edit")
+    assert "ok" in capsys.readouterr().out
+
+
+def test_drive_grant_edit_me_uses_current_user(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+    monkeypatch.setenv("FEISHU_USER_ACCESS_TOKEN", "user_access_token_x")
+
+    called: dict[str, Any] = {}
+
+    def _fake_grant_edit_permission(
+        _self: DrivePermissionService,
+        token: str,
+        member_id: str,
+        member_id_type: str = "open_id",
+        *,
+        resource_type: str,
+        permission: str,
+    ) -> None:
+        called["args"] = (token, member_id, member_id_type, resource_type, permission)
+
+    class _FakeUserInfo:
+        open_id = "ou_current"
+        user_id = "cli_user_current"
+        union_id = "on_current"
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.drive.DrivePermissionService.grant_edit_permission",
+        _fake_grant_edit_permission,
+    )
+    monkeypatch.setattr(
+        "feishu_bot_sdk.feishu.FeishuClient.get_user_info",
+        lambda _self, user_access_token=None: _FakeUserInfo(),
+    )
+
+    code = cli.main(
+        [
+            "drive",
+            "grant-edit",
+            "--token",
+            "tok_1",
+            "--resource-type",
+            "docx",
+            "--member-id",
+            "me",
+            "--member-id-type",
+            "open_id",
+            "--permission",
+            "edit",
+            "--auth-mode",
+            "user",
+        ]
+    )
+    assert code == 0
+    assert called["args"] == ("tok_1", "ou_current", "open_id", "docx", "edit")
     assert "ok" in capsys.readouterr().out
 
 
