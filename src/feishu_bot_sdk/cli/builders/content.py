@@ -394,7 +394,16 @@ def _build_docx_commands(
     convert_content.add_argument("--output", help="Write converted JSON to file")
     convert_content.set_defaults(handler=_cmd_docx_convert_content)
 
-    insert_content = docx_sub.add_parser("insert-content", help="Convert markdown/html and insert into docx", parents=[shared])
+    insert_content = docx_sub.add_parser(
+        "insert-content",
+        help="Convert markdown/html and insert into docx",
+        description=(
+            "Convert markdown/html and insert into docx.\n"
+            "By default the CLI returns a compact summary to avoid dumping large converted block payloads.\n"
+            "Pass --full-response if you need the raw converted/inserted response."
+        ),
+        parents=[shared],
+    )
     insert_content.add_argument("--document-id", required=True, help="Document token")
     insert_content.add_argument("--block-id", help="Parent block id, defaults to document root")
     insert_content.add_argument(
@@ -405,6 +414,11 @@ def _build_docx_commands(
     )
     _add_text_source_args(insert_content, name="content", label="content")
     insert_content.add_argument("--index", type=int, default=-1, help="Insert index (default: -1)")
+    insert_content.add_argument(
+        "--full-response",
+        action="store_true",
+        help="Return the raw insert response, including converted blocks and inserted batch details",
+    )
     _add_docx_write_args(insert_content)
     insert_content.set_defaults(handler=_cmd_docx_insert_content)
 

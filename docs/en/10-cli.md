@@ -24,6 +24,10 @@ feishu --help
 - `--no-store`: disable local token store read/write
 - `--base-url`: default `https://open.feishu.cn/open-apis`
 - `--timeout`: request timeout seconds
+- `--max-output-chars`: maximum stdout characters for regular command results, default `25000`
+- `--output-offset`: when output is large, inspect a later slice of the full JSON serialization
+- `--save-output`: write the full normalized JSON to a file before stdout truncation
+- `--full-output`: disable regular-command stdout truncation
 
 Auth precedence: environment variables > CLI flags > local token store.
 
@@ -32,6 +36,17 @@ Auth precedence: environment variables > CLI flags > local token store.
 - OAuth exchange env var: `FEISHU_APP_ACCESS_TOKEN`
 - Token store env vars: `FEISHU_PROFILE` / `FEISHU_TOKEN_STORE_PATH` / `FEISHU_NO_STORE`
 - Compatible vars: `APP_ID` / `APP_SECRET`
+
+## Large Output Control
+
+- Regular command stdout is capped at `25000` characters by default so scripts and LLM Agents do not get flooded by oversized JSON payloads.
+- When output is truncated, `_cli_output` includes:
+  - `next_output_offset`: the next JSON slice offset
+  - `paging.next_page_token`: the next page token when the API itself is paged
+  - `hints`: concrete follow-up commands
+- Inspect the next slice: `feishu ... --output-offset 25000 --max-output-chars 25000 --format json`
+- Keep the full result on disk: `feishu ... --save-output ./full.json --format json`
+- Prefer `--page-size` / `--page-token` over `--all` when the command supports paging
 
 ## Common Commands
 
@@ -72,6 +87,7 @@ feishu bitable create-from-csv ./final.csv --app-name "Task Result" --table-name
 feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
 feishu docx create --title "Daily Report" --folder-token fld_xxx --format json
 feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
+# Returns a compact summary by default; add --full-response for converted/inserted_batches details
 feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --output ./report.md --format json
 feishu docx list-blocks --document-id doccn_xxx --all --format json
 feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json

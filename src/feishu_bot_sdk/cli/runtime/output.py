@@ -9,12 +9,44 @@ from typing import Any, Mapping, Optional
 
 from ...exceptions import HTTPRequestError
 
-def _print_result(result: Any, *, output_format: str) -> None:
+_DEFAULT_MAX_OUTPUT_CHARS = 25000
+_PREVIEW_LIST_ITEM_OPTIONS = (20, 10, 5, 2, 1)
+_PREVIEW_MAPPING_ITEM_OPTIONS = (40, 20, 10, 5)
+_PREVIEW_STRING_CHAR_OPTIONS = (4000, 2000, 1000, 500, 200, 80)
+_PREVIEW_MAX_DEPTH = 6
+_MAX_TRUNCATION_NOTES = 8
+
+
+def _print_result(
+    result: Any,
+    *,
+    output_format: str,
+    max_output_chars: Any = None,
+    output_offset: Any = None,
+    full_output: bool = False,
+    save_output: Any = None,
+    cli_args: Any = None,
+) -> None:
     normalized = _to_jsonable(result)
+    max_output_chars_value = _normalize_output_char_limit(max_output_chars)
+    output_offset_value = _normalize_output_offset(output_offset)
+    if full_output and output_offset_value:
+        raise ValueError("output-offset cannot be combined with --full-output")
+    save_output_path = _resolve_output_path(save_output)
+    if save_output_path is not None:
+        _write_json_file(save_output_path, normalized)
+    prepared = _prepare_regular_output(
+        normalized,
+        max_output_chars=max_output_chars_value,
+        output_offset=output_offset_value,
+        full_output=full_output,
+        save_output_path=save_output_path,
+        cli_args=cli_args,
+    )
     if output_format == "json":
-        print(json.dumps(normalized, ensure_ascii=False, indent=2))
+        sys.stdout.write(_serialize_json(prepared))
         return
-    _print_human(normalized)
+    _print_human(prepared)
 
 
 def _print_human(result: Any) -> None:
@@ -257,6 +289,328 @@ def _to_jsonable(value: Any) -> Any:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
     return value
+
+
+def _prepare_regular_output(
+    normalized: Any,
+    *,
+    max_output_chars: int,
+    output_offset: int,
+    full_output: bool,
+    save_output_path: Path | None,
+    cli_args: Any,
+) -> Any:
+    if full_output:
+        return normalized
+    full_json = _serialize_json(normalized)
+    if output_offset:
+        return _build_json_slice_payload(
+            full_json,
+            max_output_chars=max_output_chars,
+            output_offset=output_offset,
+            save_output_path=save_output_path,
+            cli_args=cli_args,
+        )
+    if len(full_json) <= max_output_chars:
+        return normalized
+    return _build_preview_payload(
+        normalized,
+        full_json=full_json,
+        max_output_chars=max_output_chars,
+        save_output_path=save_output_path,
+        cli_args=cli_args,
+    )
+
+
+def _build_preview_payload(
+    normalized: Any,
+    *,
+    full_json: str,
+    max_output_chars: int,
+    save_output_path: Path | None,
+    cli_args: Any,
+) -> Any:
+    total_json_chars = len(full_json)
+    base_meta = {
+        "truncated": True,
+        "mode": "preview",
+        "stdout_char_limit": max_output_chars,
+        "total_json_chars": total_json_chars,
+        "remaining_json_chars": max(0, total_json_chars - max_output_chars),
+        "next_output_offset": max_output_chars if total_json_chars > max_output_chars else None,
+        "save_output": str(save_output_path) if save_output_path is not None else None,
+        "paging": _extract_paging_info(normalized, cli_args),
+    }
+    for max_list_items in _PREVIEW_LIST_ITEM_OPTIONS:
+        for max_mapping_items in _PREVIEW_MAPPING_ITEM_OPTIONS:
+            for max_string_chars in _PREVIEW_STRING_CHAR_OPTIONS:
+                notes: list[dict[str, Any]] = []
+                preview = _build_preview_value(
+                    normalized,
+                    path="$",
+                    depth=0,
+                    max_depth=_PREVIEW_MAX_DEPTH,
+                    max_list_items=max_list_items,
+                    max_mapping_items=max_mapping_items,
+                    max_string_chars=max_string_chars,
+                    notes=notes,
+                )
+                payload = _attach_cli_output_meta(
+                    preview,
+                    _finalize_cli_output_meta(
+                        base_meta,
+                        notes=notes,
+                        cli_args=cli_args,
+                    ),
+                )
+                if len(_serialize_json(payload)) <= max_output_chars:
+                    return payload
+    return _build_json_slice_payload(
+        full_json,
+        max_output_chars=max_output_chars,
+        output_offset=0,
+        save_output_path=save_output_path,
+        cli_args=cli_args,
+    )
+
+
+def _build_json_slice_payload(
+    full_json: str,
+    *,
+    max_output_chars: int,
+    output_offset: int,
+    save_output_path: Path | None,
+    cli_args: Any,
+) -> Mapping[str, Any]:
+    total_json_chars = len(full_json)
+    if output_offset < 0:
+        raise ValueError("output-offset must be greater than or equal to 0")
+    start = min(output_offset, total_json_chars)
+    end = min(total_json_chars, start + max_output_chars)
+    while end >= start:
+        slice_text = full_json[start:end]
+        next_offset = end if end < total_json_chars else None
+        remaining = max(0, total_json_chars - end)
+        meta = _finalize_cli_output_meta(
+            {
+                "truncated": remaining > 0 or start > 0,
+                "mode": "json_slice",
+                "stdout_char_limit": max_output_chars,
+                "output_offset": start,
+                "returned_json_chars": len(slice_text),
+                "total_json_chars": total_json_chars,
+                "remaining_json_chars": remaining,
+                "next_output_offset": next_offset,
+                "save_output": str(save_output_path) if save_output_path is not None else None,
+                "paging": None,
+            },
+            notes=[],
+            cli_args=cli_args,
+        )
+        payload = {
+            "json_slice": slice_text,
+            "_cli_output": meta,
+        }
+        if len(_serialize_json(payload)) <= max_output_chars:
+            return payload
+        if end == start:
+            break
+        reduction = max(1, (end - start) // 2)
+        end -= reduction
+    return {
+        "json_slice": "",
+        "_cli_output": _finalize_cli_output_meta(
+            {
+                "truncated": True,
+                "mode": "json_slice",
+                "stdout_char_limit": max_output_chars,
+                "output_offset": start,
+                "returned_json_chars": 0,
+                "total_json_chars": total_json_chars,
+                "remaining_json_chars": max(0, total_json_chars - start),
+                "next_output_offset": start if start < total_json_chars else None,
+                "save_output": str(save_output_path) if save_output_path is not None else None,
+                "paging": None,
+            },
+            notes=[],
+            cli_args=cli_args,
+        ),
+    }
+
+
+def _build_preview_value(
+    value: Any,
+    *,
+    path: str,
+    depth: int,
+    max_depth: int,
+    max_list_items: int,
+    max_mapping_items: int,
+    max_string_chars: int,
+    notes: list[dict[str, Any]],
+) -> Any:
+    if depth >= max_depth:
+        notes.append({"path": path, "reason": "depth_limited"})
+        return "<<truncated: depth limit>>"
+    if isinstance(value, Mapping):
+        preview: dict[str, Any] = {}
+        items = list(value.items())
+        for key, item_value in items[:max_mapping_items]:
+            key_str = str(key)
+            child_path = f"{path}.{key_str}" if path != "$" else f"$.{key_str}"
+            preview[key_str] = _build_preview_value(
+                item_value,
+                path=child_path,
+                depth=depth + 1,
+                max_depth=max_depth,
+                max_list_items=max_list_items,
+                max_mapping_items=max_mapping_items,
+                max_string_chars=max_string_chars,
+                notes=notes,
+            )
+        omitted = len(items) - len(preview)
+        if omitted > 0:
+            notes.append({"path": path, "reason": "mapping_items_limited", "omitted": omitted})
+        return preview
+    if isinstance(value, list):
+        preview_list: list[Any] = []
+        for index, item in enumerate(value[:max_list_items]):
+            child_path = f"{path}[{index}]"
+            preview_list.append(
+                _build_preview_value(
+                    item,
+                    path=child_path,
+                    depth=depth + 1,
+                    max_depth=max_depth,
+                    max_list_items=max_list_items,
+                    max_mapping_items=max_mapping_items,
+                    max_string_chars=max_string_chars,
+                    notes=notes,
+                )
+            )
+        omitted = len(value) - len(preview_list)
+        if omitted > 0:
+            notes.append({"path": path, "reason": "list_items_limited", "omitted": omitted})
+        return preview_list
+    if isinstance(value, str):
+        if len(value) <= max_string_chars:
+            return value
+        omitted = len(value) - max_string_chars
+        notes.append({"path": path, "reason": "string_clipped", "omitted_chars": omitted})
+        return value[:max_string_chars] + f"... [truncated {omitted} chars]"
+    return value
+
+
+def _attach_cli_output_meta(preview: Any, meta: Mapping[str, Any]) -> Any:
+    if isinstance(preview, Mapping):
+        payload = {str(key): value for key, value in preview.items()}
+        payload["_cli_output"] = meta
+        return payload
+    return {
+        "result": preview,
+        "_cli_output": meta,
+    }
+
+
+def _finalize_cli_output_meta(
+    base_meta: Mapping[str, Any],
+    *,
+    notes: list[dict[str, Any]],
+    cli_args: Any,
+) -> Mapping[str, Any]:
+    meta = {str(key): value for key, value in base_meta.items() if value is not None}
+    if notes:
+        meta["notes"] = notes[:_MAX_TRUNCATION_NOTES]
+    meta["hints"] = _build_output_hints(meta, cli_args)
+    return meta
+
+
+def _build_output_hints(meta: Mapping[str, Any], cli_args: Any) -> list[str]:
+    hints: list[str] = []
+    save_output = meta.get("save_output")
+    if isinstance(save_output, str) and save_output:
+        hints.append(f"full normalized JSON was written to {save_output}")
+    next_output_offset = meta.get("next_output_offset")
+    stdout_char_limit = meta.get("stdout_char_limit")
+    if isinstance(next_output_offset, int) and isinstance(stdout_char_limit, int):
+        hints.append(
+            "rerun with "
+            f"--output-offset {next_output_offset} --max-output-chars {stdout_char_limit} --format json "
+            "to inspect the next JSON slice"
+        )
+    if meta.get("truncated"):
+        hints.append("rerun with --full-output to disable stdout truncation")
+    paging = meta.get("paging")
+    if isinstance(paging, Mapping):
+        next_page_token = paging.get("next_page_token")
+        if isinstance(next_page_token, str) and next_page_token:
+            hints.append(f"use --page-token {next_page_token} to fetch the next page")
+        if paging.get("all") is True:
+            hints.append("avoid --all and use --page-size/--page-token when you need incremental pages")
+        elif paging.get("supports_page_size"):
+            hints.append("use a smaller --page-size to reduce per-call output volume")
+    return hints
+
+
+def _extract_paging_info(normalized: Any, cli_args: Any) -> Mapping[str, Any] | None:
+    has_page_size = hasattr(cli_args, "page_size")
+    has_page_token = hasattr(cli_args, "page_token")
+    has_all = hasattr(cli_args, "all")
+    if not (has_page_size or has_page_token or has_all):
+        return None
+    paging: dict[str, Any] = {
+        "supports_page_size": has_page_size,
+        "supports_page_token": has_page_token,
+        "all": bool(getattr(cli_args, "all", False)) if has_all else False,
+    }
+    if has_page_size:
+        paging["page_size"] = getattr(cli_args, "page_size", None)
+    if has_page_token:
+        paging["requested_page_token"] = getattr(cli_args, "page_token", None)
+    if isinstance(normalized, Mapping):
+        has_more = normalized.get("has_more")
+        if isinstance(has_more, bool):
+            paging["has_more"] = has_more
+        next_page_token = normalized.get("page_token")
+        if isinstance(next_page_token, str) and next_page_token:
+            paging["next_page_token"] = next_page_token
+    return paging
+
+
+def _serialize_json(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, indent=2)
+
+
+def _normalize_output_char_limit(value: Any) -> int:
+    if value is None:
+        return _DEFAULT_MAX_OUTPUT_CHARS
+    if not isinstance(value, int):
+        raise ValueError("max-output-chars must be an integer")
+    if value <= 0:
+        raise ValueError("max-output-chars must be greater than 0")
+    return value
+
+
+def _normalize_output_offset(value: Any) -> int:
+    if value is None:
+        return 0
+    if not isinstance(value, int):
+        raise ValueError("output-offset must be an integer")
+    if value < 0:
+        raise ValueError("output-offset must be greater than or equal to 0")
+    return value
+
+
+def _resolve_output_path(path_value: Any) -> Path | None:
+    if not path_value:
+        return None
+    return Path(str(path_value))
+
+
+def _write_json_file(path: Path, payload: Any) -> None:
+    if path.parent and not path.parent.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_serialize_json(payload), encoding="utf-8")
 
 
 def _extract_response_data(value: Any) -> dict[str, Any]:

@@ -3,13 +3,35 @@
 ## Global Flags
 
 ```
---format human|json     Output format (default: human)
---app-id TEXT           Feishu app ID (env: FEISHU_APP_ID)
---app-secret TEXT       Feishu app secret (env: FEISHU_APP_SECRET)
---tenant-access-token   Direct token (skip auth)
---base-url URL          API base (default: https://open.feishu.cn/open-apis)
---timeout SECONDS       Request timeout
+--format human|json         Output format (default: human)
+--app-id TEXT               Feishu app ID (env: FEISHU_APP_ID)
+--app-secret TEXT           Feishu app secret (env: FEISHU_APP_SECRET)
+--auth-mode tenant|user     Auth mode
+--base-url URL              API base (default: https://open.feishu.cn/open-apis)
+--timeout SECONDS           Request timeout
+--max-output-chars INT      Stdout cap for regular command results (default: 25000)
+--output-offset INT         Inspect a later slice of oversized JSON output
+--save-output PATH          Write full normalized JSON to file before stdout truncation
+--full-output               Disable regular-command stdout truncation
 ```
+
+## Large Output Control
+
+```bash
+# Keep full JSON on disk, but return a capped stdout preview
+feishu search app --query "calendar" --save-output ./search-full.json --format json
+
+# Inspect the next JSON slice when _cli_output.next_output_offset is returned
+feishu search app --query "calendar" --output-offset 25000 --max-output-chars 25000 --format json
+
+# Disable truncation only when you explicitly want the full stdout payload
+feishu search app --query "calendar" --full-output --format json
+```
+
+Agent rule:
+- Prefer `--page-size` and `--page-token` for large result sets.
+- Use `--all` only when the total result volume is expected to stay manageable.
+- For non-paged commands such as `drive list-members`, `calendar list-freebusy`, and `calendar batch-freebusy`, prefer `--save-output`.
 
 ## auth - Authentication
 
@@ -75,7 +97,8 @@ feishu bitable create-table --app-token bascnXXX --table-json '{"name":"Sheet2",
 
 # CRUD records
 feishu bitable create-record --app-token bascnXXX --table-id tblXXX --fields-json '{"Name":"Alice","Score":95}'
-feishu bitable list-records --app-token bascnXXX --table-id tblXXX --page-size 100
+feishu bitable list-records --app-token bascnXXX --table-id tblXXX --page-size 100 --format json
+feishu bitable list-records --app-token bascnXXX --table-id tblXXX --all --format json
 
 # Grant edit permission
 feishu bitable grant-edit --app-token bascnXXX --member-id ou_xxx
@@ -85,22 +108,22 @@ feishu bitable grant-edit --app-token bascnXXX --member-id ou_xxx
 
 ```bash
 # Create empty document
-feishu docx create --title "Weekly Report"
+feishu docx create --title "Weekly Report" --format json
 
-# Append markdown content
-feishu docx append-markdown --document-id docXXX --markdown "# Section\n\nContent"
-feishu docx append-markdown --document-id docXXX --markdown-file content.md
-cat content.md | feishu docx append-markdown --document-id docXXX --markdown-stdin
+# Insert markdown/html content
+feishu docx insert-content --document-id docXXX --content "# Section\n\nContent" --content-type markdown --format json
+feishu docx insert-content --document-id docXXX --content-file content.md --content-type markdown --document-revision-id -1 --format json
+cat content.md | feishu docx insert-content --document-id docXXX --content-stdin --content-type markdown --format json
 
-# Create document with markdown content in one step
-feishu docx create-from-markdown --title "Report" --markdown-file report.md
+# insert-content returns a compact summary by default; add --full-response only for debugging
+feishu docx insert-content --document-id docXXX --content-file content.md --content-type markdown --full-response --format json
 
 # Grant edit permission
-feishu docx grant-edit --document-id docXXX --member-id ou_xxx
+feishu docx grant-edit --document-id docXXX --member-id ou_xxx --format json
 
 # Export document as markdown
-feishu docx get-markdown --doc-token docXXX
-feishu docx get-markdown --doc-token docXXX --doc-type wiki_doc
+feishu docx get-content --doc-token docXXX --doc-type docx --content-type markdown --format json
+feishu docx get-content --doc-token docXXX --doc-type wiki_doc --content-type markdown --output ./doc.md --format json
 ```
 
 ## drive - Drive Files
@@ -117,24 +140,66 @@ feishu drive create-export-task --task-json '{"token":"xxx","type":"bitable"}'
 feishu drive get-export-task TICKET_ID --token xxx
 
 # Permissions
-feishu drive grant-edit --token docXXX --resource-type docx --member-id ou_xxx
-feishu drive list-members --token docXXX --resource-type docx
+feishu drive grant-edit --token docXXX --resource-type docx --member-id ou_xxx --permission edit --format json
+feishu drive list-members --token docXXX --resource-type docx --format json
+feishu drive list-members --token docXXX --resource-type docx --save-output ./drive-members.json --format json
 ```
 
 ## wiki - Knowledge Base
 
 ```bash
 # List wiki spaces
-feishu wiki list-spaces --page-size 20
+feishu wiki list-spaces --page-size 20 --format json
+feishu wiki list-spaces --all --format json
 
 # Search nodes
-feishu wiki search-nodes --query "project plan" --space-id spaceXXX
+feishu wiki search-nodes --query "project plan" --space-id spaceXXX --page-size 20 --format json
+feishu wiki search-nodes --query "project plan" --space-id spaceXXX --all --format json
 
 # Get node details
-feishu wiki get-node --token wikiXXX
+feishu wiki get-node --token wikiXXX --format json
 
 # List child nodes
-feishu wiki list-nodes --space-id spaceXXX --parent-node-token wikiXXX
+feishu wiki list-nodes --space-id spaceXXX --parent-node-token wikiXXX --page-size 20 --format json
+```
+
+## calendar - Calendars and Events
+
+```bash
+# Calendars
+feishu calendar list-calendars --page-size 50 --format json
+feishu calendar list-calendars --all --format json
+feishu calendar search-calendars --query "eng" --page-size 20 --format json
+feishu calendar search-calendars --query "eng" --all --format json
+
+# Events
+feishu calendar list-events --calendar-id calXXX --page-size 100 --format json
+feishu calendar list-events --calendar-id calXXX --all --format json
+feishu calendar search-events --calendar-id calXXX --query "weekly" --page-size 50 --format json
+feishu calendar search-events --calendar-id calXXX --all --format json
+
+# Freebusy results can be large and are not paged by the CLI; save before inspection
+feishu calendar list-freebusy --request-file freebusy.json --save-output ./freebusy.json --format json
+feishu calendar batch-freebusy --request-file batch-freebusy.json --save-output ./batch-freebusy.json --format json
+```
+
+## contact - Users and Departments
+
+```bash
+# Users
+feishu contact user get --user-id ou_xxx --user-id-type open_id --format json
+feishu contact user by-department --department-id od_xxx --page-size 50 --format json
+feishu contact user by-department --department-id od_xxx --all --format json
+feishu contact user search --query "Alice" --page-size 20 --auth-mode user --format json
+feishu contact user search --query "Alice" --all --auth-mode user --format json
+
+# Departments and scopes
+feishu contact department children --department-id od_xxx --page-size 50 --format json
+feishu contact department children --department-id od_xxx --all --format json
+feishu contact department parent --department-id od_xxx --all --format json
+feishu contact department search --query "engineering" --all --format json
+feishu contact scope get --page-size 100 --format json
+feishu contact scope get --all --format json
 ```
 
 ## webhook - Webhook Processing

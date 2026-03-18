@@ -19,6 +19,12 @@ ROOT_HELP_EPILOG = (
     "  5) non-text message resource: feishu media download-file <resource_key> <output> "
     "--message-id <om_xxx> --resource-type image|file --auth-mode tenant --format json\n"
     "\n"
+    "Large output controls:\n"
+    "  - default stdout is capped to 25000 chars for regular command results\n"
+    "  - use --output-offset <n> to inspect the next JSON slice\n"
+    "  - use --save-output <file> to keep the full normalized JSON on disk\n"
+    "  - use --full-output to disable truncation\n"
+    "\n"
     "Token precedence: env vars > CLI flags > local token store profile."
 )
 

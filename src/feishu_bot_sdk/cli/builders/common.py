@@ -15,6 +15,27 @@ def _add_global_args(parser: argparse.ArgumentParser) -> None:
         default="human",
         help="Output format. Default: human",
     )
+    parser.add_argument(
+        "--max-output-chars",
+        type=int,
+        default=25000,
+        help="Maximum stdout characters for regular command results. Default: 25000",
+    )
+    parser.add_argument(
+        "--output-offset",
+        type=int,
+        default=0,
+        help="When output is too large, return a later JSON slice starting at this character offset",
+    )
+    parser.add_argument(
+        "--full-output",
+        action="store_true",
+        help="Disable stdout truncation for regular command results",
+    )
+    parser.add_argument(
+        "--save-output",
+        help="Write the full normalized regular command result JSON to a file before stdout truncation",
+    )
     parser.add_argument("--app-id", help="Feishu app_id")
     parser.add_argument("--app-secret", help="Feishu app_secret")
     parser.add_argument(

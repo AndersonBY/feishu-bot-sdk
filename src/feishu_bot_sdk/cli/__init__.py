@@ -94,7 +94,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         if handler is None:
             raise ValueError("missing command handler")
         result = handler(args)
-        _print_result(result, output_format=output_format)
+        _print_result(
+            result,
+            output_format=output_format,
+            max_output_chars=getattr(args, "max_output_chars", None),
+            output_offset=getattr(args, "output_offset", None),
+            full_output=bool(getattr(args, "full_output", False)),
+            save_output=getattr(args, "save_output", None),
+            cli_args=args,
+        )
         return 0
     except SystemExit as exc:
         return _system_exit_code(exc)

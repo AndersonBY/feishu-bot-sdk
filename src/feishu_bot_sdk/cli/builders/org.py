@@ -69,6 +69,7 @@ def _build_calendar_commands(
     list_calendars.add_argument("--page-size", type=int, help="Page size")
     list_calendars.add_argument("--page-token", help="Page token")
     list_calendars.add_argument("--sync-token", help="Sync token")
+    list_calendars.add_argument("--all", action="store_true", help="Auto paginate and return all items")
     list_calendars.set_defaults(handler=_cmd_calendar_list_calendars)
 
     get_calendar = calendar_sub.add_parser("get-calendar", help="Get calendar by id", parents=[shared])
@@ -102,6 +103,7 @@ def _build_calendar_commands(
     search_calendars.add_argument("--query", required=True, help="Search query")
     search_calendars.add_argument("--page-size", type=int, help="Page size")
     search_calendars.add_argument("--page-token", help="Page token")
+    search_calendars.add_argument("--all", action="store_true", help="Auto paginate and return all items")
     search_calendars.set_defaults(handler=_cmd_calendar_search_calendars)
 
     list_events = calendar_sub.add_parser("list-events", help="List events in a calendar", parents=[shared])
@@ -113,6 +115,7 @@ def _build_calendar_commands(
     list_events.add_argument("--end-time", help="End time (unix seconds)")
     list_events.add_argument("--anchor-time", help="Anchor time (unix seconds)")
     list_events.add_argument("--user-id-type", help="Optional user_id_type")
+    list_events.add_argument("--all", action="store_true", help="Auto paginate and return all items")
     list_events.set_defaults(handler=_cmd_calendar_list_events)
 
     get_event = calendar_sub.add_parser("get-event", help="Get event by id", parents=[shared])
@@ -212,6 +215,7 @@ def _build_calendar_commands(
     search_events.add_argument("--page-size", type=int, help="Page size")
     search_events.add_argument("--page-token", help="Page token")
     search_events.add_argument("--user-id-type", help="Optional user_id_type")
+    search_events.add_argument("--all", action="store_true", help="Auto paginate and return all items")
     search_events.set_defaults(handler=_cmd_calendar_search_events)
 
     reply_event = calendar_sub.add_parser("reply-event", help="Reply to an event", parents=[shared])
@@ -353,6 +357,7 @@ def _build_contact_commands(
     user_by_department.add_argument("--department-id-type", help="Optional department_id_type")
     user_by_department.add_argument("--page-size", type=int, help="Page size")
     user_by_department.add_argument("--page-token", help="Page token")
+    user_by_department.add_argument("--all", action="store_true", help="Auto paginate and return all items")
     user_by_department.set_defaults(handler=_cmd_contact_user_by_department)
 
     user_search = user_sub.add_parser(
@@ -372,6 +377,7 @@ def _build_contact_commands(
     user_search.add_argument("--query", required=True, help="Search query")
     user_search.add_argument("--page-size", type=int, help="Page size")
     user_search.add_argument("--page-token", help="Page token")
+    user_search.add_argument("--all", action="store_true", help="Auto paginate and return all users")
     user_search.set_defaults(handler=_cmd_contact_user_search)
 
     department_parser = contact_sub.add_parser("department", help="Department operations")
@@ -391,6 +397,7 @@ def _build_contact_commands(
     department_children.add_argument("--fetch-child", choices=("true", "false"), help="Recursive fetch (true/false). Omit = direct children only")
     department_children.add_argument("--page-size", type=int, help="Page size")
     department_children.add_argument("--page-token", help="Page token")
+    department_children.add_argument("--all", action="store_true", help="Auto paginate and return all items")
     department_children.set_defaults(handler=_cmd_contact_department_children)
 
     department_batch_get = department_sub.add_parser(
@@ -415,6 +422,7 @@ def _build_contact_commands(
     department_parent.add_argument("--department-id-type", help="Optional department_id_type")
     department_parent.add_argument("--page-size", type=int, help="Page size")
     department_parent.add_argument("--page-token", help="Page token")
+    department_parent.add_argument("--all", action="store_true", help="Auto paginate and return all items")
     department_parent.set_defaults(handler=_cmd_contact_department_parent)
 
     department_search = department_sub.add_parser(
@@ -427,6 +435,7 @@ def _build_contact_commands(
     department_search.add_argument("--department-id-type", help="Optional department_id_type")
     department_search.add_argument("--page-size", type=int, help="Page size")
     department_search.add_argument("--page-token", help="Page token")
+    department_search.add_argument("--all", action="store_true", help="Auto paginate and return all items")
     department_search.set_defaults(handler=_cmd_contact_department_search)
 
     scope_parser = contact_sub.add_parser("scope", help="Contact scope operations")
@@ -438,4 +447,5 @@ def _build_contact_commands(
     scope_get.add_argument("--department-id-type", help="Optional department_id_type")
     scope_get.add_argument("--page-size", type=int, help="Page size")
     scope_get.add_argument("--page-token", help="Page token")
+    scope_get.add_argument("--all", action="store_true", help="Auto paginate and return all scope ids")
     scope_get.set_defaults(handler=_cmd_contact_scope_get)

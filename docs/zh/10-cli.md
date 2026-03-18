@@ -24,6 +24,10 @@ feishu --help
 - `--no-store`：禁用本地 token 读写
 - `--base-url`：默认 `https://open.feishu.cn/open-apis`
 - `--timeout`：请求超时秒数
+- `--max-output-chars`：常规命令 stdout 最大字符数，默认 `25000`
+- `--output-offset`：输出过大时，按完整 JSON 序列化后的字符偏移查看后续片段
+- `--save-output`：先把完整标准化 JSON 写入文件，再按 stdout 限制输出
+- `--full-output`：关闭常规命令 stdout 截断
 
 认证优先级：环境变量 > 命令行参数 > 本地 token store。
 
@@ -32,6 +36,17 @@ feishu --help
 - OAuth 交换环境变量：`FEISHU_APP_ACCESS_TOKEN`
 - Token store 变量：`FEISHU_PROFILE` / `FEISHU_TOKEN_STORE_PATH` / `FEISHU_NO_STORE`
 - 兼容变量：`APP_ID` / `APP_SECRET`
+
+## 大输出控制
+
+- 常规命令默认把 stdout 控制在 `25000` 字符内，避免脚本和 LLM Agent 被超长 JSON 挤爆上下文。
+- 如果返回被截断，CLI 会在 `_cli_output` 里给出：
+  - `next_output_offset`：下一段 JSON 片段的起始偏移
+  - `paging.next_page_token`：如果接口本身支持翻页，会给出下一页 token
+  - `hints`：下一步可直接执行的命令建议
+- 查看后续片段：`feishu ... --output-offset 25000 --max-output-chars 25000 --format json`
+- 保留完整结果：`feishu ... --save-output ./full.json --format json`
+- 如果命令本身支持翻页，优先用 `--page-size` / `--page-token`，谨慎使用 `--all`
 
 ## 常用命令
 
@@ -72,6 +87,7 @@ feishu bitable create-from-csv ./final.csv --app-name "任务结果" --table-nam
 feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
 feishu docx create --title "日报" --folder-token fld_xxx --format json
 feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
+# 默认返回精简摘要；需要完整 converted/inserted_batches 时加 --full-response
 feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --output ./report.md --format json
 feishu docx list-blocks --document-id doccn_xxx --all --format json
 feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json

@@ -23,10 +23,24 @@ def _cmd_calendar_primary(args: argparse.Namespace) -> Mapping[str, Any]:
 
 def _cmd_calendar_list_calendars(args: argparse.Namespace) -> Mapping[str, Any]:
     service = CalendarService(_build_client(args))
-    return service.list_calendars(
-        page_size=getattr(args, "page_size", None),
-        page_token=getattr(args, "page_token", None),
-        sync_token=getattr(args, "sync_token", None),
+    page_size = getattr(args, "page_size", None)
+    page_token = getattr(args, "page_token", None)
+    sync_token = getattr(args, "sync_token", None)
+    if not bool(getattr(args, "all", False)):
+        return service.list_calendars(
+            page_size=page_size,
+            page_token=page_token,
+            sync_token=sync_token,
+        )
+    return _collect_all_pages(
+        lambda *, page_size, page_token: service.list_calendars(
+            page_size=page_size,
+            page_token=page_token,
+            sync_token=sync_token,
+        ),
+        page_size=page_size,
+        page_token=page_token,
+        default_page_size=50,
     )
 
 
@@ -66,24 +80,60 @@ def _cmd_calendar_delete_calendar(args: argparse.Namespace) -> Mapping[str, Any]
 
 def _cmd_calendar_search_calendars(args: argparse.Namespace) -> Mapping[str, Any]:
     service = CalendarService(_build_client(args))
-    return service.search_calendars(
-        str(args.query),
-        page_size=getattr(args, "page_size", None),
-        page_token=getattr(args, "page_token", None),
+    page_size = getattr(args, "page_size", None)
+    page_token = getattr(args, "page_token", None)
+    if not bool(getattr(args, "all", False)):
+        return service.search_calendars(
+            str(args.query),
+            page_size=page_size,
+            page_token=page_token,
+        )
+    return _collect_all_pages(
+        lambda *, page_size, page_token: service.search_calendars(
+            str(args.query),
+            page_size=page_size,
+            page_token=page_token,
+        ),
+        page_size=page_size,
+        page_token=page_token,
+        default_page_size=50,
     )
 
 
 def _cmd_calendar_list_events(args: argparse.Namespace) -> Mapping[str, Any]:
     service = CalendarService(_build_client(args))
-    return service.list_events(
-        str(args.calendar_id),
-        page_size=getattr(args, "page_size", None),
-        page_token=getattr(args, "page_token", None),
-        sync_token=getattr(args, "sync_token", None),
-        start_time=getattr(args, "start_time", None),
-        end_time=getattr(args, "end_time", None),
-        anchor_time=getattr(args, "anchor_time", None),
-        user_id_type=getattr(args, "user_id_type", None),
+    page_size = getattr(args, "page_size", None)
+    page_token = getattr(args, "page_token", None)
+    sync_token = getattr(args, "sync_token", None)
+    start_time = getattr(args, "start_time", None)
+    end_time = getattr(args, "end_time", None)
+    anchor_time = getattr(args, "anchor_time", None)
+    user_id_type = getattr(args, "user_id_type", None)
+    if not bool(getattr(args, "all", False)):
+        return service.list_events(
+            str(args.calendar_id),
+            page_size=page_size,
+            page_token=page_token,
+            sync_token=sync_token,
+            start_time=start_time,
+            end_time=end_time,
+            anchor_time=anchor_time,
+            user_id_type=user_id_type,
+        )
+    return _collect_all_pages(
+        lambda *, page_size, page_token: service.list_events(
+            str(args.calendar_id),
+            page_size=page_size,
+            page_token=page_token,
+            sync_token=sync_token,
+            start_time=start_time,
+            end_time=end_time,
+            anchor_time=anchor_time,
+            user_id_type=user_id_type,
+        ),
+        page_size=page_size,
+        page_token=page_token,
+        default_page_size=100,
     )
 
 
@@ -236,13 +286,30 @@ def _cmd_calendar_search_events(args: argparse.Namespace) -> Mapping[str, Any]:
         required=False,
     )
     service = CalendarService(_build_client(args))
-    return service.search_events(
-        str(args.calendar_id),
-        str(args.query),
-        page_size=getattr(args, "page_size", None),
-        page_token=getattr(args, "page_token", None),
-        user_id_type=getattr(args, "user_id_type", None),
-        search_filter=search_filter or None,
+    page_size = getattr(args, "page_size", None)
+    page_token = getattr(args, "page_token", None)
+    user_id_type = getattr(args, "user_id_type", None)
+    if not bool(getattr(args, "all", False)):
+        return service.search_events(
+            str(args.calendar_id),
+            str(args.query),
+            page_size=page_size,
+            page_token=page_token,
+            user_id_type=user_id_type,
+            search_filter=search_filter or None,
+        )
+    return _collect_all_pages(
+        lambda *, page_size, page_token: service.search_events(
+            str(args.calendar_id),
+            str(args.query),
+            page_size=page_size,
+            page_token=page_token,
+            user_id_type=user_id_type,
+            search_filter=search_filter or None,
+        ),
+        page_size=page_size,
+        page_token=page_token,
+        default_page_size=100,
     )
 
 
@@ -335,21 +402,52 @@ def _cmd_contact_user_get_id(args: argparse.Namespace) -> Mapping[str, Any]:
 
 def _cmd_contact_user_by_department(args: argparse.Namespace) -> Mapping[str, Any]:
     service = ContactService(_build_client(args))
-    return service.find_users_by_department(
-        str(args.department_id),
-        user_id_type=getattr(args, "user_id_type", None),
-        department_id_type=getattr(args, "department_id_type", None),
-        page_size=getattr(args, "page_size", None),
-        page_token=getattr(args, "page_token", None),
+    page_size = getattr(args, "page_size", None)
+    page_token = getattr(args, "page_token", None)
+    user_id_type = getattr(args, "user_id_type", None)
+    department_id_type = getattr(args, "department_id_type", None)
+    if not bool(getattr(args, "all", False)):
+        return service.find_users_by_department(
+            str(args.department_id),
+            user_id_type=user_id_type,
+            department_id_type=department_id_type,
+            page_size=page_size,
+            page_token=page_token,
+        )
+    return _collect_all_pages(
+        lambda *, page_size, page_token: service.find_users_by_department(
+            str(args.department_id),
+            user_id_type=user_id_type,
+            department_id_type=department_id_type,
+            page_size=page_size,
+            page_token=page_token,
+        ),
+        page_size=page_size,
+        page_token=page_token,
+        default_page_size=50,
     )
 
 
 def _cmd_contact_user_search(args: argparse.Namespace) -> Mapping[str, Any]:
     service = ContactService(_build_client(args))
-    return service.search_users(
-        str(args.query),
-        page_size=getattr(args, "page_size", None),
-        page_token=getattr(args, "page_token", None),
+    page_size = getattr(args, "page_size", None)
+    page_token = getattr(args, "page_token", None)
+    if not bool(getattr(args, "all", False)):
+        return service.search_users(
+            str(args.query),
+            page_size=page_size,
+            page_token=page_token,
+        )
+    return _collect_all_pages_for_key(
+        lambda *, page_size, page_token: service.search_users(
+            str(args.query),
+            page_size=page_size,
+            page_token=page_token,
+        ),
+        page_size=page_size,
+        page_token=page_token,
+        default_page_size=50,
+        item_key="users",
     )
 
 
@@ -370,13 +468,31 @@ def _cmd_contact_department_children(args: argparse.Namespace) -> Mapping[str, A
     else:
         fetch_child = str(raw_fetch_child).lower() == "true"
     service = ContactService(_build_client(args))
-    return service.list_department_children(
-        str(args.department_id),
-        user_id_type=getattr(args, "user_id_type", None),
-        department_id_type=getattr(args, "department_id_type", None),
-        fetch_child=fetch_child,
-        page_size=getattr(args, "page_size", None),
-        page_token=getattr(args, "page_token", None),
+    page_size = getattr(args, "page_size", None)
+    page_token = getattr(args, "page_token", None)
+    user_id_type = getattr(args, "user_id_type", None)
+    department_id_type = getattr(args, "department_id_type", None)
+    if not bool(getattr(args, "all", False)):
+        return service.list_department_children(
+            str(args.department_id),
+            user_id_type=user_id_type,
+            department_id_type=department_id_type,
+            fetch_child=fetch_child,
+            page_size=page_size,
+            page_token=page_token,
+        )
+    return _collect_all_pages(
+        lambda *, page_size, page_token: service.list_department_children(
+            str(args.department_id),
+            user_id_type=user_id_type,
+            department_id_type=department_id_type,
+            fetch_child=fetch_child,
+            page_size=page_size,
+            page_token=page_token,
+        ),
+        page_size=page_size,
+        page_token=page_token,
+        default_page_size=50,
     )
 
 
@@ -392,33 +508,83 @@ def _cmd_contact_department_batch_get(args: argparse.Namespace) -> Mapping[str, 
 
 def _cmd_contact_department_parent(args: argparse.Namespace) -> Mapping[str, Any]:
     service = ContactService(_build_client(args))
-    return service.list_parent_departments(
-        str(args.department_id),
-        user_id_type=getattr(args, "user_id_type", None),
-        department_id_type=getattr(args, "department_id_type", None),
-        page_size=getattr(args, "page_size", None),
-        page_token=getattr(args, "page_token", None),
+    page_size = getattr(args, "page_size", None)
+    page_token = getattr(args, "page_token", None)
+    user_id_type = getattr(args, "user_id_type", None)
+    department_id_type = getattr(args, "department_id_type", None)
+    if not bool(getattr(args, "all", False)):
+        return service.list_parent_departments(
+            str(args.department_id),
+            user_id_type=user_id_type,
+            department_id_type=department_id_type,
+            page_size=page_size,
+            page_token=page_token,
+        )
+    return _collect_all_pages(
+        lambda *, page_size, page_token: service.list_parent_departments(
+            str(args.department_id),
+            user_id_type=user_id_type,
+            department_id_type=department_id_type,
+            page_size=page_size,
+            page_token=page_token,
+        ),
+        page_size=page_size,
+        page_token=page_token,
+        default_page_size=50,
     )
 
 
 def _cmd_contact_department_search(args: argparse.Namespace) -> Mapping[str, Any]:
     service = ContactService(_build_client(args))
-    return service.search_departments(
-        str(args.query),
-        user_id_type=getattr(args, "user_id_type", None),
-        department_id_type=getattr(args, "department_id_type", None),
-        page_size=getattr(args, "page_size", None),
-        page_token=getattr(args, "page_token", None),
+    page_size = getattr(args, "page_size", None)
+    page_token = getattr(args, "page_token", None)
+    user_id_type = getattr(args, "user_id_type", None)
+    department_id_type = getattr(args, "department_id_type", None)
+    if not bool(getattr(args, "all", False)):
+        return service.search_departments(
+            str(args.query),
+            user_id_type=user_id_type,
+            department_id_type=department_id_type,
+            page_size=page_size,
+            page_token=page_token,
+        )
+    return _collect_all_pages(
+        lambda *, page_size, page_token: service.search_departments(
+            str(args.query),
+            user_id_type=user_id_type,
+            department_id_type=department_id_type,
+            page_size=page_size,
+            page_token=page_token,
+        ),
+        page_size=page_size,
+        page_token=page_token,
+        default_page_size=50,
     )
 
 
 def _cmd_contact_scope_get(args: argparse.Namespace) -> Mapping[str, Any]:
     service = ContactService(_build_client(args))
-    return service.list_scopes(
-        user_id_type=getattr(args, "user_id_type", None),
-        department_id_type=getattr(args, "department_id_type", None),
-        page_size=getattr(args, "page_size", None),
-        page_token=getattr(args, "page_token", None),
+    page_size = getattr(args, "page_size", None)
+    page_token = getattr(args, "page_token", None)
+    user_id_type = getattr(args, "user_id_type", None)
+    department_id_type = getattr(args, "department_id_type", None)
+    if not bool(getattr(args, "all", False)):
+        return service.list_scopes(
+            user_id_type=user_id_type,
+            department_id_type=department_id_type,
+            page_size=page_size,
+            page_token=page_token,
+        )
+    return _collect_all_scope_pages(
+        lambda *, page_size, page_token: service.list_scopes(
+            user_id_type=user_id_type,
+            department_id_type=department_id_type,
+            page_size=page_size,
+            page_token=page_token,
+        ),
+        page_size=page_size,
+        page_token=page_token,
+        default_page_size=50,
     )
 
 
@@ -453,6 +619,72 @@ def _collect_all_pages(
         if not current_token:
             break
     return {"all": True, "has_more": False, "count": len(collected), "items": collected}
+
+
+def _collect_all_pages_for_key(
+    fetch_page: Callable[..., Mapping[str, Any]],
+    *,
+    page_size: int | None,
+    page_token: str | None,
+    default_page_size: int,
+    item_key: str,
+) -> Mapping[str, Any]:
+    collected: list[Any] = []
+    current_token = page_token
+    current_page_size = page_size
+    while True:
+        data = fetch_page(page_size=current_page_size, page_token=current_token)
+        items = data.get(item_key)
+        if isinstance(items, list):
+            collected.extend(items)
+        if not _has_more(data):
+            break
+        current_token = _next_page_token(data)
+        if not current_token:
+            break
+        if current_page_size is None:
+            current_page_size = default_page_size
+    return {"all": True, "has_more": False, "count": len(collected), item_key: collected}
+
+
+def _collect_all_scope_pages(
+    fetch_page: Callable[..., Mapping[str, Any]],
+    *,
+    page_size: int | None,
+    page_token: str | None,
+    default_page_size: int,
+) -> Mapping[str, Any]:
+    user_ids: list[str] = []
+    department_ids: list[str] = []
+    group_ids: list[str] = []
+    current_token = page_token
+    current_page_size = page_size
+    while True:
+        data = fetch_page(page_size=current_page_size, page_token=current_token)
+        raw_user_ids = data.get("user_ids")
+        raw_department_ids = data.get("department_ids")
+        raw_group_ids = data.get("group_ids")
+        if isinstance(raw_user_ids, list):
+            user_ids.extend(value for value in raw_user_ids if isinstance(value, str) and value)
+        if isinstance(raw_department_ids, list):
+            department_ids.extend(value for value in raw_department_ids if isinstance(value, str) and value)
+        if isinstance(raw_group_ids, list):
+            group_ids.extend(value for value in raw_group_ids if isinstance(value, str) and value)
+        if not _has_more(data):
+            break
+        current_token = _next_page_token(data)
+        if not current_token:
+            break
+        if current_page_size is None:
+            current_page_size = default_page_size
+    return {
+        "all": True,
+        "has_more": False,
+        "count": len(user_ids) + len(department_ids) + len(group_ids),
+        "user_ids": user_ids,
+        "department_ids": department_ids,
+        "group_ids": group_ids,
+    }
 
 
 def _cmd_calendar_create_attendees(args: argparse.Namespace) -> Mapping[str, Any]:

@@ -169,6 +169,40 @@ def test_contact_department_children(monkeypatch: Any, capsys: Any) -> None:
     assert payload["items"][0]["department_id"] == "od_1"
 
 
+def test_contact_user_search_all(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    calls: list[str | None] = []
+
+    def _fake_search_users(
+        _self: ContactService,
+        query: str,
+        *,
+        page_size: int | None = None,
+        page_token: str | None = None,
+    ) -> dict[str, Any]:
+        assert query == "Alice"
+        calls.append(page_token)
+        if page_token == "next_1":
+            return {"users": [{"open_id": "ou_2"}], "has_more": False}
+        return {"users": [{"open_id": "ou_1"}], "has_more": True, "page_token": "next_1"}
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.contact.ContactService.search_users", _fake_search_users
+    )
+
+    code = cli.main(
+        ["contact", "user", "search", "--query", "Alice", "--all", "--format", "json"]
+    )
+    assert code == 0
+    assert calls == [None, "next_1"]
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["all"] is True
+    assert payload["count"] == 2
+    assert [item["open_id"] for item in payload["users"]] == ["ou_1", "ou_2"]
+
+
 def test_contact_scope_get(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
@@ -216,4 +250,49 @@ def test_contact_scope_get(monkeypatch: Any, capsys: Any) -> None:
     assert captured["page_size"] == 100
     assert captured["page_token"] == "scope_1"
     payload = json.loads(capsys.readouterr().out)
+    assert payload["group_ids"] == ["g_1"]
+
+
+def test_contact_scope_get_all(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    calls: list[str | None] = []
+
+    def _fake_list_scopes(
+        _self: ContactService,
+        *,
+        user_id_type: str | None = None,
+        department_id_type: str | None = None,
+        page_size: int | None = None,
+        page_token: str | None = None,
+    ) -> dict[str, Any]:
+        calls.append(page_token)
+        if page_token == "next_1":
+            return {
+                "user_ids": ["ou_2"],
+                "department_ids": ["od_2"],
+                "group_ids": [],
+                "has_more": False,
+            }
+        return {
+            "user_ids": ["ou_1"],
+            "department_ids": ["od_1"],
+            "group_ids": ["g_1"],
+            "has_more": True,
+            "page_token": "next_1",
+        }
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.contact.ContactService.list_scopes", _fake_list_scopes
+    )
+
+    code = cli.main(["contact", "scope", "get", "--all", "--format", "json"])
+    assert code == 0
+    assert calls == [None, "next_1"]
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["all"] is True
+    assert payload["count"] == 5
+    assert payload["user_ids"] == ["ou_1", "ou_2"]
+    assert payload["department_ids"] == ["od_1", "od_2"]
     assert payload["group_ids"] == ["g_1"]

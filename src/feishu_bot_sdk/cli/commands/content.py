@@ -72,6 +72,49 @@ def _write_json_output(path_value: str, payload: Mapping[str, Any]) -> Path:
     return output_path
 
 
+def _list_count(value: Any) -> int:
+    if not isinstance(value, list):
+        return 0
+    return len(value)
+
+
+def _count_inserted_relations(inserted_batches: Any) -> int:
+    if not isinstance(inserted_batches, list):
+        return 0
+    total = 0
+    for batch in inserted_batches:
+        if not isinstance(batch, Mapping):
+            continue
+        total += _list_count(batch.get("block_id_relations"))
+    return total
+
+
+def _summarize_docx_insert_result(data: Mapping[str, Any], *, content: str) -> Mapping[str, Any]:
+    converted = data.get("converted")
+    inserted_batches = data.get("inserted_batches")
+    image_replacements = data.get("image_replacements")
+
+    converted_block_count = 0
+    first_level_block_count = 0
+    if isinstance(converted, Mapping):
+        converted_block_count = _list_count(converted.get("blocks"))
+        first_level_block_count = _list_count(converted.get("first_level_block_ids"))
+
+    summary: dict[str, Any] = {
+        "ok": bool(data.get("ok", True)),
+        "document_id": data.get("document_id"),
+        "block_id": data.get("block_id"),
+        "content_type": data.get("content_type"),
+        "input_char_count": len(content),
+        "batch_count": int(data.get("batch_count", _list_count(inserted_batches))),
+        "first_level_block_count": first_level_block_count,
+        "converted_block_count": converted_block_count,
+        "inserted_block_count": _count_inserted_relations(inserted_batches),
+        "image_replacement_count": _list_count(image_replacements),
+    }
+    return {key: value for key, value in summary.items() if value is not None}
+
+
 def _collect_all_pages(
     fetch_page: Callable[..., Mapping[str, Any]],
     *,
@@ -508,7 +551,7 @@ def _cmd_docx_insert_content(args: argparse.Namespace) -> Mapping[str, Any]:
         name="content",
     )
     service = DocxService(_build_client(args))
-    return service.insert_content(
+    data = service.insert_content(
         str(args.document_id),
         content,
         block_id=getattr(args, "block_id", None),
@@ -518,6 +561,9 @@ def _cmd_docx_insert_content(args: argparse.Namespace) -> Mapping[str, Any]:
         client_token=getattr(args, "client_token", None),
         user_id_type=getattr(args, "user_id_type", None),
     )
+    if bool(getattr(args, "full_response", False)):
+        return data
+    return _summarize_docx_insert_result(data, content=content)
 
 
 def _cmd_docx_set_title(args: argparse.Namespace) -> Mapping[str, Any]:

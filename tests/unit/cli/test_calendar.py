@@ -47,6 +47,37 @@ def test_calendar_list_calendars(monkeypatch: Any, capsys: Any) -> None:
     assert payload["items"][0]["calendar_id"] == "cal_1"
 
 
+def test_calendar_list_calendars_all(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    calls: list[str | None] = []
+
+    def _fake_list_calendars(
+        _self: CalendarService,
+        *,
+        page_size: int | None = None,
+        page_token: str | None = None,
+        sync_token: str | None = None,
+    ) -> dict[str, Any]:
+        calls.append(page_token)
+        if page_token == "next_1":
+            return {"items": [{"calendar_id": "cal_2"}], "has_more": False}
+        return {"items": [{"calendar_id": "cal_1"}], "has_more": True, "page_token": "next_1"}
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.calendar.CalendarService.list_calendars", _fake_list_calendars
+    )
+
+    code = cli.main(["calendar", "list-calendars", "--all", "--format", "json"])
+    assert code == 0
+    assert calls == [None, "next_1"]
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["all"] is True
+    assert payload["count"] == 2
+    assert [item["calendar_id"] for item in payload["items"]] == ["cal_1", "cal_2"]
+
+
 def test_calendar_create_event_from_stdin(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")

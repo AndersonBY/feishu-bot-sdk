@@ -72,9 +72,11 @@ uv tool install feishu-bot-sdk
 
 ## CLI 命令速查
 
-全局参数：`--format human|json`、`--app-id`、`--app-secret`、`--auth-mode tenant|user`、`--base-url`、`--timeout`
+全局参数：`--format human|json`、`--app-id`、`--app-secret`、`--auth-mode tenant|user`、`--base-url`、`--timeout`、
+`--max-output-chars`、`--output-offset`、`--save-output`、`--full-output`
 
 所有命令支持 `--format json` 输出机器可读格式，支持 stdin 输入（`--*-stdin`、`--*-file`、`--*-json`）。
+常规命令默认把 stdout 控制在 25000 字符内；当输出过大时，CLI 会返回 `_cli_output`，告诉你如何查看后续 JSON 片段或下一页。
 
 ### 命令组总览
 
@@ -121,6 +123,7 @@ feishu bitable create-record --app-token app_xxx --table-id tbl_xxx --fields-jso
 ```bash
 feishu docx create --title "Weekly Report" --format json
 feishu docx insert-content --document-id doccn_xxx --content-file report.md --content-type markdown --document-revision-id -1 --format json
+# 默认返回精简摘要；只有调试转换/插入细节时才加 --full-response
 feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --output ./report.md
 ```
 
@@ -132,7 +135,7 @@ feishu wiki list-spaces --all --format json
 
 **日历：**
 ```bash
-feishu calendar list-calendars --page-size 50 --format json
+feishu calendar list-calendars --all --format json
 feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json
 feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
 ```
@@ -223,8 +226,16 @@ server.run()
 
 ## Agent 使用提示
 
-- 分页查询优先用 `--all`：`bitable list-records`、`wiki list-spaces`、`wiki search-nodes`、`docx list-blocks`、`mail message list`、`mail group list`、`mail group member list`
+- 机器调用统一加 `--format json`
+- 常规命令 stdout 默认上限 25000 字符；如果返回里出现 `_cli_output.truncated=true`：
+  - 先看 `_cli_output.hints`
+  - 用 `--output-offset <next_output_offset>` 看后续 JSON 片段
+  - 或用 `--save-output ./full.json` 把完整标准化 JSON 写盘
+- 对支持翻页的命令，优先用 `--page-size` + `--page-token` 做增量抓取；只有在确认总量可控时才用 `--all`
+- 已支持 `--all` 的高频查询包括：`bitable list-records`、`wiki list-spaces`、`wiki search-nodes`、`docx list-blocks`、`mail message list`、`mail group list`、`mail group member list`、`calendar list-calendars`、`calendar search-calendars`、`calendar list-events`、`calendar search-events`、`contact user by-department`、`contact user search`、`contact department children`、`contact department parent`、`contact department search`、`contact scope get`
+- 对目前没有 CLI 翻页参数的命令，避免直接把大结果塞进上下文：`drive list-members`、`calendar list-freebusy`、`calendar batch-freebusy`
 - 文档写入优先用 `docx insert-content --content-type markdown`，避免手动构建 block
+- `docx insert-content` 默认只返回精简摘要；只有在排查 block 转换/图片替换时才加 `--full-response`
 - 日历附件用 `calendar attach-material`，避免权限问题
 - 邮件发送优先用 `mail message send-markdown`，自动处理 Markdown 渲染和图片内联
 - 搜索类命令（`search app/message/doc-wiki`）需要 `--auth-mode user`
@@ -250,6 +261,9 @@ feishu mail address query-status --email ops@example.com --email alerts@example.
 
 # 列出收件箱邮件（自动翻页）
 feishu mail message list --user-mailbox-id me --folder-id INBOX --all --format json
+
+# 如果输出仍然太大，先落盘再分析
+feishu mail message list --user-mailbox-id me --folder-id INBOX --all --save-output ./mail-full.json --format json
 
 # 从 Markdown 文件渲染 HTML 邮件并发送
 feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
