@@ -14,6 +14,7 @@ from ..commands import (
     _cmd_bitable_get_view,
     _cmd_bitable_grant_edit,
     _cmd_bitable_list_records,
+    _cmd_bitable_list_tables,
     _cmd_bitable_list_views,
     _cmd_bitable_update_app,
     _cmd_bitable_update_view,
@@ -123,6 +124,7 @@ def _build_bitable_commands(
         epilog=(
             "Examples:\n"
             "  feishu bitable create-from-csv ./final.csv --app-name \"Task\" --table-name \"Result\" --format json\n"
+            "  feishu bitable list-tables --app-token app_xxx --format json\n"
             "  echo '{\"Task\":\"Follow up\"}' | feishu bitable create-record --app-token app_xxx --table-id tbl_xxx --fields-stdin --format json\n"
             "  feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json"
         ),
@@ -152,6 +154,13 @@ def _build_bitable_commands(
     )
     create_from_csv.set_defaults(handler=_cmd_bitable_create_from_csv)
 
+    list_tables = bitable_sub.add_parser("list-tables", help="List tables", parents=[shared])
+    list_tables.add_argument("--app-token", required=True, help="Bitable app_token")
+    list_tables.add_argument("--page-size", type=int, help="Page size")
+    list_tables.add_argument("--page-token", help="Page token")
+    list_tables.add_argument("--all", action="store_true", help="Auto paginate and return all items")
+    list_tables.set_defaults(handler=_cmd_bitable_list_tables)
+
     create_table = bitable_sub.add_parser("create-table", help="Create table", parents=[shared])
     create_table.add_argument("--app-token", required=True, help="Bitable app_token")
     create_table.add_argument("--table-json", help='Table JSON, e.g. {"name":"Tasks","fields":[{"field_name":"Title","type":1}]}')
@@ -161,7 +170,10 @@ def _build_bitable_commands(
 
     create_record = bitable_sub.add_parser("create-record", help="Create record", parents=[shared])
     create_record.add_argument("--app-token", required=True, help="Bitable app_token")
-    create_record.add_argument("--table-id", required=True, help="Bitable table_id")
+    create_record.add_argument(
+        "--table-id",
+        help="Optional Bitable table_id; auto-resolved when the app has a default or exactly one table",
+    )
     create_record.add_argument("--fields-json", help='Fields JSON, e.g. {"Title":"Buy milk","Status":"Todo"}')
     create_record.add_argument("--fields-file", help="Fields JSON file path")
     create_record.add_argument("--fields-stdin", action="store_true", help="Read fields JSON from stdin")
@@ -176,7 +188,10 @@ def _build_bitable_commands(
 
     list_records = bitable_sub.add_parser("list-records", help="List records", parents=[shared])
     list_records.add_argument("--app-token", required=True, help="Bitable app_token")
-    list_records.add_argument("--table-id", required=True, help="Bitable table_id")
+    list_records.add_argument(
+        "--table-id",
+        help="Optional Bitable table_id; auto-resolved when the app has a default or exactly one table",
+    )
     list_records.add_argument("--page-size", type=int, help="Page size")
     list_records.add_argument("--page-token", help="Page token")
     list_records.add_argument("--view-id", help="Optional view id")
@@ -224,7 +239,10 @@ def _build_bitable_commands(
 
     list_views = bitable_sub.add_parser("list-views", help="List views in a table", parents=[shared])
     list_views.add_argument("--app-token", required=True, help="Bitable app_token")
-    list_views.add_argument("--table-id", required=True, help="Table ID")
+    list_views.add_argument(
+        "--table-id",
+        help="Optional table ID; auto-resolved when the app has a default or exactly one table",
+    )
     list_views.add_argument("--page-size", type=int, help="Page size")
     list_views.add_argument("--page-token", help="Page token")
     list_views.add_argument("--all", action="store_true", help="Auto paginate and return all items")
@@ -232,33 +250,48 @@ def _build_bitable_commands(
 
     get_view = bitable_sub.add_parser("get-view", help="Get a view", parents=[shared])
     get_view.add_argument("--app-token", required=True, help="Bitable app_token")
-    get_view.add_argument("--table-id", required=True, help="Table ID")
+    get_view.add_argument(
+        "--table-id",
+        help="Optional table ID; auto-resolved when the app has a default or exactly one table",
+    )
     get_view.add_argument("--view-id", required=True, help="View ID")
     get_view.set_defaults(handler=_cmd_bitable_get_view)
 
     create_view = bitable_sub.add_parser("create-view", help="Create a view", parents=[shared])
     create_view.add_argument("--app-token", required=True, help="Bitable app_token")
-    create_view.add_argument("--table-id", required=True, help="Table ID")
+    create_view.add_argument(
+        "--table-id",
+        help="Optional table ID; auto-resolved when the app has a default or exactly one table",
+    )
     create_view.add_argument("--view-name", required=True, help="View name")
     create_view.add_argument("--view-type", choices=_VIEW_TYPE_CHOICES, help="View type")
     create_view.set_defaults(handler=_cmd_bitable_create_view)
 
     update_view = bitable_sub.add_parser("update-view", help="Update a view", parents=[shared])
     update_view.add_argument("--app-token", required=True, help="Bitable app_token")
-    update_view.add_argument("--table-id", required=True, help="Table ID")
+    update_view.add_argument(
+        "--table-id",
+        help="Optional table ID; auto-resolved when the app has a default or exactly one table",
+    )
     update_view.add_argument("--view-id", required=True, help="View ID")
     update_view.add_argument("--view-name", required=True, help="New view name")
     update_view.set_defaults(handler=_cmd_bitable_update_view)
 
     delete_view = bitable_sub.add_parser("delete-view", help="Delete a view", parents=[shared])
     delete_view.add_argument("--app-token", required=True, help="Bitable app_token")
-    delete_view.add_argument("--table-id", required=True, help="Table ID")
+    delete_view.add_argument(
+        "--table-id",
+        help="Optional table ID; auto-resolved when the app has a default or exactly one table",
+    )
     delete_view.add_argument("--view-id", required=True, help="View ID")
     delete_view.set_defaults(handler=_cmd_bitable_delete_view)
 
     get_field = bitable_sub.add_parser("get-field", help="Get a field", parents=[shared])
     get_field.add_argument("--app-token", required=True, help="Bitable app_token")
-    get_field.add_argument("--table-id", required=True, help="Table ID")
+    get_field.add_argument(
+        "--table-id",
+        help="Optional table ID; auto-resolved when the app has a default or exactly one table",
+    )
     get_field.add_argument("--field-id", required=True, help="Field ID")
     get_field.set_defaults(handler=_cmd_bitable_get_field)
 

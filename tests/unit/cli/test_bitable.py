@@ -245,3 +245,189 @@ def test_bitable_list_records_all(monkeypatch: Any, capsys: Any) -> None:
     assert payload["all"] is True
     assert payload["count"] == 2
     assert [item["record_id"] for item in payload["items"]] == ["rec_1", "rec_2"]
+
+
+def test_bitable_list_tables_all(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    calls: list[dict[str, Any]] = []
+
+    def _fake_list_tables(
+        _self: BitableService,
+        app_token: str,
+        *,
+        page_size: int | None = None,
+        page_token: str | None = None,
+    ) -> dict[str, Any]:
+        calls.append(
+            {
+                "app_token": app_token,
+                "page_size": page_size,
+                "page_token": page_token,
+            }
+        )
+        if page_token == "next_1":
+            return {"items": [{"table_id": "tbl_2", "name": "Sheet 2"}], "has_more": False}
+        return {
+            "items": [{"table_id": "tbl_1", "name": "Sheet 1"}],
+            "has_more": True,
+            "page_token": "next_1",
+        }
+
+    monkeypatch.setattr("feishu_bot_sdk.bitable.BitableService.list_tables", _fake_list_tables)
+
+    code = cli.main(
+        [
+            "bitable",
+            "list-tables",
+            "--app-token",
+            "app_1",
+            "--all",
+            "--format",
+            "json",
+        ]
+    )
+
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert len(calls) == 2
+    assert calls[0]["app_token"] == "app_1"
+    assert payload["all"] is True
+    assert payload["count"] == 2
+    assert [item["table_id"] for item in payload["items"]] == ["tbl_1", "tbl_2"]
+
+
+def test_bitable_list_views_resolves_single_table_id(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    called: dict[str, Any] = {}
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.bitable.BitableService.get_app",
+        lambda _self, app_token: {"app": {"app_token": app_token, "default_table_id": ""}},
+    )
+    monkeypatch.setattr(
+        "feishu_bot_sdk.bitable.BitableService.iter_tables",
+        lambda _self, app_token, page_size=100: iter(
+            [{"table_id": "tbl_single", "name": "Result"}]
+        ),
+    )
+
+    def _fake_list_views(
+        _self: BitableService,
+        app_token: str,
+        table_id: str,
+        *,
+        page_size: int | None = None,
+        page_token: str | None = None,
+        user_id_type: str | None = None,
+    ) -> dict[str, Any]:
+        called["app_token"] = app_token
+        called["table_id"] = table_id
+        return {"items": [{"view_id": "vew_1"}], "has_more": False}
+
+    monkeypatch.setattr("feishu_bot_sdk.bitable.BitableService.list_views", _fake_list_views)
+
+    code = cli.main(
+        [
+            "bitable",
+            "list-views",
+            "--app-token",
+            "app_1",
+            "--table-id",
+            "",
+            "--format",
+            "json",
+        ]
+    )
+
+    assert code == 0
+    assert called["app_token"] == "app_1"
+    assert called["table_id"] == "tbl_single"
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["items"][0]["view_id"] == "vew_1"
+
+
+def test_bitable_list_views_requires_table_id_when_multiple_tables(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.bitable.BitableService.get_app",
+        lambda _self, app_token: {"app": {"app_token": app_token, "default_table_id": ""}},
+    )
+    monkeypatch.setattr(
+        "feishu_bot_sdk.bitable.BitableService.iter_tables",
+        lambda _self, app_token, page_size=100: iter(
+            [
+                {"table_id": "tbl_1", "name": "Sheet 1"},
+                {"table_id": "tbl_2", "name": "Sheet 2"},
+            ]
+        ),
+    )
+
+    code = cli.main(
+        [
+            "bitable",
+            "list-views",
+            "--app-token",
+            "app_1",
+            "--format",
+            "json",
+        ]
+    )
+
+    assert code == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is False
+    assert payload["exit_code"] == 2
+    assert "list-tables" in payload["error"]
+    assert "tbl_1 (Sheet 1)" in payload["error"]
+
+
+def test_bitable_copy_app_returns_resolved_table_id(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.bitable.BitableService.copy_app",
+        lambda _self, app_token, name=None, folder_token=None: {
+            "code": 0,
+            "msg": "success",
+            "data": {
+                "app": {
+                    "app_token": "app_copy_1",
+                    "default_table_id": "",
+                    "name": name or "Copy",
+                    "url": "https://example.com/base/app_copy_1",
+                }
+            },
+        },
+    )
+    monkeypatch.setattr(
+        "feishu_bot_sdk.bitable.BitableService.iter_tables",
+        lambda _self, app_token, page_size=100: iter(
+            [{"table_id": "tbl_single", "name": "Result"}]
+        ),
+    )
+
+    code = cli.main(
+        [
+            "bitable",
+            "copy-app",
+            "--app-token",
+            "app_src_1",
+            "--name",
+            "Copy",
+            "--format",
+            "json",
+        ]
+    )
+
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["data"]["table_id"] == "tbl_single"
+    assert payload["data"]["table_name"] == "Result"
+    assert payload["data"]["app"]["default_table_id"] == "tbl_single"

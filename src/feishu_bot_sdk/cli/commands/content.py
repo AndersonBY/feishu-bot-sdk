@@ -89,6 +89,140 @@ def _count_inserted_relations(inserted_batches: Any) -> int:
     return total
 
 
+def _require_non_empty_string_arg(value: Any, *, name: str, example: str | None = None) -> str:
+    normalized = str(value or "").strip()
+    if normalized:
+        return normalized
+    message = f"{name} must not be empty"
+    if example:
+        message = f"{message}; example: {example}"
+    raise ValueError(message)
+
+
+def _optional_string(value: Any) -> str | None:
+    normalized = str(value or "").strip()
+    if normalized:
+        return normalized
+    return None
+
+
+def _describe_bitable_table(item: Mapping[str, Any]) -> str:
+    table_id = _optional_string(item.get("table_id")) or "<unknown>"
+    table_name = _optional_string(item.get("name")) or _optional_string(item.get("table_name"))
+    if table_name:
+        return f"{table_id} ({table_name})"
+    return table_id
+
+
+def _list_bitable_tables(service: BitableService, app_token: str) -> list[Mapping[str, Any]]:
+    return [item for item in service.iter_tables(app_token, page_size=100) if isinstance(item, Mapping)]
+
+
+def _resolve_bitable_table_id(
+    service: BitableService,
+    app_token: str,
+    *,
+    table_id: Any,
+    command_name: str,
+) -> str:
+    explicit_table_id = _optional_string(table_id)
+    if explicit_table_id:
+        return explicit_table_id
+
+    app_info = service.get_app(app_token)
+    app_payload = app_info.get("app") if isinstance(app_info, Mapping) else None
+    if isinstance(app_payload, Mapping):
+        default_table_id = _optional_string(app_payload.get("default_table_id"))
+        if default_table_id:
+            return default_table_id
+
+    tables = _list_bitable_tables(service, app_token)
+    if len(tables) == 1:
+        only_table_id = _optional_string(tables[0].get("table_id"))
+        if only_table_id:
+            return only_table_id
+
+    if not tables:
+        raise ValueError(
+            f"table-id is required for `{command_name}`; app `{app_token}` has no tables"
+        )
+
+    candidates = ", ".join(_describe_bitable_table(item) for item in tables[:5])
+    if len(tables) > 5:
+        candidates = f"{candidates}, ... ({len(tables)} tables total)"
+    raise ValueError(
+        f"table-id is required for `{command_name}`; app `{app_token}` has {len(tables)} tables and no default table id. "
+        f"Run `feishu bitable list-tables --app-token {app_token} --format json` and choose one. "
+        f"Candidates: {candidates}"
+    )
+
+
+def _result_to_plain_mapping(result: Mapping[str, Any]) -> dict[str, Any]:
+    to_dict = getattr(result, "to_dict", None)
+    if callable(to_dict):
+        try:
+            payload = to_dict(include_meta=True)
+        except TypeError:
+            payload = to_dict()
+        if isinstance(payload, Mapping):
+            return {str(key): value for key, value in payload.items()}
+    return {str(key): value for key, value in result.items()}
+
+
+def _augment_bitable_app_result(
+    service: BitableService,
+    result: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    payload = _result_to_plain_mapping(result)
+    data_payload: dict[str, Any]
+    raw_data_payload = payload.get("data")
+    if isinstance(raw_data_payload, Mapping):
+        data_payload = dict(raw_data_payload)
+        payload["data"] = data_payload
+    else:
+        data_payload = payload
+
+    raw_app_payload = data_payload.get("app")
+    if not isinstance(raw_app_payload, Mapping):
+        return payload
+    app_payload = dict(raw_app_payload)
+    data_payload["app"] = app_payload
+
+    app_token = _optional_string(app_payload.get("app_token"))
+    if not app_token:
+        return payload
+
+    default_table_id = _optional_string(app_payload.get("default_table_id"))
+    if default_table_id:
+        data_payload.setdefault("table_id", default_table_id)
+        return payload
+
+    try:
+        tables = _list_bitable_tables(service, app_token)
+    except Exception:
+        return payload
+
+    if len(tables) == 1:
+        only_table_id = _optional_string(tables[0].get("table_id"))
+        only_table_name = _optional_string(tables[0].get("name")) or _optional_string(
+            tables[0].get("table_name")
+        )
+        if only_table_id:
+            app_payload["default_table_id"] = only_table_id
+            data_payload["table_id"] = only_table_id
+            if only_table_name:
+                data_payload["table_name"] = only_table_name
+        return payload
+
+    if tables:
+        data_payload["table_count"] = len(tables)
+        data_payload["table_resolution_hint"] = (
+            f"default table id is empty; run `feishu bitable list-tables --app-token {app_token} --format json` "
+            "to choose a table. Table-specific commands can auto-resolve the table only when the app has exactly one table."
+        )
+    return payload
+
+
 def _resolve_member_identity(
     args: argparse.Namespace,
     *,
@@ -163,9 +297,9 @@ def _collect_all_pages(
 def _cmd_bitable_create_from_csv(args: argparse.Namespace) -> Mapping[str, Any]:
     service = BitableService(_build_client(args))
     app_token, app_url = service.create_from_csv(
-        str(args.csv_path),
-        str(args.app_name),
-        str(args.table_name),
+        _require_non_empty_string_arg(args.csv_path, name="csv_path"),
+        _require_non_empty_string_arg(args.app_name, name="app-name"),
+        _require_non_empty_string_arg(args.table_name, name="table-name"),
     )
     granted = False
     member_id = getattr(args, "grant_member_id", None)
@@ -192,7 +326,10 @@ def _cmd_bitable_create_table(args: argparse.Namespace) -> Mapping[str, Any]:
         required=True,
     )
     service = BitableService(_build_client(args))
-    return service.create_table(str(args.app_token), table)
+    return service.create_table(
+        _require_non_empty_string_arg(args.app_token, name="app-token"),
+        table,
+    )
 
 
 def _cmd_bitable_create_record(args: argparse.Namespace) -> Mapping[str, Any]:
@@ -204,9 +341,15 @@ def _cmd_bitable_create_record(args: argparse.Namespace) -> Mapping[str, Any]:
         required=True,
     )
     service = BitableService(_build_client(args))
+    app_token = _require_non_empty_string_arg(args.app_token, name="app-token")
     return service.create_record(
-        str(args.app_token),
-        str(args.table_id),
+        app_token,
+        _resolve_bitable_table_id(
+            service,
+            app_token,
+            table_id=getattr(args, "table_id", None),
+            command_name="create-record",
+        ),
         fields,
         user_id_type=getattr(args, "user_id_type", None),
         client_token=getattr(args, "client_token", None),
@@ -216,6 +359,13 @@ def _cmd_bitable_create_record(args: argparse.Namespace) -> Mapping[str, Any]:
 
 def _cmd_bitable_list_records(args: argparse.Namespace) -> Mapping[str, Any]:
     service = BitableService(_build_client(args))
+    app_token = _require_non_empty_string_arg(args.app_token, name="app-token")
+    table_id = _resolve_bitable_table_id(
+        service,
+        app_token,
+        table_id=getattr(args, "table_id", None),
+        command_name="list-records",
+    )
     page_size = getattr(args, "page_size", None)
     page_token = getattr(args, "page_token", None)
     view_id = getattr(args, "view_id", None)
@@ -226,8 +376,8 @@ def _cmd_bitable_list_records(args: argparse.Namespace) -> Mapping[str, Any]:
     text_field_as_array = _optional_bool(getattr(args, "text_field_as_array", None))
     if not bool(getattr(args, "all", False)):
         return service.list_records(
-            str(args.app_token),
-            str(args.table_id),
+            app_token,
+            table_id,
             page_size=page_size,
             page_token=page_token,
             view_id=view_id,
@@ -240,8 +390,8 @@ def _cmd_bitable_list_records(args: argparse.Namespace) -> Mapping[str, Any]:
 
     return _collect_all_pages(
         lambda *, page_size, page_token: service.list_records(
-            str(args.app_token),
-            str(args.table_id),
+            app_token,
+            table_id,
             page_size=page_size,
             page_token=page_token,
             view_id=view_id,
@@ -260,7 +410,7 @@ def _cmd_bitable_list_records(args: argparse.Namespace) -> Mapping[str, Any]:
 def _cmd_bitable_grant_edit(args: argparse.Namespace) -> Mapping[str, bool]:
     service = BitableService(_build_client(args))
     service.grant_edit_permission(
-        str(args.app_token),
+        _require_non_empty_string_arg(args.app_token, name="app-token"),
         _resolve_member_identity(
             args,
             member_id=getattr(args, "member_id", None),
@@ -273,33 +423,68 @@ def _cmd_bitable_grant_edit(args: argparse.Namespace) -> Mapping[str, bool]:
 
 def _cmd_bitable_get_app(args: argparse.Namespace) -> Mapping[str, Any]:
     service = BitableService(_build_client(args))
-    return service.get_app(str(args.app_token))
+    return _augment_bitable_app_result(
+        service,
+        service.get_app(_require_non_empty_string_arg(args.app_token, name="app-token")),
+    )
 
 
 def _cmd_bitable_update_app(args: argparse.Namespace) -> Mapping[str, Any]:
     service = BitableService(_build_client(args))
-    return service.update_app(str(args.app_token), name=getattr(args, "name", None))
+    return service.update_app(
+        _require_non_empty_string_arg(args.app_token, name="app-token"),
+        name=getattr(args, "name", None),
+    )
+
+
+def _cmd_bitable_list_tables(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = BitableService(_build_client(args))
+    app_token = _require_non_empty_string_arg(args.app_token, name="app-token")
+    page_size = getattr(args, "page_size", None)
+    page_token = getattr(args, "page_token", None)
+    if not bool(getattr(args, "all", False)):
+        return service.list_tables(app_token, page_size=page_size, page_token=page_token)
+    return _collect_all_pages(
+        lambda *, page_size, page_token: service.list_tables(
+            app_token,
+            page_size=page_size,
+            page_token=page_token,
+        ),
+        page_size=page_size,
+        page_token=page_token,
+        default_page_size=100,
+    )
 
 
 def _cmd_bitable_copy_app(args: argparse.Namespace) -> Mapping[str, Any]:
     service = BitableService(_build_client(args))
-    return service.copy_app(
-        str(args.app_token),
-        name=getattr(args, "name", None),
-        folder_token=getattr(args, "folder_token", None),
+    return _augment_bitable_app_result(
+        service,
+        service.copy_app(
+            _require_non_empty_string_arg(args.app_token, name="app-token"),
+            name=getattr(args, "name", None),
+            folder_token=getattr(args, "folder_token", None),
+        ),
     )
 
 
 def _cmd_bitable_list_views(args: argparse.Namespace) -> Mapping[str, Any]:
     service = BitableService(_build_client(args))
+    app_token = _require_non_empty_string_arg(args.app_token, name="app-token")
+    table_id = _resolve_bitable_table_id(
+        service,
+        app_token,
+        table_id=getattr(args, "table_id", None),
+        command_name="list-views",
+    )
     page_size = getattr(args, "page_size", None)
     page_token = getattr(args, "page_token", None)
     if not bool(getattr(args, "all", False)):
-        return service.list_views(str(args.app_token), str(args.table_id), page_size=page_size, page_token=page_token)
+        return service.list_views(app_token, table_id, page_size=page_size, page_token=page_token)
     return _collect_all_pages(
         lambda *, page_size, page_token: service.list_views(
-            str(args.app_token),
-            str(args.table_id),
+            app_token,
+            table_id,
             page_size=page_size,
             page_token=page_token,
         ),
@@ -311,31 +496,84 @@ def _cmd_bitable_list_views(args: argparse.Namespace) -> Mapping[str, Any]:
 
 def _cmd_bitable_get_view(args: argparse.Namespace) -> Mapping[str, Any]:
     service = BitableService(_build_client(args))
-    return service.get_view(str(args.app_token), str(args.table_id), str(args.view_id))
+    app_token = _require_non_empty_string_arg(args.app_token, name="app-token")
+    return service.get_view(
+        app_token,
+        _resolve_bitable_table_id(
+            service,
+            app_token,
+            table_id=getattr(args, "table_id", None),
+            command_name="get-view",
+        ),
+        _require_non_empty_string_arg(args.view_id, name="view-id"),
+    )
 
 
 def _cmd_bitable_create_view(args: argparse.Namespace) -> Mapping[str, Any]:
-    view: dict[str, object] = {"view_name": str(args.view_name)}
+    view: dict[str, object] = {
+        "view_name": _require_non_empty_string_arg(args.view_name, name="view-name")
+    }
     view_type = getattr(args, "view_type", None)
     if view_type:
         view["view_type"] = str(view_type)
     service = BitableService(_build_client(args))
-    return service.create_view(str(args.app_token), str(args.table_id), view)
+    app_token = _require_non_empty_string_arg(args.app_token, name="app-token")
+    return service.create_view(
+        app_token,
+        _resolve_bitable_table_id(
+            service,
+            app_token,
+            table_id=getattr(args, "table_id", None),
+            command_name="create-view",
+        ),
+        view,
+    )
 
 
 def _cmd_bitable_update_view(args: argparse.Namespace) -> Mapping[str, Any]:
     service = BitableService(_build_client(args))
-    return service.update_view(str(args.app_token), str(args.table_id), str(args.view_id), {"view_name": str(args.view_name)})
+    app_token = _require_non_empty_string_arg(args.app_token, name="app-token")
+    return service.update_view(
+        app_token,
+        _resolve_bitable_table_id(
+            service,
+            app_token,
+            table_id=getattr(args, "table_id", None),
+            command_name="update-view",
+        ),
+        _require_non_empty_string_arg(args.view_id, name="view-id"),
+        {"view_name": _require_non_empty_string_arg(args.view_name, name="view-name")},
+    )
 
 
 def _cmd_bitable_delete_view(args: argparse.Namespace) -> Mapping[str, Any]:
     service = BitableService(_build_client(args))
-    return service.delete_view(str(args.app_token), str(args.table_id), str(args.view_id))
+    app_token = _require_non_empty_string_arg(args.app_token, name="app-token")
+    return service.delete_view(
+        app_token,
+        _resolve_bitable_table_id(
+            service,
+            app_token,
+            table_id=getattr(args, "table_id", None),
+            command_name="delete-view",
+        ),
+        _require_non_empty_string_arg(args.view_id, name="view-id"),
+    )
 
 
 def _cmd_bitable_get_field(args: argparse.Namespace) -> Mapping[str, Any]:
     service = BitableService(_build_client(args))
-    return service.get_field(str(args.app_token), str(args.table_id), str(args.field_id))
+    app_token = _require_non_empty_string_arg(args.app_token, name="app-token")
+    return service.get_field(
+        app_token,
+        _resolve_bitable_table_id(
+            service,
+            app_token,
+            table_id=getattr(args, "table_id", None),
+            command_name="get-field",
+        ),
+        _require_non_empty_string_arg(args.field_id, name="field-id"),
+    )
 
 
 def _cmd_docx_create(args: argparse.Namespace) -> Mapping[str, Any]:
