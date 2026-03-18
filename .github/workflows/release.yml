@@ -13,17 +13,17 @@ jobs:
     name: Code Quality
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -51,21 +51,21 @@ jobs:
     needs: quality
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
 
       - name: Build
         run: uv build
 
       - name: Upload dist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dist
           path: dist/
@@ -75,7 +75,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -86,32 +86,35 @@ jobs:
           echo "tag=${PREV_TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Generate release notes
-        id: notes
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           PREV=${{ steps.prev_tag.outputs.tag }}
           if [ -z "$PREV" ]; then
-            NOTES=$(git log --pretty=format:"- %s (%h)" "$TAG")
+            git log --pretty=format:"- %s (%h)" "$TAG" > RELEASE_NOTES.txt
           else
-            NOTES=$(git log --pretty=format:"- %s (%h)" "${PREV}..${TAG}")
+            git log --pretty=format:"- %s (%h)" "${PREV}..${TAG}" > RELEASE_NOTES.txt
           fi
-          {
-            echo "notes<<EOF"
-            echo "$NOTES"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          if [ ! -s RELEASE_NOTES.txt ]; then
+            echo "- Release $TAG" > RELEASE_NOTES.txt
+          fi
 
       - name: Download dist
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          body: ${{ steps.notes.outputs.notes }}
-          files: dist/*
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TAG" --notes-file RELEASE_NOTES.txt
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --title "$TAG" --notes-file RELEASE_NOTES.txt
+          fi
 
   publish:
     name: Publish to PyPI
@@ -121,11 +124,14 @@ jobs:
     permissions:
       id-token: write
     steps:
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
       - name: Download dist
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        run: uv publish --trusted-publishing always dist/*
