@@ -301,7 +301,7 @@ def _cmd_message_send_markdown(args: argparse.Namespace) -> Mapping[str, Any]:
         dedupe_key=getattr(args, "dedupe_key", None),
         head_from=head_from,
         base_dir=base_dir,
-        latex_mode=getattr(args, "latex_mode", "auto"),  # type: ignore[arg-type]
+        latex_mode=getattr(args, "latex_mode", "auto"),
     )
 
 

@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Any
 
 from feishu_bot_sdk import cli
-from feishu_bot_sdk.search import SearchService
 
 
 def _large_search_payload() -> dict[str, Any]:
