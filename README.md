@@ -97,7 +97,10 @@ feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx 
 
 # 6) CSV 创建多维表格并授权
 feishu bitable create-from-csv ./final.csv --app-name "任务结果" --table-name "结果表" --grant-member-id ou_xxx
+# 6.1) 先列出表；若应用只有默认表或唯一一张表，部分命令可省略 --table-id
+feishu bitable list-tables --app-token app_xxx --format json
 feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
+feishu bitable list-views --app-token app_xxx --format json
 
 # 7) 创建并写入 Docx
 feishu docx create --title "日报" --folder-token fld_xxx --format json

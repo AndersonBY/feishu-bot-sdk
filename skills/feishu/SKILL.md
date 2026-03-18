@@ -118,8 +118,10 @@ cat report.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --f
 **多维表格：**
 ```bash
 feishu bitable create-from-csv data.csv --app-name "Sales" --table-name "Q1"
+feishu bitable list-tables --app-token app_xxx --format json
 feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
-feishu bitable create-record --app-token app_xxx --table-id tbl_xxx --fields-json '{"Name":"Alice","Score":95}'
+feishu bitable list-views --app-token app_xxx --format json
+feishu bitable create-record --app-token app_xxx --fields-json '{"Name":"Alice","Score":95}'
 ```
 
 **云文档：**
@@ -238,6 +240,7 @@ server.run()
   - 或用 `--save-output ./full.json` 把完整标准化 JSON 写盘
 - 对支持翻页的命令，优先用 `--page-size` + `--page-token` 做增量抓取；只有在确认总量可控时才用 `--all`
 - 已支持 `--all` 的高频查询包括：`bitable list-records`、`wiki list-spaces`、`wiki search-nodes`、`docx list-blocks`、`mail message list`、`mail group list`、`mail group member list`、`calendar list-calendars`、`calendar search-calendars`、`calendar list-events`、`calendar search-events`、`contact user by-department`、`contact user search`、`contact department children`、`contact department parent`、`contact department search`、`contact scope get`
+- `bitable list-tables` 也支持 `--all`
 - 对目前没有 CLI 翻页参数的命令，避免直接把大结果塞进上下文：`drive list-members`、`calendar list-freebusy`、`calendar batch-freebusy`
 - 文档写入优先用 `docx insert-content --content-type markdown`，避免手动构建 block
 - `docx insert-content` 默认只返回精简摘要；只有在排查 block 转换/图片替换时才加 `--full-response`
@@ -245,6 +248,8 @@ server.run()
 - 邮件发送优先用 `mail message send-markdown`，自动处理 Markdown 渲染和图片内联
 - 搜索类命令（`search app/message/doc-wiki`）需要 `--auth-mode user`
 - `bitable list-records` 支持 `--view-id`、`--filter`、`--sort`、`--field-names`
+- Bitable 表级命令在应用有默认表或只有唯一一张表时，可省略 `--table-id`；若有多张表且默认表为空，先运行 `bitable list-tables`
+- `bitable get-app` / `copy-app` 在能唯一确定表时，会补充 `data.table_id`
 - 权限相关参数使用严格选项：`--member-id-type`、`--resource-type`、`--permission`
 - 如果用户说“给我 / 分享给我 / 授权给我”，先用 `feishu auth whoami --auth-mode user --format json` 解析当前登录用户
 - `drive/docx/bitable grant-edit` 支持 `--member-id me`，会按 `--member-id-type` 解析当前登录用户的 `open_id` / `user_id` / `union_id`

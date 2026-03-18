@@ -54,6 +54,22 @@ bitable.delete_record(app_token, "tbl_xxx", record_id)
 - `client_token`: idempotency token for retries.
 - `text_field_as_array`: rich-text response style.
 
+## CLI Notes
+
+```bash
+# Inspect tables first
+feishu bitable list-tables --app-token app_xxx --format json
+
+# When the app has a default table or exactly one table, --table-id can be omitted
+feishu bitable list-records --app-token app_xxx --all --format json
+feishu bitable list-views --app-token app_xxx --format json
+```
+
+- `bitable create-record`, `list-records`, `list-views`, `get-view`, `create-view`, `update-view`, `delete-view`, and `get-field` prefer an explicit `--table-id`
+- If `--table-id` is omitted, the CLI tries `default_table_id` first, then auto-selects the only table when the app has exactly one table
+- `bitable get-app` and `copy-app` backfill `data.table_id` when the table can be resolved uniquely
+- If the app has multiple tables and no default table ID, the CLI will tell you to run `bitable list-tables`
+
 ## Async Version
 
 - `AsyncBitableService` keeps the same method names.

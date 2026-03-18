@@ -84,7 +84,9 @@ feishu media download-file img_v3_xxx ./downloads/image.jpg --format json
 # user-sent message resources require message_id
 feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx --resource-type image --format json
 feishu bitable create-from-csv ./final.csv --app-name "Task Result" --table-name "Result"
+feishu bitable list-tables --app-token app_xxx --format json
 feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
+feishu bitable list-views --app-token app_xxx --format json
 feishu docx create --title "Daily Report" --folder-token fld_xxx --format json
 feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
 # Returns a compact summary by default; add --full-response for converted/inserted_batches details
@@ -146,8 +148,11 @@ Automatic behavior:
 - For announcement edits, prefer `chat announcement batch-update`; use `create-children` to append blocks and `delete-children` to remove ranges
 - For member management, `feishu group member ...` is an alias of `feishu chat member ...`, which is often easier for agents to infer from plain-language prompts
 - Prefer `--all` for paged queries: `bitable list-records`, `wiki list-spaces`, `wiki search-nodes`, `wiki list-nodes`
+- `bitable list-tables` also supports `--all`
 - `docx list-blocks`, `docx list-children`, `drive view-records`, and `drive version-list` also support `--all`
 - `bitable list-records` now supports `--view-id`, `--filter`, `--sort`, `--field-names`, and `--text-field-as-array`
+- `bitable list-records`, `list-views`, `create-record`, `get-view`, `create-view`, `update-view`, `delete-view`, and `get-field` can omit `--table-id` when the app has a default table or exactly one table
+- `bitable get-app` and `copy-app` try to backfill `data.table_id` when `default_table_id` is empty; if the app has multiple tables, run `bitable list-tables` first
 - Permission-related flags now use strict choices: `--member-id-type`, `--resource-type`, `--permission`
 - For doc writes, prefer `docx insert-content` instead of building markdown blocks manually
 

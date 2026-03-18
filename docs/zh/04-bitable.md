@@ -57,6 +57,22 @@ bitable.delete_record(app_token, "tbl_xxx", record_id)
 - `client_token`: 幂等令牌，建议在重试场景传入。
 - `text_field_as_array`: 控制富文本字段返回形态。
 
+## CLI 提示
+
+```bash
+# 先查表列表
+feishu bitable list-tables --app-token app_xxx --format json
+
+# 如果应用有默认表，或者只有一张表，可省略 --table-id
+feishu bitable list-records --app-token app_xxx --all --format json
+feishu bitable list-views --app-token app_xxx --format json
+```
+
+- `bitable create-record`、`list-records`、`list-views`、`get-view`、`create-view`、`update-view`、`delete-view`、`get-field` 会优先使用显式 `--table-id`
+- 如果未传 `--table-id`，CLI 会依次尝试：`default_table_id` -> 表列表里唯一一张表
+- `bitable get-app` / `copy-app` 在能唯一确定表时，会补充返回 `data.table_id`
+- 如果应用下有多张表且 `default_table_id` 为空，CLI 会提示你先运行 `bitable list-tables`
+
 ## 异步版
 
 - `AsyncBitableService` 方法名与同步版一致。

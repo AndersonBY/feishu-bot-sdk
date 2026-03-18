@@ -97,7 +97,10 @@ feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx 
 
 # 6) Create Bitable from CSV and grant access
 feishu bitable create-from-csv ./final.csv --app-name "Task Result" --table-name "Result" --grant-member-id ou_xxx
+# 6.1) List tables first; some commands can omit --table-id when the app has a default or only one table
+feishu bitable list-tables --app-token app_xxx --format json
 feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
+feishu bitable list-views --app-token app_xxx --format json
 
 # 7) Create and write Docx
 feishu docx create --title "Daily Report" --folder-token fld_xxx --format json

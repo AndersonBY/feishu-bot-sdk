@@ -95,13 +95,18 @@ feishu media upload-file video.mp4 --file-type mp4 --duration 60000
 feishu bitable create-from-csv data.csv --app-name "Sales Data" --table-name "Q1"
 feishu bitable create-from-csv data.csv --app-name "Sales" --table-name "Q1" --grant-member-id ou_xxx
 
+# List tables first when you need an explicit table choice
+feishu bitable list-tables --app-token bascnXXX --format json
+
 # Create table in existing app
 feishu bitable create-table --app-token bascnXXX --table-json '{"name":"Sheet2","fields":[...]}'
 
 # CRUD records
-feishu bitable create-record --app-token bascnXXX --table-id tblXXX --fields-json '{"Name":"Alice","Score":95}'
+# --table-id can be omitted when the app has a default table or exactly one table
+feishu bitable create-record --app-token bascnXXX --fields-json '{"Name":"Alice","Score":95}'
 feishu bitable list-records --app-token bascnXXX --table-id tblXXX --page-size 100 --format json
-feishu bitable list-records --app-token bascnXXX --table-id tblXXX --all --format json
+feishu bitable list-records --app-token bascnXXX --all --format json
+feishu bitable list-views --app-token bascnXXX --format json
 
 # Grant edit permission
 feishu bitable grant-edit --app-token bascnXXX --member-id ou_xxx

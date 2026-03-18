@@ -84,7 +84,9 @@ feishu media download-file img_v3_xxx ./downloads/image.jpg --format json
 # 用户发送的消息资源需带 message_id
 feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx --resource-type image --format json
 feishu bitable create-from-csv ./final.csv --app-name "任务结果" --table-name "结果表"
+feishu bitable list-tables --app-token app_xxx --format json
 feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
+feishu bitable list-views --app-token app_xxx --format json
 feishu docx create --title "日报" --folder-token fld_xxx --format json
 feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
 # 默认返回精简摘要；需要完整 converted/inserted_batches 时加 --full-response
@@ -146,8 +148,11 @@ feishu mail public-mailbox member batch-create --public-mailbox-id support@examp
 - 修改群公告时优先使用 `chat announcement batch-update`；新增块用 `create-children`，删除块用 `delete-children`
 - 群组成员管理可直接使用 `feishu group member ...`，它是 `feishu chat member ...` 的别名，适合更接近自然语言的 Agent 提示
 - 分页查询优先使用 `--all`：`bitable list-records`、`wiki list-spaces`、`wiki search-nodes`、`wiki list-nodes`
+- `bitable list-tables` 也支持 `--all`
 - `docx list-blocks`、`docx list-children`、`drive view-records`、`drive version-list` 也支持 `--all`
 - `bitable list-records` 现已支持 `--view-id`、`--filter`、`--sort`、`--field-names`、`--text-field-as-array`
+- `bitable list-records` / `list-views` / `create-record` / `get-view` / `create-view` / `update-view` / `delete-view` / `get-field` 在应用存在默认表，或只有唯一一张表时，可省略 `--table-id`
+- `bitable get-app` / `copy-app` 如果发现 `default_table_id` 为空，会尝试补充 `data.table_id`；若应用里有多张表，先执行 `bitable list-tables`
 - 授权参数已做强约束：`--member-id-type`、`--resource-type`、`--permission`，可减少参数拼写错误
 - 云文档写入建议直接用 `docx insert-content`，不要再自己拼 markdown 块
 
