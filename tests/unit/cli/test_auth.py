@@ -162,6 +162,17 @@ def test_extract_required_user_scopes() -> None:
     )
 
 
+def test_extract_required_tenant_scopes() -> None:
+    text = (
+        "Access denied. One of the following scopes is required: "
+        "[drive:drive, drive:drive:readonly, space:document:retrieve, drive:drive]"
+    )
+    assert (
+        cli._extract_required_tenant_scopes(text)
+        == "drive:drive drive:drive:readonly space:document:retrieve"
+    )
+
+
 def test_format_http_error_permission_hint_includes_scope_suggestion() -> None:
     exc = HTTPRequestError(
         "http request failed",
@@ -174,6 +185,21 @@ def test_format_http_error_permission_hint_includes_scope_suggestion() -> None:
     message = cli._format_http_error(exc)
     assert "missing user scopes" in message
     assert "contact:user:search contact:contact.base:readonly" in message
+
+
+def test_format_http_error_missing_tenant_scope_hint() -> None:
+    exc = HTTPRequestError(
+        "http request failed",
+        status_code=400,
+        response_text=(
+            '{"code":99991672,"msg":"Access denied. One of the following scopes is required: '
+            '[drive:drive, drive:drive:readonly, space:document:retrieve]"}'
+        ),
+    )
+    message = cli._format_http_error(exc)
+    assert "missing tenant app scopes" in message
+    assert "drive:drive drive:drive:readonly space:document:retrieve" in message
+    assert "not fixed by switching to user auth" in message
 
 
 def test_format_http_error_redirect_uri_hint() -> None:
@@ -243,6 +269,14 @@ def test_format_feishu_error_message_token_hints() -> None:
     assert "clear FEISHU_USER_REFRESH_TOKEN" in invalid_refresh
 
 
+def test_format_configuration_error_message_user_mode_hint() -> None:
+    message = cli._format_configuration_error_message(
+        "user mode requires user_access_token/access_token or user_refresh_token"
+    )
+    assert "vclawctl auth current --provider feishu" in message
+    assert "requester_auth_available=false" in message
+
+
 def test_cli_main_feishu_error_uses_hint(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
@@ -258,7 +292,33 @@ def test_cli_main_feishu_error_uses_hint(monkeypatch: Any, capsys: Any) -> None:
     assert code == 3
     payload = json.loads(capsys.readouterr().out)
     assert "refresh token is invalid" in payload["error"]
-    assert "clear FEISHU_USER_REFRESH_TOKEN" in payload["error"]
+
+
+def test_cli_main_configuration_error_uses_hint(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+    monkeypatch.setenv("FEISHU_AUTH_MODE", "user")
+    monkeypatch.setenv("FEISHU_NO_STORE", "1")
+    monkeypatch.delenv("FEISHU_ACCESS_TOKEN", raising=False)
+    monkeypatch.delenv("FEISHU_USER_ACCESS_TOKEN", raising=False)
+    monkeypatch.delenv("FEISHU_USER_REFRESH_TOKEN", raising=False)
+
+    code = cli.main(
+        [
+            "search",
+            "doc-wiki",
+            "--query",
+            "weekly",
+            "--doc-filter-json",
+            '{"only_title":true}',
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert "vclawctl auth current --provider feishu" in payload["error"]
+    assert "re-authorize requester access from v-claw settings" in payload["error"]
 
 
 def test_auth_login_stores_user_token(

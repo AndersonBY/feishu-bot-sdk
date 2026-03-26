@@ -32,6 +32,8 @@ from .runtime import (
     _UserTokenStoreContext,
     _build_client,
     _build_config,
+    _extract_required_tenant_scopes,
+    _format_configuration_error_message,
     _extract_required_user_scopes,
     _format_feishu_error_message,
     _format_http_error,
@@ -107,7 +109,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     except SystemExit as exc:
         return _system_exit_code(exc)
     except ConfigurationError as exc:
-        return _print_error(str(exc), exit_code=2, output_format=output_format)
+        message = _format_configuration_error_message(str(exc))
+        return _print_error(message, exit_code=2, output_format=output_format)
     except ValueError as exc:
         return _print_error(str(exc), exit_code=2, output_format=output_format)
     except HTTPRequestError as exc:
@@ -129,6 +132,8 @@ __all__ = [
     "_UserTokenStoreContext",
     "_build_client",
     "_build_config",
+    "_extract_required_tenant_scopes",
+    "_format_configuration_error_message",
     "_extract_required_user_scopes",
     "_format_feishu_error_message",
     "_wait_for_oauth_callback",

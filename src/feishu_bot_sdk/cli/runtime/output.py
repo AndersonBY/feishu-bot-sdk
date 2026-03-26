@@ -219,6 +219,19 @@ def _format_http_error(exc: HTTPRequestError) -> str:
                     "hint=missing user scope; run `feishu auth login --scope \"offline_access <required_scope>\"` "
                     "and retry."
                 )
+        if '"code":99991672' in response_lower or "one of the following scopes is required" in response_lower:
+            scope_hint = _extract_required_tenant_scopes(exc.response_text)
+            if scope_hint:
+                parts.append(
+                    "hint=missing tenant app scopes; enable one of these scopes in the "
+                    f"Feishu app console and retry: {scope_hint}. This is not fixed by "
+                    "switching to user auth."
+                )
+            else:
+                parts.append(
+                    "hint=missing tenant app scope; enable the required scope in the "
+                    "Feishu app console and retry. This is not fixed by switching to user auth."
+                )
         if '"code":99991663' in response_lower or '"code":99991668' in response_lower:
             parts.append(
                 "hint=invalid access token; prefer user auth for search APIs: "
@@ -248,6 +261,45 @@ def _extract_required_user_scopes(response_text: str) -> str:
         if scope not in scopes:
             scopes.append(scope)
     return " ".join(scopes)
+
+
+def _extract_required_tenant_scopes(response_text: str) -> str:
+    match = re.search(
+        r"one of the following scopes is required:\s*\[([^\]]+)\]",
+        response_text,
+        flags=re.IGNORECASE,
+    )
+    if match is None:
+        return ""
+    raw_scopes = [item.strip() for item in match.group(1).split(",")]
+    scopes: list[str] = []
+    for scope in raw_scopes:
+        if not scope:
+            continue
+        if scope not in scopes:
+            scopes.append(scope)
+    return " ".join(scopes)
+
+
+def _format_configuration_error_message(message: str) -> str:
+    lower = message.lower()
+    parts = [message]
+    if "user mode requires user_access_token/access_token or user_refresh_token" in lower:
+        parts.append(
+            "hint=user auth is unavailable. In a v-claw managed session, run "
+            "`vclawctl auth current --provider feishu`; if "
+            "`capabilities.requester_auth_available=false`, do not retry user-mode "
+            "commands and re-authorize requester access from v-claw settings. "
+            "Otherwise provide `FEISHU_USER_ACCESS_TOKEN`/`FEISHU_USER_REFRESH_TOKEN` "
+            "or switch to tenant auth."
+        )
+    if "auth whoami requires user_access_token/access_token or user_refresh_token" in lower:
+        parts.append(
+            "hint=user identity lookup requires requester auth. In a v-claw managed "
+            "session, confirm `requester_auth_available=true` before calling "
+            "`feishu auth whoami --auth-mode user`."
+        )
+    return "; ".join(parts)
 
 
 def _format_feishu_error_message(message: str) -> str:
