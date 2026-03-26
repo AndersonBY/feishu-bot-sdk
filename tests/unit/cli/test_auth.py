@@ -40,6 +40,20 @@ def test_build_config_prefers_env_credentials(monkeypatch: Any) -> None:
     assert config.app_secret == "env_app_secret"
 
 
+def test_build_config_accepts_auto_mode_with_user_token() -> None:
+    config = cli._build_config(
+        _base_args(
+            auth_mode="auto",
+            app_id="cli_app",
+            app_secret="cli_secret",
+            user_access_token="user_token_1",
+        )
+    )
+
+    assert config.auth_mode == "auto"
+    assert config.user_access_token == "user_token_1"
+
+
 def test_build_config_uses_user_token_from_store_when_env_and_args_missing() -> None:
     store_token = StoredUserToken(
         access_token="store_access_token",

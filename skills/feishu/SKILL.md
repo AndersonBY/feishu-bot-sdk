@@ -35,12 +35,12 @@ export FEISHU_APP_ID="cli_xxx"
 export FEISHU_APP_SECRET="xxx"
 
 # 认证模式（可选，默认 tenant）
-export FEISHU_AUTH_MODE="tenant"        # tenant 或 user
+export FEISHU_AUTH_MODE="tenant"        # tenant / user / auto
 
 # 静态 token（可选，跳过自动认证）
 export FEISHU_ACCESS_TOKEN="t-xxx"
 
-# 用户认证 token（auth_mode=user 时使用）
+# 用户认证 token（auth_mode=user 或 auto 时可用）
 export FEISHU_USER_ACCESS_TOKEN="u-xxx"
 export FEISHU_USER_REFRESH_TOKEN="ur-xxx"
 
@@ -65,6 +65,11 @@ feishu im send-text --receive-id ou_xxx --text "hello"
 处理“给我权限 / 分享给我 / 把我加入”这类请求时，默认把“我”理解为当前操作者。
 优先用 `feishu auth whoami --auth-mode user --format json` 解析当前登录用户，再执行权限变更。
 
+当同时具备 tenant 凭证和 user token 时，优先使用 `FEISHU_AUTH_MODE=auto`：
+- 搜索、日历、任务、邮箱、`auth whoami` 这类明显偏用户身份的 API 会优先走 user token
+- 如果 endpoint 明确不支持 user token，CLI 会自动回退到 tenant
+- 只有在你要强制指定身份时，才显式传 `--auth-mode tenant` 或 `--auth-mode user`
+
 ## 安装
 
 ```bash
@@ -75,7 +80,7 @@ uv tool install feishu-bot-sdk
 
 ## CLI 命令速查
 
-全局参数：`--format human|json`、`--app-id`、`--app-secret`、`--auth-mode tenant|user`、`--base-url`、`--timeout`、
+全局参数：`--format human|json`、`--app-id`、`--app-secret`、`--auth-mode tenant|user|auto`、`--base-url`、`--timeout`、
 `--max-output-chars`、`--output-offset`、`--save-output`、`--full-output`
 
 所有命令支持 `--format json` 输出机器可读格式，支持 stdin 输入（`--*-stdin`、`--*-file`、`--*-json`）。
@@ -97,7 +102,7 @@ uv tool install feishu-bot-sdk
 | `calendar` | 日历/日程管理 | `feishu calendar list-calendars --format json` |
 | `mail` | 邮箱/邮件组/公共邮箱 | `feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md` |
 | `contact` | 通讯录查询 | `feishu contact user get --user-id ou_xxx --format json` |
-| `search` | 搜索应用/消息/文档 | `feishu search doc-wiki --query "report" --auth-mode user --format json` |
+| `search` | 搜索应用/消息/文档 | `feishu search doc-wiki --query "report" --auth-mode auto --format json` |
 | `sheets` | 电子表格操作 | `feishu sheets ...` |
 | `task` | 任务管理 | `feishu task ...` |
 | `webhook` | Webhook 解析/验签/服务 | `feishu webhook serve --port 8000` |
@@ -145,10 +150,10 @@ feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --f
 feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
 ```
 
-**搜索（需要 user auth）：**
+**搜索（通常直接用 auto）：**
 ```bash
-feishu search doc-wiki --query "weekly report" --auth-mode user --format json
-feishu search message --query "incident" --chat-type group_chat --auth-mode user --format json
+feishu search doc-wiki --query "weekly report" --auth-mode auto --format json
+feishu search message --query "incident" --chat-type group_chat --auth-mode auto --format json
 ```
 
 **通讯录：**
@@ -162,7 +167,7 @@ feishu contact department search --query "engineering" --format json
 ```bash
 feishu drive upload-file report.pdf --parent-type explorer --parent-node fld_xxx
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
-feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id me --permission edit --auth-mode user --format json
+feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id me --permission edit --auth-mode auto --format json
 ```
 
 ## Python SDK 速查
@@ -246,7 +251,7 @@ server.run()
 - `docx insert-content` 默认只返回精简摘要；只有在排查 block 转换/图片替换时才加 `--full-response`
 - 日历附件用 `calendar attach-material`，避免权限问题
 - 邮件发送优先用 `mail message send-markdown`，自动处理 Markdown 渲染和图片内联
-- 搜索类命令（`search app/message/doc-wiki`）需要 `--auth-mode user`
+- 搜索类命令（`search app/message/doc-wiki`）通常直接用 `--auth-mode auto`
 - `bitable list-records` 支持 `--view-id`、`--filter`、`--sort`、`--field-names`
 - Bitable 表级命令在应用有默认表或只有唯一一张表时，可省略 `--table-id`；若有多张表且默认表为空，先运行 `bitable list-tables`
 - `bitable get-app` / `copy-app` 在能唯一确定表时，会补充 `data.table_id`

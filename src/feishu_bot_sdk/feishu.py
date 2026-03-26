@@ -227,62 +227,123 @@ class FeishuClient:
             query_params = json_payload
             json_payload = {}
         key = build_rate_limit_key(method_upper, path)
-        refreshed_once = False
-        while True:
-            token = self._resolve_access_token()
-            headers = {"Authorization": f"Bearer {token}"}
-            if method_upper != "GET":
-                headers["Content-Type"] = "application/json"
-            if self._rate_limiter is not None:
-                self._rate_limiter.acquire(key)
-            try:
-                data = self._http.request_json(
-                    method_upper,
-                    url,
-                    headers=headers,
-                    params=query_params,
-                    payload=json_payload,
-                    timeout_seconds=self._config.timeout_seconds,
-                )
-            except HTTPRequestError as exc:
-                if self._rate_limiter is not None and exc.status_code == 429:
-                    self._rate_limiter.on_throttled(key, _extract_retry_after(exc.response_headers))
-                if (
-                    not refreshed_once
-                    and self._config.auth_mode == "user"
-                    and _is_token_http_error(exc)
-                    and self._can_refresh_user_token()
-                ):
-                    self._force_refresh_user_access_token()
-                    refreshed_once = True
-                    continue
-                raise
-            if data.get("code") != 0:
-                if self._rate_limiter is not None and _is_throttled_response(data):
-                    self._rate_limiter.on_throttled(key)
-                if (
-                    not refreshed_once
-                    and self._config.auth_mode == "user"
-                    and _is_token_api_error(data)
-                    and self._can_refresh_user_token()
-                ):
-                    self._force_refresh_user_access_token()
-                    refreshed_once = True
-                    continue
-                raise FeishuError(f"feishu api failed: {data}")
-            if self._rate_limiter is not None:
-                self._rate_limiter.on_success(key)
-            return data
+        auth_modes = self._request_auth_modes_for_path(path)
+        last_error: Exception | None = None
+        for index, auth_mode in enumerate(auth_modes):
+            refreshed_once = False
+            while True:
+                token = self._resolve_access_token_for_mode(auth_mode)
+                headers = {"Authorization": f"Bearer {token}"}
+                if method_upper != "GET":
+                    headers["Content-Type"] = "application/json"
+                if self._rate_limiter is not None:
+                    self._rate_limiter.acquire(key)
+                try:
+                    data = self._http.request_json(
+                        method_upper,
+                        url,
+                        headers=headers,
+                        params=query_params,
+                        payload=json_payload,
+                        timeout_seconds=self._config.timeout_seconds,
+                    )
+                except HTTPRequestError as exc:
+                    if self._rate_limiter is not None and exc.status_code == 429:
+                        self._rate_limiter.on_throttled(key, _extract_retry_after(exc.response_headers))
+                    if (
+                        not refreshed_once
+                        and auth_mode == "user"
+                        and _is_token_http_error(exc)
+                        and self._can_refresh_user_token()
+                    ):
+                        self._force_refresh_user_access_token()
+                        refreshed_once = True
+                        continue
+                    if index + 1 < len(auth_modes) and _should_retry_with_alternate_auth_mode(
+                        current_mode=auth_mode,
+                        http_error=exc,
+                    ):
+                        last_error = exc
+                        break
+                    raise
+                if data.get("code") != 0:
+                    if self._rate_limiter is not None and _is_throttled_response(data):
+                        self._rate_limiter.on_throttled(key)
+                    if (
+                        not refreshed_once
+                        and auth_mode == "user"
+                        and _is_token_api_error(data)
+                        and self._can_refresh_user_token()
+                    ):
+                        self._force_refresh_user_access_token()
+                        refreshed_once = True
+                        continue
+                    error = FeishuError(f"feishu api failed: {data}")
+                    if index + 1 < len(auth_modes) and _should_retry_with_alternate_auth_mode(
+                        current_mode=auth_mode,
+                        api_error=data,
+                    ):
+                        last_error = error
+                        break
+                    raise error
+                if self._rate_limiter is not None:
+                    self._rate_limiter.on_success(key)
+                return data
+        if last_error is not None:
+            raise last_error
+        raise ConfigurationError("no Feishu auth mode available for this request")
 
     def _resolve_access_token(self) -> str:
-        if self._config.access_token:
-            return self._config.access_token
-        auth_mode = (self._config.auth_mode or "tenant").strip().lower()
-        if auth_mode == "tenant":
+        return self._resolve_access_token_for_mode(self._default_access_token_mode())
+
+    def _resolve_access_token_for_mode(self, auth_mode: str) -> str:
+        normalized_mode = str(auth_mode or "").strip().lower()
+        if normalized_mode == "tenant":
+            if self._config.access_token:
+                return self._config.access_token
             return self._resolve_tenant_access_token()
-        if auth_mode == "user":
+        if normalized_mode == "user":
+            if (self._config.auth_mode or "").strip().lower() == "user" and self._config.access_token:
+                return self._config.access_token
             return self._resolve_user_access_token()
-        raise ConfigurationError("auth_mode must be either 'tenant' or 'user'")
+        raise ConfigurationError("auth_mode must be either 'tenant', 'user', or 'auto'")
+
+    def _default_access_token_mode(self) -> str:
+        auth_mode = (self._config.auth_mode or "tenant").strip().lower()
+        if auth_mode in {"tenant", "user"}:
+            return auth_mode
+        if self._has_tenant_auth():
+            return "tenant"
+        if self._has_user_auth():
+            return "user"
+        raise ConfigurationError("auto mode requires tenant credentials or user token")
+
+    def _request_auth_modes_for_path(self, path: str) -> list[str]:
+        auth_mode = (self._config.auth_mode or "tenant").strip().lower()
+        if auth_mode in {"tenant", "user"}:
+            return [auth_mode]
+        preferred = _preferred_auth_mode_for_path(path)
+        alternate = "tenant" if preferred == "user" else "user"
+        ordered = [preferred, alternate]
+        available: list[str] = []
+        for mode in ordered:
+            if mode == "tenant" and self._has_tenant_auth() and mode not in available:
+                available.append(mode)
+            if mode == "user" and self._has_user_auth() and mode not in available:
+                available.append(mode)
+        if available:
+            return available
+        raise ConfigurationError("auto mode requires tenant credentials or user token")
+
+    def _has_tenant_auth(self) -> bool:
+        return bool(self._config.access_token or (self._config.app_id and self._config.app_secret))
+
+    def _has_user_auth(self) -> bool:
+        return bool(
+            self._config.user_access_token
+            or self._config.user_refresh_token
+            or ((self._config.auth_mode or "").strip().lower() == "user" and self._config.access_token)
+        )
 
     def _resolve_tenant_access_token(self) -> str:
         cached = self._tenant_token_cache
@@ -552,65 +613,126 @@ class AsyncFeishuClient:
             query_params = json_payload
             json_payload = {}
         key = build_rate_limit_key(method_upper, path)
-        refreshed_once = False
-        while True:
-            token = await self._resolve_access_token()
-            headers = {"Authorization": f"Bearer {token}"}
-            if method_upper != "GET":
-                headers["Content-Type"] = "application/json"
-            if self._rate_limiter is not None:
-                await self._rate_limiter.acquire(key)
-            try:
-                data = await self._http.request_json(
-                    method_upper,
-                    url,
-                    headers=headers,
-                    params=query_params,
-                    payload=json_payload,
-                    timeout_seconds=self._config.timeout_seconds,
-                )
-            except HTTPRequestError as exc:
-                if self._rate_limiter is not None and exc.status_code == 429:
-                    await self._rate_limiter.on_throttled(key, _extract_retry_after(exc.response_headers))
-                if (
-                    not refreshed_once
-                    and self._config.auth_mode == "user"
-                    and _is_token_http_error(exc)
-                    and self._can_refresh_user_token()
-                ):
-                    await self._force_refresh_user_access_token()
-                    refreshed_once = True
-                    continue
-                raise
-            if data.get("code") != 0:
-                if self._rate_limiter is not None and _is_throttled_response(data):
-                    await self._rate_limiter.on_throttled(key)
-                if (
-                    not refreshed_once
-                    and self._config.auth_mode == "user"
-                    and _is_token_api_error(data)
-                    and self._can_refresh_user_token()
-                ):
-                    await self._force_refresh_user_access_token()
-                    refreshed_once = True
-                    continue
-                raise FeishuError(f"feishu api failed: {data}")
-            if self._rate_limiter is not None:
-                await self._rate_limiter.on_success(key)
-            return data
+        auth_modes = self._request_auth_modes_for_path(path)
+        last_error: Exception | None = None
+        for index, auth_mode in enumerate(auth_modes):
+            refreshed_once = False
+            while True:
+                token = await self._resolve_access_token_for_mode(auth_mode)
+                headers = {"Authorization": f"Bearer {token}"}
+                if method_upper != "GET":
+                    headers["Content-Type"] = "application/json"
+                if self._rate_limiter is not None:
+                    await self._rate_limiter.acquire(key)
+                try:
+                    data = await self._http.request_json(
+                        method_upper,
+                        url,
+                        headers=headers,
+                        params=query_params,
+                        payload=json_payload,
+                        timeout_seconds=self._config.timeout_seconds,
+                    )
+                except HTTPRequestError as exc:
+                    if self._rate_limiter is not None and exc.status_code == 429:
+                        await self._rate_limiter.on_throttled(key, _extract_retry_after(exc.response_headers))
+                    if (
+                        not refreshed_once
+                        and auth_mode == "user"
+                        and _is_token_http_error(exc)
+                        and self._can_refresh_user_token()
+                    ):
+                        await self._force_refresh_user_access_token()
+                        refreshed_once = True
+                        continue
+                    if index + 1 < len(auth_modes) and _should_retry_with_alternate_auth_mode(
+                        current_mode=auth_mode,
+                        http_error=exc,
+                    ):
+                        last_error = exc
+                        break
+                    raise
+                if data.get("code") != 0:
+                    if self._rate_limiter is not None and _is_throttled_response(data):
+                        await self._rate_limiter.on_throttled(key)
+                    if (
+                        not refreshed_once
+                        and auth_mode == "user"
+                        and _is_token_api_error(data)
+                        and self._can_refresh_user_token()
+                    ):
+                        await self._force_refresh_user_access_token()
+                        refreshed_once = True
+                        continue
+                    error = FeishuError(f"feishu api failed: {data}")
+                    if index + 1 < len(auth_modes) and _should_retry_with_alternate_auth_mode(
+                        current_mode=auth_mode,
+                        api_error=data,
+                    ):
+                        last_error = error
+                        break
+                    raise error
+                if self._rate_limiter is not None:
+                    await self._rate_limiter.on_success(key)
+                return data
+        if last_error is not None:
+            raise last_error
+        raise ConfigurationError("no Feishu auth mode available for this request")
 
     async def aclose(self) -> None:
         await self._http.aclose()
 
     async def _resolve_access_token(self) -> str:
-        if self._config.access_token:
-            return self._config.access_token
-        auth_mode = (self._config.auth_mode or "tenant").strip().lower()
-        if auth_mode == "tenant":
+        return await self._resolve_access_token_for_mode(self._default_access_token_mode())
+
+    async def _resolve_access_token_for_mode(self, auth_mode: str) -> str:
+        normalized_mode = str(auth_mode or "").strip().lower()
+        if normalized_mode == "tenant":
+            if self._config.access_token:
+                return self._config.access_token
             return await self._resolve_tenant_access_token()
-        if auth_mode == "user":
+        if normalized_mode == "user":
+            if (self._config.auth_mode or "").strip().lower() == "user" and self._config.access_token:
+                return self._config.access_token
             return await self._resolve_user_access_token()
-        raise ConfigurationError("auth_mode must be either 'tenant' or 'user'")
+        raise ConfigurationError("auth_mode must be either 'tenant', 'user', or 'auto'")
+
+    def _default_access_token_mode(self) -> str:
+        auth_mode = (self._config.auth_mode or "tenant").strip().lower()
+        if auth_mode in {"tenant", "user"}:
+            return auth_mode
+        if self._has_tenant_auth():
+            return "tenant"
+        if self._has_user_auth():
+            return "user"
+        raise ConfigurationError("auto mode requires tenant credentials or user token")
+
+    def _request_auth_modes_for_path(self, path: str) -> list[str]:
+        auth_mode = (self._config.auth_mode or "tenant").strip().lower()
+        if auth_mode in {"tenant", "user"}:
+            return [auth_mode]
+        preferred = _preferred_auth_mode_for_path(path)
+        alternate = "tenant" if preferred == "user" else "user"
+        ordered = [preferred, alternate]
+        available: list[str] = []
+        for mode in ordered:
+            if mode == "tenant" and self._has_tenant_auth() and mode not in available:
+                available.append(mode)
+            if mode == "user" and self._has_user_auth() and mode not in available:
+                available.append(mode)
+        if available:
+            return available
+        raise ConfigurationError("auto mode requires tenant credentials or user token")
+
+    def _has_tenant_auth(self) -> bool:
+        return bool(self._config.access_token or (self._config.app_id and self._config.app_secret))
+
+    def _has_user_auth(self) -> bool:
+        return bool(
+            self._config.user_access_token
+            or self._config.user_refresh_token
+            or ((self._config.auth_mode or "").strip().lower() == "user" and self._config.access_token)
+        )
 
     async def _resolve_tenant_access_token(self) -> str:
         cached = self._tenant_token_cache
@@ -834,6 +956,63 @@ def _derive_open_domain(base_url: str) -> str:
     if index >= 0:
         return base_url[:index]
     return base_url.rstrip("/")
+
+
+def _preferred_auth_mode_for_path(path: str) -> str:
+    normalized = str(path or "").strip().lower()
+    if normalized == "/authen/v1/user_info":
+        return "user"
+    if normalized.startswith(("/search/", "/calendar/", "/task/", "/mail/")):
+        return "user"
+    return "tenant"
+
+
+def _should_retry_with_alternate_auth_mode(
+    *,
+    current_mode: str,
+    api_error: Mapping[str, object] | None = None,
+    http_error: HTTPRequestError | None = None,
+) -> bool:
+    normalized_mode = str(current_mode or "").strip().lower()
+    if normalized_mode == "tenant":
+        return _is_user_identity_required_api_error(api_error) or _is_user_identity_required_http_error(http_error)
+    if normalized_mode == "user":
+        return _is_user_access_token_unsupported_api_error(api_error) or _is_user_access_token_unsupported_http_error(http_error)
+    return False
+
+
+def _is_user_identity_required_api_error(data: Mapping[str, object] | None) -> bool:
+    if not isinstance(data, Mapping):
+        return False
+    code = _to_optional_int(data.get("code"))
+    message = (_to_optional_str(data.get("msg")) or "").lower()
+    return bool(
+        code == 99991679
+        or "required one of these privileges under the user identity" in message
+        or "under the user identity" in message
+    )
+
+
+def _is_user_access_token_unsupported_api_error(data: Mapping[str, object] | None) -> bool:
+    if not isinstance(data, Mapping):
+        return False
+    code = _to_optional_int(data.get("code"))
+    message = (_to_optional_str(data.get("msg")) or "").lower()
+    return bool(code == 99991668 and "user access token not support" in message)
+
+
+def _is_user_identity_required_http_error(exc: HTTPRequestError | None) -> bool:
+    if exc is None:
+        return False
+    response = (exc.response_text or "").lower()
+    return '"code":99991679' in response or "under the user identity" in response
+
+
+def _is_user_access_token_unsupported_http_error(exc: HTTPRequestError | None) -> bool:
+    if exc is None:
+        return False
+    response = (exc.response_text or "").lower()
+    return '"code":99991668' in response and "user access token not support" in response
 
 
 def _initial_user_token_cache(config: FeishuConfig) -> Optional[_UserTokenCache]:

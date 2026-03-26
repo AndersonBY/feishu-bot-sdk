@@ -6,7 +6,7 @@
 --format human|json         Output format (default: human)
 --app-id TEXT               Feishu app ID (env: FEISHU_APP_ID)
 --app-secret TEXT           Feishu app secret (env: FEISHU_APP_SECRET)
---auth-mode tenant|user     Auth mode
+--auth-mode tenant|user|auto Auth mode
 --base-url URL              API base (default: https://open.feishu.cn/open-apis)
 --timeout SECONDS           Request timeout
 --max-output-chars INT      Stdout cap for regular command results (default: 25000)
@@ -110,7 +110,7 @@ feishu bitable list-views --app-token bascnXXX --format json
 
 # Grant edit permission
 feishu bitable grant-edit --app-token bascnXXX --member-id ou_xxx
-feishu bitable grant-edit --app-token bascnXXX --member-id me --member-id-type open_id --auth-mode user --format json
+feishu bitable grant-edit --app-token bascnXXX --member-id me --member-id-type open_id --auth-mode auto --format json
 ```
 
 ## docx - Documents
@@ -129,7 +129,7 @@ feishu docx insert-content --document-id docXXX --content-file content.md --cont
 
 # Grant edit permission
 feishu docx grant-edit --document-id docXXX --member-id ou_xxx --format json
-feishu docx grant-edit --document-id docXXX --member-id me --member-id-type open_id --auth-mode user --format json
+feishu docx grant-edit --document-id docXXX --member-id me --member-id-type open_id --auth-mode auto --format json
 
 # Export document as markdown
 feishu docx get-content --doc-token docXXX --doc-type docx --content-type markdown --format json
@@ -151,7 +151,7 @@ feishu drive get-export-task TICKET_ID --token xxx
 
 # Permissions
 feishu drive grant-edit --token docXXX --resource-type docx --member-id ou_xxx --permission edit --format json
-feishu drive grant-edit --token docXXX --resource-type docx --member-id me --member-id-type open_id --permission edit --auth-mode user --format json
+feishu drive grant-edit --token docXXX --resource-type docx --member-id me --member-id-type open_id --permission edit --auth-mode auto --format json
 feishu drive list-members --token docXXX --resource-type docx --format json
 feishu drive list-members --token docXXX --resource-type docx --save-output ./drive-members.json --format json
 ```
@@ -201,8 +201,8 @@ feishu calendar batch-freebusy --request-file batch-freebusy.json --save-output 
 feishu contact user get --user-id ou_xxx --user-id-type open_id --format json
 feishu contact user by-department --department-id od_xxx --page-size 50 --format json
 feishu contact user by-department --department-id od_xxx --all --format json
-feishu contact user search --query "Alice" --page-size 20 --auth-mode user --format json
-feishu contact user search --query "Alice" --all --auth-mode user --format json
+feishu contact user search --query "Alice" --page-size 20 --auth-mode auto --format json
+feishu contact user search --query "Alice" --all --auth-mode auto --format json
 
 # Departments and scopes
 feishu contact department children --department-id od_xxx --page-size 50 --format json

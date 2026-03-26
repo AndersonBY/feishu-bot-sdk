@@ -119,8 +119,10 @@ def _build_config(
 
     timeout_seconds = _resolve_timeout_seconds(args)
 
-    if auth_mode not in {"tenant", "user"}:
-        raise ConfigurationError("invalid auth mode: FEISHU_AUTH_MODE/--auth-mode must be 'tenant' or 'user'")
+    if auth_mode not in {"tenant", "user", "auto"}:
+        raise ConfigurationError(
+            "invalid auth mode: FEISHU_AUTH_MODE/--auth-mode must be 'tenant', 'user', or 'auto'"
+        )
 
     group = getattr(args, "group", None)
     auth_command = str(getattr(args, "auth_command", ""))
@@ -193,12 +195,25 @@ def _build_config(
             raise ConfigurationError(
                 "tenant mode requires either access_token or app_id/app_secret"
             )
-    else:
+    elif auth_mode == "user":
         effective_user_access = resolved_access_token or user_access_token
         if not skip_user_access_token_requirement and not effective_user_access and not user_refresh_token:
             raise ConfigurationError(
                 "user mode requires user_access_token/access_token or user_refresh_token"
             )
+        if user_refresh_token and not (app_access_token or (app_id and app_secret)):
+            raise ConfigurationError(
+                "refreshing user token requires app_access_token or app_id/app_secret"
+            )
+    else:
+        tenant_ready = bool(resolved_access_token or (app_id and app_secret))
+        user_ready = bool(user_access_token or user_refresh_token)
+        if (
+            not skip_tenant_token_requirement
+            and not skip_user_access_token_requirement
+            and not (tenant_ready or user_ready)
+        ):
+            raise ConfigurationError("auto mode requires tenant credentials or user token")
         if user_refresh_token and not (app_access_token or (app_id and app_secret)):
             raise ConfigurationError(
                 "refreshing user token requires app_access_token or app_id/app_secret"

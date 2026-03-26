@@ -33,8 +33,8 @@ class FeishuConfig:
 
     def __post_init__(self) -> None:
         normalized_mode = str(self.auth_mode or "").strip().lower()
-        if normalized_mode not in {"tenant", "user"}:
-            raise ValueError("auth_mode must be either 'tenant' or 'user'")
+        if normalized_mode not in {"tenant", "user", "auto"}:
+            raise ValueError("auth_mode must be either 'tenant', 'user', or 'auto'")
         object.__setattr__(self, "auth_mode", normalized_mode)
         refresh_before = float(self.user_token_refresh_before_seconds)
         if refresh_before < 0:

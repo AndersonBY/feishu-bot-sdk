@@ -173,6 +173,73 @@ def test_feishu_client_throttles_on_http_429():
     assert limiter.throttled == [("POST:/im/v1/messages", 3.0)]
 
 
+def test_feishu_client_auto_mode_retries_with_user_when_tenant_requires_user_identity():
+    calls: list[Mapping[str, Any]] = []
+
+    def resolver(call: Mapping[str, Any]) -> Mapping[str, Any]:
+        calls.append(call)
+        auth_header = str(call["headers"].get("Authorization") or "")
+        if auth_header == "Bearer tenant-token":
+            return {
+                "code": 99991679,
+                "msg": "Unauthorized. required one of these privileges under the user identity: [search:docs:read]",
+            }
+        return {"code": 0, "data": {"ok": True, "mode": "user"}}
+
+    http = _SyncHttpStub(resolver)
+    client = FeishuClient(
+        FeishuConfig(
+            app_id="cli_1",
+            app_secret="secret_1",
+            auth_mode="auto",
+            user_access_token="user-token",
+            rate_limit_enabled=False,
+        ),
+        http_client=cast(JsonHttpClient, http),
+    )
+    client._tenant_token_cache = cast(Any, type("Cache", (), {"token": "tenant-token", "expires_at": float("inf")})())
+
+    data = client.request_json("POST", "/wiki/v2/spaces", payload={"name": "Test"})
+
+    assert data == {"code": 0, "data": {"ok": True, "mode": "user"}}
+    assert [call["headers"]["Authorization"] for call in calls] == [
+        "Bearer tenant-token",
+        "Bearer user-token",
+    ]
+
+
+def test_feishu_client_auto_mode_retries_with_tenant_when_endpoint_rejects_user_token():
+    calls: list[Mapping[str, Any]] = []
+
+    def resolver(call: Mapping[str, Any]) -> Mapping[str, Any]:
+        calls.append(call)
+        auth_header = str(call["headers"].get("Authorization") or "")
+        if auth_header == "Bearer user-token":
+            return {"code": 99991668, "msg": "user access token not support"}
+        return {"code": 0, "data": {"ok": True, "mode": "tenant"}}
+
+    http = _SyncHttpStub(resolver)
+    client = FeishuClient(
+        FeishuConfig(
+            app_id="cli_1",
+            app_secret="secret_1",
+            auth_mode="auto",
+            user_access_token="user-token",
+            rate_limit_enabled=False,
+        ),
+        http_client=cast(JsonHttpClient, http),
+    )
+    client._tenant_token_cache = cast(Any, type("Cache", (), {"token": "tenant-token", "expires_at": float("inf")})())
+
+    data = client.request_json("POST", "/calendar/v4/calendars/primary/events", payload={"summary": "Meeting"})
+
+    assert data == {"code": 0, "data": {"ok": True, "mode": "tenant"}}
+    assert [call["headers"]["Authorization"] for call in calls] == [
+        "Bearer user-token",
+        "Bearer tenant-token",
+    ]
+
+
 def test_async_feishu_client_calls_rate_limiter_hooks():
     async def run() -> None:
         limiter = _AsyncLimiterStub()
@@ -220,3 +287,40 @@ def test_async_adaptive_rate_limiter_waits_after_throttle():
 
     asyncio.run(run())
     assert waits == [1.5]
+
+
+def test_async_feishu_client_auto_mode_retries_with_user_when_tenant_requires_user_identity():
+    async def run() -> None:
+        calls: list[Mapping[str, Any]] = []
+
+        def resolver(call: Mapping[str, Any]) -> Mapping[str, Any]:
+            calls.append(call)
+            auth_header = str(call["headers"].get("Authorization") or "")
+            if auth_header == "Bearer tenant-token":
+                return {
+                    "code": 99991679,
+                    "msg": "Unauthorized. required one of these privileges under the user identity: [search:message]",
+                }
+            return {"code": 0, "data": {"ok": True, "mode": "user"}}
+
+        http = _AsyncHttpStub(resolver)
+        client = AsyncFeishuClient(
+            FeishuConfig(
+                app_id="cli_1",
+                app_secret="secret_1",
+                auth_mode="auto",
+                user_access_token="user-token",
+                rate_limit_enabled=False,
+            ),
+            http_client=cast(AsyncJsonHttpClient, http),
+        )
+        client._tenant_token_cache = cast(Any, type("Cache", (), {"token": "tenant-token", "expires_at": float("inf")})())
+
+        data = await client.request_json("POST", "/drive/v1/files", payload={"page_size": 10})
+        assert data == {"code": 0, "data": {"ok": True, "mode": "user"}}
+        assert [call["headers"]["Authorization"] for call in calls] == [
+            "Bearer tenant-token",
+            "Bearer user-token",
+        ]
+
+    asyncio.run(run())

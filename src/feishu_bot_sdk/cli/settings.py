@@ -14,8 +14,8 @@ ROOT_HELP_EPILOG = (
     "Quick start (Agent-friendly):\n"
     "  1) feishu auth login --scope \"offline_access contact:user:search\" --no-browser --format json\n"
     "  2) feishu auth whoami --auth-mode user --format json\n"
-    "  3) feishu contact user search --query \"name\" --auth-mode user --format json\n"
-    "  4) feishu calendar create-event --auth-mode user --calendar-id <id> --event-file event.json --format json\n"
+    "  3) feishu contact user search --query \"name\" --auth-mode auto --format json\n"
+    "  4) feishu calendar create-event --auth-mode auto --calendar-id <id> --event-file event.json --format json\n"
     "  5) non-text message resource: feishu media download-file <resource_key> <output> "
     "--message-id <om_xxx> --resource-type image|file --auth-mode tenant --format json\n"
     "\n"
@@ -25,7 +25,8 @@ ROOT_HELP_EPILOG = (
     "  - use --save-output <file> to keep the full normalized JSON on disk\n"
     "  - use --full-output to disable truncation\n"
     "\n"
-    "Token precedence: env vars > CLI flags > local token store profile."
+    "Token precedence: env vars > CLI flags > local token store profile.\n"
+    "With auth_mode=auto, the CLI prefers user auth for user-centric APIs and falls back to tenant only when needed."
 )
 
 AUTH_HELP_EPILOG = (

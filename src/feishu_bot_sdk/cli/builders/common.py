@@ -40,7 +40,7 @@ def _add_global_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--app-secret", help="Feishu app_secret")
     parser.add_argument(
         "--auth-mode",
-        choices=("tenant", "user"),
+        choices=("tenant", "user", "auto"),
         help="Auth mode for API calls. Default: tenant",
     )
     parser.add_argument("--access-token", help="Static access token for selected auth mode")
