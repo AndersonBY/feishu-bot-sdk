@@ -51,6 +51,7 @@ from ..commands import (
     _cmd_drive_list_members,
     _cmd_drive_meta,
     _cmd_drive_move,
+    _cmd_drive_root_folder_meta,
     _cmd_drive_shortcut,
     _cmd_drive_stats,
     _cmd_drive_upload_file,
@@ -540,6 +541,14 @@ def _build_drive_commands(
     upload_file.add_argument("--file-name", help="Override file name")
     upload_file.add_argument("--checksum", help="Optional checksum")
     upload_file.add_argument("--content-type", help="Optional mime type")
+    upload_file.add_argument(
+        "--check-requester-owner",
+        action="store_true",
+        help=(
+            "Resolve the current user identity and attach live ownership diagnostics. "
+            "Useful for validating whether a user-mode upload is actually requester-owned."
+        ),
+    )
     upload_file.set_defaults(handler=_cmd_drive_upload_file)
 
     download_file = drive_sub.add_parser("download-file", help="Download drive file", parents=[shared])
@@ -551,6 +560,14 @@ def _build_drive_commands(
     _add_json_source_args(meta, name="request_docs", label="request_docs", json_help='Docs to query, e.g. [{"doc_token":"doccn_xxx","doc_type":"docx"}]')
     meta.add_argument("--with-url", choices=_BOOL_CHOICES, help="Include URL in response (true/false). Omit = false")
     meta.add_argument("--user-id-type", choices=_ID_TYPE_CHOICES, help="Optional user_id_type")
+    meta.add_argument(
+        "--check-requester-owner",
+        action="store_true",
+        help=(
+            "Resolve the current user identity and compare owner_id/latest_modify_user "
+            "against requester IDs. Useful for owner-sensitive Drive checks."
+        ),
+    )
     meta.set_defaults(handler=_cmd_drive_meta)
 
     stats = drive_sub.add_parser("stats", help="Get file statistics", parents=[shared])
@@ -707,6 +724,19 @@ def _build_drive_commands(
     create_folder.add_argument("--name", required=True, help="Folder name")
     create_folder.add_argument("--folder-token", required=True, help="Parent folder token")
     create_folder.set_defaults(handler=_cmd_drive_create_folder)
+
+    root_folder_meta = drive_sub.add_parser(
+        "root-folder-meta",
+        help="Get the current principal's drive root folder metadata",
+        parents=[shared],
+        description=(
+            "Resolve the current auth principal's root folder token. "
+            "For requester-owned uploads, call this first under --auth-mode user, "
+            "then create/upload under the returned token."
+        ),
+        formatter_class=_HELP_FORMATTER,
+    )
+    root_folder_meta.set_defaults(handler=_cmd_drive_root_folder_meta)
 
 
 def _build_wiki_commands(

@@ -13,6 +13,7 @@ from .builders import (
     _build_bot_commands,
     _build_calendar_commands,
     _build_chat_commands,
+    _build_config_commands,
     _build_contact_commands,
     _build_docx_commands,
     _build_drive_commands,
@@ -32,6 +33,8 @@ from .runtime import (
     _UserTokenStoreContext,
     _build_client,
     _build_config,
+    default_cli_config_path,
+    load_cli_config,
     _extract_required_tenant_scopes,
     _format_configuration_error_message,
     _extract_required_user_scopes,
@@ -64,6 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="group")
     subparsers.required = True
 
+    _build_config_commands(subparsers, shared)
     _build_auth_commands(subparsers, shared)
     _build_oauth_commands(subparsers, shared)
     _build_bot_commands(subparsers, shared)
@@ -132,6 +136,8 @@ __all__ = [
     "_UserTokenStoreContext",
     "_build_client",
     "_build_config",
+    "default_cli_config_path",
+    "load_cli_config",
     "_extract_required_tenant_scopes",
     "_format_configuration_error_message",
     "_extract_required_user_scopes",

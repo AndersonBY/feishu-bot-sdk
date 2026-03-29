@@ -106,6 +106,109 @@ def _optional_string(value: Any) -> str | None:
     return None
 
 
+def _mapping_to_plain_dict(value: Mapping[str, Any]) -> dict[str, Any]:
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        converted = to_dict()
+        if isinstance(converted, Mapping):
+            return {str(key): item for key, item in converted.items()}
+    return {str(key): item for key, item in value.items()}
+
+
+def _extract_response_data(payload: Mapping[str, Any]) -> Mapping[str, Any]:
+    data = payload.get("data")
+    if isinstance(data, Mapping):
+        return data
+    return payload
+
+
+def _extract_drive_meta_items(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    data = _extract_response_data(payload)
+    metas = data.get("metas")
+    if not isinstance(metas, list):
+        return []
+    return [item for item in metas if isinstance(item, Mapping)]
+
+
+def _requester_identity_payload(args: argparse.Namespace) -> dict[str, Any]:
+    user_info = _build_client(args, force_user_auth=True).get_user_info()
+    return {
+        "open_id": _optional_string(getattr(user_info, "open_id", None)),
+        "user_id": _optional_string(getattr(user_info, "user_id", None)),
+        "union_id": _optional_string(getattr(user_info, "union_id", None)),
+        "name": _optional_string(getattr(user_info, "name", None)),
+    }
+
+
+def _match_requester_identity(value: Any, requester_identity: Mapping[str, Any]) -> str | None:
+    normalized = _optional_string(value)
+    if normalized is None:
+        return None
+    for field in ("open_id", "user_id", "union_id"):
+        candidate = _optional_string(requester_identity.get(field))
+        if candidate and candidate == normalized:
+            return field
+    return None
+
+
+def _build_requester_owner_diagnostics(
+    *,
+    requester_identity: Mapping[str, Any],
+    metas: list[Mapping[str, Any]],
+) -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+    for item in metas:
+        owner_id = _optional_string(item.get("owner_id"))
+        latest_modify_user = _optional_string(item.get("latest_modify_user"))
+        owner_match_field = _match_requester_identity(owner_id, requester_identity)
+        modifier_match_field = _match_requester_identity(latest_modify_user, requester_identity)
+        verdict = "requester_owner_match" if owner_match_field else "owner_mismatch"
+        if owner_match_field and latest_modify_user and not modifier_match_field:
+            verdict = "owner_match_modifier_mismatch"
+        checks.append(
+            {
+                "doc_token": _optional_string(item.get("doc_token")),
+                "doc_type": _optional_string(item.get("doc_type")),
+                "title": _optional_string(item.get("title")),
+                "owner_id": owner_id,
+                "latest_modify_user": latest_modify_user,
+                "owner_matches_requester": bool(owner_match_field),
+                "owner_match_field": owner_match_field,
+                "modifier_matches_requester": bool(modifier_match_field),
+                "modifier_match_field": modifier_match_field,
+                "verdict": verdict,
+            }
+        )
+    requester_owner_verified = bool(checks) and all(
+        bool(item.get("owner_matches_requester")) for item in checks
+    )
+    return {
+        "requester_identity": dict(requester_identity),
+        "requester_owner_verified": requester_owner_verified,
+        "ownership_checks": checks,
+        "note": (
+            "User-mode API success does not prove requester ownership. "
+            "Check requester_owner_verified or ownership_checks[].owner_matches_requester."
+        ),
+    }
+
+
+def _attach_requester_owner_diagnostics(
+    *,
+    args: argparse.Namespace,
+    payload: Mapping[str, Any],
+    metas: list[Mapping[str, Any]],
+) -> dict[str, Any]:
+    result = _mapping_to_plain_dict(payload)
+    requester_identity = _requester_identity_payload(args)
+    diagnostics = _build_requester_owner_diagnostics(
+        requester_identity=requester_identity,
+        metas=metas,
+    )
+    result["_cli_diagnostics"] = diagnostics
+    return result
+
+
 def _describe_bitable_table(item: Mapping[str, Any]) -> str:
     table_id = _optional_string(item.get("table_id")) or "<unknown>"
     table_name = _optional_string(item.get("name")) or _optional_string(item.get("table_name"))
@@ -916,14 +1019,32 @@ def _cmd_docx_grant_edit(args: argparse.Namespace) -> Mapping[str, bool]:
 
 
 def _cmd_drive_upload_file(args: argparse.Namespace) -> Mapping[str, Any]:
-    service = DriveFileService(_build_client(args))
-    return service.upload_file(
+    client = _build_client(args)
+    service = DriveFileService(client)
+    result = service.upload_file(
         str(args.path),
         parent_type=str(args.parent_type),
         parent_node=str(args.parent_node),
         file_name=getattr(args, "file_name", None),
         checksum=getattr(args, "checksum", None),
         content_type=getattr(args, "content_type", None),
+    )
+    if not bool(getattr(args, "check_requester_owner", False)):
+        return result
+    result_payload = _mapping_to_plain_dict(result)
+    data = _extract_response_data(result_payload)
+    file_token = _optional_string(data.get("file_token")) or _optional_string(data.get("token"))
+    if file_token is None:
+        raise ValueError("drive upload response missing file_token")
+    meta_result = service.batch_query_metas(
+        [{"doc_token": file_token, "doc_type": "file"}],
+        with_url=True,
+    )
+    metas = _extract_drive_meta_items(_mapping_to_plain_dict(meta_result))
+    return _attach_requester_owner_diagnostics(
+        args=args,
+        payload=result_payload,
+        metas=metas,
     )
 
 
@@ -943,10 +1064,19 @@ def _cmd_drive_meta(args: argparse.Namespace) -> Mapping[str, Any]:
         required=True,
     )
     service = DriveFileService(_build_client(args))
-    return service.batch_query_metas(
+    result = service.batch_query_metas(
         request_docs,
         with_url=_optional_bool(getattr(args, "with_url", None)),
         user_id_type=getattr(args, "user_id_type", None),
+    )
+    if not bool(getattr(args, "check_requester_owner", False)):
+        return result
+    result_payload = _mapping_to_plain_dict(result)
+    metas = _extract_drive_meta_items(result_payload)
+    return _attach_requester_owner_diagnostics(
+        args=args,
+        payload=result_payload,
+        metas=metas,
     )
 
 
@@ -1200,6 +1330,11 @@ def _cmd_drive_list_files(args: argparse.Namespace) -> Mapping[str, Any]:
 def _cmd_drive_create_folder(args: argparse.Namespace) -> Mapping[str, Any]:
     service = DriveFileService(_build_client(args))
     return service.create_folder(name=str(args.name), folder_token=str(args.folder_token))
+
+
+def _cmd_drive_root_folder_meta(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = DriveFileService(_build_client(args))
+    return service.get_root_folder_meta()
 
 
 def _cmd_wiki_list_spaces(args: argparse.Namespace) -> Mapping[str, Any]:

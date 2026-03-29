@@ -351,8 +351,9 @@ def test_drive_list_files_and_create_folder():
 
     service.list_files(folder_token="fld_root", page_size=20, order_by="EditedTime", direction="DESC", user_id_type="open_id")
     service.create_folder(name="NewFolder", folder_token="fld_root")
+    service.get_root_folder_meta()
 
-    assert len(stub.calls) == 2
+    assert len(stub.calls) == 3
     assert stub.calls[0]["path"] == "/drive/v1/files"
     assert stub.calls[0]["method"] == "GET"
     assert stub.calls[0]["params"] == {
@@ -365,6 +366,9 @@ def test_drive_list_files_and_create_folder():
     assert stub.calls[1]["path"] == "/drive/v1/files/create_folder"
     assert stub.calls[1]["method"] == "POST"
     assert stub.calls[1]["payload"] == {"name": "NewFolder", "folder_token": "fld_root"}
+    assert stub.calls[2]["path"] == "/drive/explorer/v2/root_folder/meta"
+    assert stub.calls[2]["method"] == "GET"
+    assert stub.calls[2]["params"] == {}
 
 
 def test_drive_iter_files_pagination():

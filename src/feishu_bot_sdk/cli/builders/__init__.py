@@ -1,6 +1,7 @@
 from .auth import _build_auth_commands, _build_bot_commands, _build_oauth_commands
 from .chat import _build_chat_commands
 from .common import _add_global_args
+from .config import _build_config_commands
 from .content import _build_bitable_commands, _build_docx_commands, _build_drive_commands, _build_wiki_commands
 from .eventing import _build_server_commands, _build_webhook_commands, _build_ws_commands
 from .mail import _build_mail_commands
@@ -16,6 +17,7 @@ __all__ = [
     "_build_oauth_commands",
     "_build_bot_commands",
     "_build_chat_commands",
+    "_build_config_commands",
     "_build_im_commands",
     "_build_media_commands",
     "_build_bitable_commands",

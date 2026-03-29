@@ -37,7 +37,10 @@ def _add_global_args(parser: argparse.ArgumentParser) -> None:
         help="Write the full normalized regular command result JSON to a file before stdout truncation",
     )
     parser.add_argument("--app-id", help="Feishu app_id")
-    parser.add_argument("--app-secret", help="Feishu app_secret")
+    parser.add_argument(
+        "--app-secret",
+        help="Feishu app_secret (discouraged; prefer `feishu config init --app-secret-stdin`)",
+    )
     parser.add_argument(
         "--auth-mode",
         choices=("tenant", "user", "auto"),
@@ -47,7 +50,10 @@ def _add_global_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--app-access-token", help="Static app_access_token for OAuth token exchange")
     parser.add_argument("--user-access-token", help="Static user_access_token")
     parser.add_argument("--user-refresh-token", help="User refresh_token for auto refresh")
-    parser.add_argument("--profile", help="Token profile name. Default: FEISHU_PROFILE or default")
+    parser.add_argument(
+        "--profile",
+        help="CLI profile name. Default: FEISHU_PROFILE or configured default profile",
+    )
     parser.add_argument("--token-store", help="Token store file path")
     parser.add_argument("--no-store", action="store_true", help="Disable reading/writing local token store")
     parser.add_argument("--base-url", help=f"Feishu OpenAPI base url. Default: {_DEFAULT_BASE_URL}")

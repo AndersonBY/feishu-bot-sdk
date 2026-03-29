@@ -44,16 +44,23 @@ feishu --help
 - 命令名：`feishu`
 - 默认输出：人类友好格式
 - 机器可读输出：追加 `--format json`
-- 认证优先级：环境变量优先，其次命令行全局参数
+- 认证优先级：环境变量 > 命令行全局参数 > CLI profile > 本地 token store profile
   - 环境变量：`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_AUTH_MODE`、`FEISHU_ACCESS_TOKEN`
   - 用户态变量：`FEISHU_USER_ACCESS_TOKEN`、`FEISHU_USER_REFRESH_TOKEN`
   - OAuth 交换变量：`FEISHU_APP_ACCESS_TOKEN`
-  - Token Store：`FEISHU_PROFILE`、`FEISHU_TOKEN_STORE_PATH`、`FEISHU_NO_STORE`
+  - CLI 配置 / Store：`FEISHU_PROFILE`、`FEISHU_CLI_CONFIG_PATH`、`FEISHU_SECRET_STORE_PATH`、`FEISHU_SECRET_STORE_KEY_PATH`、`FEISHU_TOKEN_STORE_PATH`、`FEISHU_NO_STORE`
   - 全局参数：`--app-id`、`--app-secret`、`--auth-mode`、`--access-token`、`--profile`、`--token-store`、`--no-store`
+- `--app-secret` 仍兼容，但只建议临时调试使用；日常推荐 `feishu config init --app-secret-stdin`
 
 示例：
 
 ```bash
+# 0) 初始化 CLI profile（推荐）
+printf 'app_secret' | feishu config init --profile default --app-id cli_xxx --app-secret-stdin --set-default --auth-mode auto --format json
+feishu config show --format json
+feishu config list-profiles --format json
+feishu config migrate-token-store --from ~/.config/feishu-bot-sdk/tokens.json --app-id cli_xxx --format json
+
 # 1) 获取当前认证模式 token（JSON 输出）
 feishu auth token --format json
 
@@ -108,8 +115,12 @@ feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --
 feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --format json
 
 # 8) 上传云空间文件
+feishu drive root-folder-meta --auth-mode user --format json
+feishu drive create-folder --auth-mode user --folder-token <root_token> --name "Uploads" --format json
 feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx
+feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx --auth-mode user --check-requester-owner --format json
 feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
+feishu drive meta --request-docs-json '[{"doc_token":"file_xxx","doc_type":"file"}]' --auth-mode user --check-requester-owner --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id me --permission edit --auth-mode user --format json
 

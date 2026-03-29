@@ -140,7 +140,10 @@ feishu docx get-content --doc-token docXXX --doc-type wiki_doc --content-type ma
 
 ```bash
 # Upload file to drive
+feishu drive root-folder-meta --auth-mode user --format json
+feishu drive create-folder --auth-mode user --folder-token fld_root_xxx --name "Uploads" --format json
 feishu drive upload-file report.pdf --parent-type explorer --parent-node fldcnXXX
+feishu drive upload-file report.pdf --parent-type explorer --parent-node fldcnXXX --auth-mode user --check-requester-owner --format json
 
 # Import/export tasks
 feishu drive create-import-task --task-json '{"file_extension":"csv","file_token":"xxx","type":"bitable",...}'
@@ -150,6 +153,7 @@ feishu drive create-export-task --task-json '{"token":"xxx","type":"bitable"}'
 feishu drive get-export-task TICKET_ID --token xxx
 
 # Permissions
+feishu drive meta --request-docs-json '[{"doc_token":"file_xxx","doc_type":"file"}]' --auth-mode user --check-requester-owner --format json
 feishu drive grant-edit --token docXXX --resource-type docx --member-id ou_xxx --permission edit --format json
 feishu drive grant-edit --token docXXX --resource-type docx --member-id me --member-id-type open_id --permission edit --auth-mode auto --format json
 feishu drive list-members --token docXXX --resource-type docx --format json

@@ -18,6 +18,9 @@ from ...config import FeishuConfig
 from ...exceptions import ConfigurationError
 from ...feishu import FeishuClient
 from ...token_store import StoredUserToken, TokenStore, default_token_store_path
+from .config_store import CLIProfile
+from .profiles import resolve_cli_profile
+from .secret_store import resolve_secret_store
 
 _DEFAULT_BASE_URL = "https://open.feishu.cn/open-apis"
 _DEFAULT_TIMEOUT_SECONDS = 30.0
@@ -35,6 +38,21 @@ class _UserTokenStoreContext:
     store: TokenStore | None
     from_env_or_arg: bool
     loaded_token: StoredUserToken | None
+
+
+def _resolve_cli_profile(args: argparse.Namespace) -> tuple[str, CLIProfile | None]:
+    profile_name, profile, _ = resolve_cli_profile(getattr(args, "profile", None))
+    return profile_name, profile
+
+
+def _resolve_profile_app_secret(profile: CLIProfile | None) -> str | None:
+    if profile is None or profile.app_secret_ref is None:
+        return None
+    try:
+        return resolve_secret_store().get(profile.app_secret_ref)
+    except ValueError:
+        return None
+
 
 def _build_client(args: argparse.Namespace, *, force_user_auth: bool = False) -> FeishuClient:
     token_context = _resolve_user_token_store_context(args)
@@ -69,13 +87,19 @@ def _build_config(
     env_app_access_token = os.getenv("FEISHU_APP_ACCESS_TOKEN")
     env_base_url = os.getenv("FEISHU_BASE_URL")
 
-    app_id = env_app_id or getattr(args, "app_id", None)
-    app_secret = env_app_secret or getattr(args, "app_secret", None)
+    _, cli_profile = _resolve_cli_profile(args)
+    profile_app_id = cli_profile.app_id if cli_profile is not None else None
+    profile_app_secret = _resolve_profile_app_secret(cli_profile)
+    profile_auth_mode = cli_profile.auth_mode if cli_profile is not None else None
+    profile_base_url = cli_profile.base_url if cli_profile is not None else None
+
+    app_id = env_app_id or getattr(args, "app_id", None) or profile_app_id
+    app_secret = env_app_secret or getattr(args, "app_secret", None) or profile_app_secret
     if force_user_auth:
         auth_mode = "user"
     else:
-        auth_mode = (env_auth_mode or getattr(args, "auth_mode", None) or "tenant").strip().lower()
-    base_url = getattr(args, "base_url", None) or env_base_url or _DEFAULT_BASE_URL
+        auth_mode = (env_auth_mode or getattr(args, "auth_mode", None) or profile_auth_mode or "tenant").strip().lower()
+    base_url = getattr(args, "base_url", None) or env_base_url or profile_base_url or _DEFAULT_BASE_URL
     app_access_token = env_app_access_token or getattr(args, "app_access_token", None)
     stored_token = token_context.loaded_token if token_context is not None else None
     stored_access_token = stored_token.access_token if stored_token is not None else None
@@ -117,7 +141,7 @@ def _build_config(
         except ValueError as exc:
             raise ValueError("FEISHU_USER_TOKEN_REFRESH_BEFORE_SECONDS must be a number") from exc
 
-    timeout_seconds = _resolve_timeout_seconds(args)
+    timeout_seconds = _resolve_timeout_seconds(args, cli_profile=cli_profile)
 
     if auth_mode not in {"tenant", "user", "auto"}:
         raise ConfigurationError(
@@ -236,16 +260,13 @@ def _build_config(
 
 
 def _resolve_user_token_store_context(args: argparse.Namespace) -> _UserTokenStoreContext:
-    profile = (
-        str(getattr(args, "profile", "")).strip()
-        or str(os.getenv("FEISHU_PROFILE", "")).strip()
-        or "default"
-    )
+    profile, cli_profile = _resolve_cli_profile(args)
     no_store_raw = bool(getattr(args, "no_store", False)) or _is_truthy(os.getenv("FEISHU_NO_STORE"))
     token_store_path_value = (
         getattr(args, "token_store", None)
         or os.getenv("FEISHU_TOKEN_STORE_PATH")
         or os.getenv("FEISHU_TOKEN_STORE")
+        or (cli_profile.token_store_path if cli_profile is not None else None)
     )
     store_path = (
         Path(str(token_store_path_value))
@@ -290,10 +311,12 @@ def _store_user_token(args: argparse.Namespace, token: Any) -> Mapping[str, Any]
             "profile": context.profile,
             "store_path": str(context.store_path),
         }
+    _, cli_profile = _resolve_cli_profile(args)
     app_id = (
         os.getenv("FEISHU_APP_ID")
         or os.getenv("APP_ID")
         or getattr(args, "app_id", None)
+        or (cli_profile.app_id if cli_profile is not None else None)
     )
     context.store.save_profile(
         context.profile,
@@ -500,9 +523,11 @@ def _to_optional_int(value: Any) -> int | None:
     return None
 
 
-def _resolve_timeout_seconds(args: argparse.Namespace) -> float:
+def _resolve_timeout_seconds(args: argparse.Namespace, *, cli_profile: CLIProfile | None = None) -> float:
     env_timeout = os.getenv("FEISHU_TIMEOUT_SECONDS")
     timeout = getattr(args, "timeout", None)
+    if timeout is None and cli_profile is not None and cli_profile.timeout_seconds is not None:
+        timeout = cli_profile.timeout_seconds
     if timeout is None and env_timeout:
         try:
             timeout = float(env_timeout)
@@ -512,12 +537,23 @@ def _resolve_timeout_seconds(args: argparse.Namespace) -> float:
 
 
 def _resolve_app_credentials(args: argparse.Namespace) -> tuple[str, str]:
-    app_id = os.getenv("FEISHU_APP_ID") or os.getenv("APP_ID") or getattr(args, "app_id", None)
-    app_secret = os.getenv("FEISHU_APP_SECRET") or os.getenv("APP_SECRET") or getattr(args, "app_secret", None)
+    _, cli_profile = _resolve_cli_profile(args)
+    app_id = (
+        os.getenv("FEISHU_APP_ID")
+        or os.getenv("APP_ID")
+        or getattr(args, "app_id", None)
+        or (cli_profile.app_id if cli_profile is not None else None)
+    )
+    app_secret = (
+        os.getenv("FEISHU_APP_SECRET")
+        or os.getenv("APP_SECRET")
+        or getattr(args, "app_secret", None)
+        or _resolve_profile_app_secret(cli_profile)
+    )
     if not app_id or not app_secret:
         raise ConfigurationError(
             "missing app credentials: set FEISHU_APP_ID/FEISHU_APP_SECRET env vars, "
-            "or pass --app-id and --app-secret"
+            "configure a profile with `feishu config init`, or pass --app-id and --app-secret"
         )
     return str(app_id), str(app_secret)
 

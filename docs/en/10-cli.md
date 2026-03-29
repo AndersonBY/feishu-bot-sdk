@@ -14,12 +14,12 @@ feishu --help
 ## Global Flags
 
 - `--format human|json`: default is `human`; use `json` for machine workflows
-- `--app-id` / `--app-secret`: app credentials
+- `--app-id` / `--app-secret`: app credentials; `--app-secret` is only recommended for temporary debugging, prefer `feishu config init --app-secret-stdin`
 - `--auth-mode tenant|user`: auth mode, default is `tenant`
 - `--access-token`: optional static access token for current auth mode
 - `--app-access-token`: optional app token for OAuth code/refresh exchange
 - `--user-access-token` / `--user-refresh-token`: user tokens (common with `auth_mode=user`)
-- `--profile`: local token profile (default from `FEISHU_PROFILE` or `default`)
+- `--profile`: CLI profile (default from `FEISHU_PROFILE` or the configured default profile)
 - `--token-store`: local token store path
 - `--no-store`: disable local token store read/write
 - `--base-url`: default `https://open.feishu.cn/open-apis`
@@ -29,13 +29,26 @@ feishu --help
 - `--save-output`: write the full normalized JSON to a file before stdout truncation
 - `--full-output`: disable regular-command stdout truncation
 
-Auth precedence: environment variables > CLI flags > local token store.
+Auth precedence: environment variables > CLI flags > CLI profile > local token store profile.
 
 - Env vars: `FEISHU_APP_ID` / `FEISHU_APP_SECRET` / `FEISHU_AUTH_MODE` / `FEISHU_ACCESS_TOKEN`
 - User auth env vars: `FEISHU_USER_ACCESS_TOKEN` / `FEISHU_USER_REFRESH_TOKEN`
 - OAuth exchange env var: `FEISHU_APP_ACCESS_TOKEN`
-- Token store env vars: `FEISHU_PROFILE` / `FEISHU_TOKEN_STORE_PATH` / `FEISHU_NO_STORE`
+- CLI config / store env vars: `FEISHU_PROFILE` / `FEISHU_CLI_CONFIG_PATH` / `FEISHU_SECRET_STORE_PATH` / `FEISHU_SECRET_STORE_KEY_PATH` / `FEISHU_TOKEN_STORE_PATH` / `FEISHU_NO_STORE`
 - Compatible vars: `APP_ID` / `APP_SECRET`
+
+## Profile Bootstrap
+
+Recommended first step: configure a CLI profile, then use the rest of the `auth` and domain commands against that profile.
+
+```bash
+printf 'app_secret' | feishu config init --profile default --app-id cli_xxx --app-secret-stdin --set-default --auth-mode auto --format json
+feishu config show --format json
+feishu config list-profiles --format json
+feishu config migrate-token-store --from ~/.config/feishu-bot-sdk/tokens.json --app-id cli_xxx --format json
+```
+
+If you already have a legacy `tokens.json`, use `config migrate-token-store` to import the old profile names and token store path into the new CLI config. The legacy token file itself is left in place.
 
 ## Large Output Control
 
@@ -51,6 +64,13 @@ Auth precedence: environment variables > CLI flags > local token store.
 ## Common Commands
 
 ```bash
+# config / profile
+feishu config init --profile default --app-id cli_xxx --app-secret-file ./.secrets/feishu_app_secret --set-default --format json
+feishu config show --profile default --format json
+feishu config set-default-profile default --format json
+feishu config migrate-token-store --from ./tokens.json --default-profile default --format json
+feishu config remove-profile default --format json
+
 # auth (recommended: localhost callback, no public URL)
 feishu auth token --format json
 feishu auth login --scope "offline_access contact:user.base:readonly" --no-browser --format json
@@ -92,7 +112,11 @@ feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --
 # Returns a compact summary by default; add --full-response for converted/inserted_batches details
 feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --output ./report.md --format json
 feishu docx list-blocks --document-id doccn_xxx --all --format json
+feishu drive root-folder-meta --auth-mode user --format json
+feishu drive create-folder --auth-mode user --folder-token <root_token> --name "Uploads" --format json
+feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx --auth-mode user --check-requester-owner --format json
 feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
+feishu drive meta --request-docs-json '[{"doc_token":"file_xxx","doc_type":"file"}]' --auth-mode user --check-requester-owner --format json
 feishu drive version-list doccn_xxx --obj-type docx --page-size 50 --all --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id me --member-id-type open_id --permission edit --auth-mode user --format json

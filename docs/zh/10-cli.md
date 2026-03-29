@@ -14,12 +14,12 @@ feishu --help
 ## 全局参数
 
 - `--format human|json`：默认 `human`，机器调用建议 `json`
-- `--app-id` / `--app-secret`：飞书应用凭证
+- `--app-id` / `--app-secret`：飞书应用凭证；`--app-secret` 仅建议临时调试，日常推荐 `feishu config init --app-secret-stdin`
 - `--auth-mode tenant|user`：认证模式，默认 `tenant`
 - `--access-token`：当前认证模式的静态 access token（可选）
 - `--app-access-token`：OAuth code/refresh 交换使用（可选）
 - `--user-access-token` / `--user-refresh-token`：用户态 token（`auth_mode=user` 常用）
-- `--profile`：本地 token profile，默认读取 `FEISHU_PROFILE` 或 `default`
+- `--profile`：CLI profile，默认读取 `FEISHU_PROFILE` 或当前配置的 default profile
 - `--token-store`：本地 token 存储路径
 - `--no-store`：禁用本地 token 读写
 - `--base-url`：默认 `https://open.feishu.cn/open-apis`
@@ -29,13 +29,26 @@ feishu --help
 - `--save-output`：先把完整标准化 JSON 写入文件，再按 stdout 限制输出
 - `--full-output`：关闭常规命令 stdout 截断
 
-认证优先级：环境变量 > 命令行参数 > 本地 token store。
+认证优先级：环境变量 > 命令行参数 > CLI profile > 本地 token store profile。
 
 - 环境变量：`FEISHU_APP_ID` / `FEISHU_APP_SECRET` / `FEISHU_AUTH_MODE` / `FEISHU_ACCESS_TOKEN`
 - 用户态环境变量：`FEISHU_USER_ACCESS_TOKEN` / `FEISHU_USER_REFRESH_TOKEN`
 - OAuth 交换环境变量：`FEISHU_APP_ACCESS_TOKEN`
-- Token store 变量：`FEISHU_PROFILE` / `FEISHU_TOKEN_STORE_PATH` / `FEISHU_NO_STORE`
+- CLI 配置 / Store 变量：`FEISHU_PROFILE` / `FEISHU_CLI_CONFIG_PATH` / `FEISHU_SECRET_STORE_PATH` / `FEISHU_SECRET_STORE_KEY_PATH` / `FEISHU_TOKEN_STORE_PATH` / `FEISHU_NO_STORE`
 - 兼容变量：`APP_ID` / `APP_SECRET`
+
+## Profile 初始化
+
+推荐先配置一个 CLI profile，再执行后续 `auth` / domain 命令：
+
+```bash
+printf 'app_secret' | feishu config init --profile default --app-id cli_xxx --app-secret-stdin --set-default --auth-mode auto --format json
+feishu config show --format json
+feishu config list-profiles --format json
+feishu config migrate-token-store --from ~/.config/feishu-bot-sdk/tokens.json --app-id cli_xxx --format json
+```
+
+如果你已经有旧版 `tokens.json`，可用 `config migrate-token-store` 把旧 profile 名称与 token store 路径导入到新版 CLI config；旧 token 文件本身不会被删除。
 
 ## 大输出控制
 
@@ -51,6 +64,13 @@ feishu --help
 ## 常用命令
 
 ```bash
+# 配置 / profile
+feishu config init --profile default --app-id cli_xxx --app-secret-file ./.secrets/feishu_app_secret --set-default --format json
+feishu config show --profile default --format json
+feishu config set-default-profile default --format json
+feishu config migrate-token-store --from ./tokens.json --default-profile default --format json
+feishu config remove-profile default --format json
+
 # 鉴权（推荐：无公网 localhost 回调）
 feishu auth token --format json
 feishu auth login --scope "offline_access contact:user.base:readonly" --no-browser --format json
@@ -92,7 +112,11 @@ feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --
 # 默认返回精简摘要；需要完整 converted/inserted_batches 时加 --full-response
 feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --output ./report.md --format json
 feishu docx list-blocks --document-id doccn_xxx --all --format json
+feishu drive root-folder-meta --auth-mode user --format json
+feishu drive create-folder --auth-mode user --folder-token <root_token> --name "Uploads" --format json
+feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx --auth-mode user --check-requester-owner --format json
 feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
+feishu drive meta --request-docs-json '[{"doc_token":"file_xxx","doc_type":"file"}]' --auth-mode user --check-requester-owner --format json
 feishu drive version-list doccn_xxx --obj-type docx --page-size 50 --all --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id me --member-id-type open_id --permission edit --auth-mode user --format json

@@ -23,6 +23,19 @@ description: >
 
 飞书开放平台 Python SDK + CLI。提供 `feishu` 命令行工具和 Python 同步/异步 API。
 
+## Agent 使用守则
+
+- 在任何支持 skill 激活的 Agent 环境里，只要任务涉及飞书 API、`feishu` CLI 或 `feishu_bot_sdk`，先激活 `feishu` skill，再执行命令。
+- 不要凭记忆猜测 CLI 命令名、参数名、认证行为。优先以本 skill、`references/cli.md` 或 `feishu ... --help` 为准；旧 transcript 里的参数可能已经过期。
+- 优先使用环境变量或宿主管理的认证注入。除非是在做显式的底层认证调试，不要手工传 `--user-access-token`、`--user-refresh-token`、`--access-token`、`--app-secret`。
+- 不要打印、回显、转述或记录 token / secret / 敏感环境变量原值。
+- 当用户明确要求“以我身份上传”“归我所有”“放到我的空间”时，不要复用旧任务记忆里的 folder token / parent node。先解析当前用户身份和目标位置，再用实时 Drive 元数据校验 owner / permission。
+- 对 `drive/*` 和“创建后要求 owner/creator 是当前用户本人”的任务，不要用 `--auth-mode auto` 冒充用户身份。`auto` 对很多非 user-centric endpoint 会优先走 tenant。先执行 `feishu auth whoami --auth-mode user --format json`；只有成功后才用 `--auth-mode user`，失败就停止并说明当前 requester token 不可用。
+- `feishu auth whoami --auth-mode user` 成功只说明“当前 user token 可用”，不等于“创建出来的资源 owner 一定是当前用户本人”。普通 `feishu drive upload-file` 在 user 模式下仍可能生成应用主体名下文件。
+- 对 requester-owned 的 Drive 上传，优先先拿当前 requester 的 root folder：`feishu drive root-folder-meta --auth-mode user --format json`。必要时先 `feishu drive create-folder --auth-mode user --folder-token <root_token> --name <folder>`，再把文件上传到这个新目录。不要直接把历史 transcript 里的 `parent_node` 当成“我的空间”。
+- owner-sensitive 任务必须做最终校验。优先使用 `feishu drive meta --check-requester-owner --auth-mode user --format json`，或 `feishu drive upload-file --check-requester-owner ... --auth-mode user --format json`。只有 `_cli_diagnostics.requester_owner_verified=true`，或者 `owner_id` 明确等于当前用户的 `open_id/user_id/union_id`，才能宣称“归用户本人所有”。
+- 如果实时校验里 `owner_id` / `latest_modify_user` 与当前用户 ID 不一致，就明确告诉用户“这次资源不是用户本人 owner”，不要因为命令走了 user mode 就改写结论。
+
 ## 环境变量配置（优先级最高）
 
 CLI 认证优先级：环境变量 > CLI 参数 > 本地 token store。
@@ -165,7 +178,11 @@ feishu contact department search --query "engineering" --format json
 
 **云盘/权限：**
 ```bash
+feishu drive root-folder-meta --auth-mode user --format json
+feishu drive create-folder --auth-mode user --folder-token fld_root_xxx --name "Uploads" --format json
 feishu drive upload-file report.pdf --parent-type explorer --parent-node fld_xxx
+feishu drive upload-file report.pdf --parent-type explorer --parent-node fld_xxx --auth-mode user --check-requester-owner --format json
+feishu drive meta --request-docs-json '[{"doc_token":"file_xxx","doc_type":"file"}]' --auth-mode user --check-requester-owner --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id me --permission edit --auth-mode auto --format json
 ```

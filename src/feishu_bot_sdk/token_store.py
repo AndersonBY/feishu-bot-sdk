@@ -91,6 +91,20 @@ class TokenStore:
         data["version"] = _STORE_VERSION
         self._write_store(data)
 
+    def list_profiles(self) -> dict[str, StoredUserToken]:
+        data = self._read_store()
+        profiles = data.get("profiles")
+        if not isinstance(profiles, Mapping):
+            return {}
+        items: dict[str, StoredUserToken] = {}
+        for name, raw in profiles.items():
+            if not isinstance(name, str) or not name or not isinstance(raw, Mapping):
+                continue
+            parsed = StoredUserToken.from_mapping(raw)
+            if parsed is not None:
+                items[name] = parsed
+        return items
+
     def delete_profile(self, profile: str) -> bool:
         data = self._read_store()
         profiles = data.get("profiles")

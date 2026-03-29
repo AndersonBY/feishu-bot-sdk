@@ -559,6 +559,13 @@ class DriveFileService:
         )
         return _unwrap_data(response)
 
+    def get_root_folder_meta(self) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "GET",
+            "/drive/explorer/v2/root_folder/meta",
+        )
+        return _unwrap_data(response)
+
     def _request_json_raw(
         self,
         method: str,
@@ -1152,6 +1159,13 @@ class AsyncDriveFileService:
             "POST",
             "/drive/v1/files/create_folder",
             payload={"name": name, "folder_token": folder_token},
+        )
+        return _unwrap_data(response)
+
+    async def get_root_folder_meta(self) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "GET",
+            "/drive/explorer/v2/root_folder/meta",
         )
         return _unwrap_data(response)
 
