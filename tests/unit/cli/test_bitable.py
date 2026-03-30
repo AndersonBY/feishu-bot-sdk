@@ -1,4 +1,3 @@
-import json
 from typing import Any
 from feishu_bot_sdk import cli
 from feishu_bot_sdk.bitable import BitableService
