@@ -7,7 +7,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, cast
 
 from ...exceptions import HTTPRequestError
 
@@ -404,18 +404,19 @@ def _coerce_error_detail(
     error_type: str | None,
 ) -> dict[str, Any]:
     if isinstance(error, Mapping):
+        err = cast(Mapping[str, Any], error)
         detail = _build_error_detail(
-            error_type=str(error.get("type") or error_type or _default_error_type(exit_code)),
-            code=error.get("code") if "code" in error else _default_error_code(error_type, exit_code),
-            message=str(error.get("message") or error.get("error") or ""),
-            hint=_optional_text(error.get("hint")),
-            retryable=bool(error.get("retryable", False)),
+            error_type=str(err.get("type") or error_type or _default_error_type(exit_code)),
+            code=err.get("code") if "code" in err else _default_error_code(error_type, exit_code),
+            message=str(err.get("message") or err.get("error") or ""),
+            hint=_optional_text(err.get("hint")),
+            retryable=bool(err.get("retryable", False)),
         )
         for key in ("status_code", "response_excerpt"):
-            if key in error:
-                detail[key] = error[key]
-        if "details" in error:
-            detail["details"] = _to_jsonable(error.get("details"))
+            if key in err:
+                detail[key] = err[key]
+        if "details" in err:
+            detail["details"] = _to_jsonable(err.get("details"))
         return detail
     return _build_error_detail(
         error_type=error_type or _default_error_type(exit_code),

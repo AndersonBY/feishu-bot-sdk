@@ -21,6 +21,8 @@ def load_scope_priorities() -> dict[str, int]:
         if not scope_name:
             continue
         score_raw = item.get("final_score")
+        if score_raw is None:
+            continue
         try:
             priorities[scope_name] = int(round(float(score_raw)))
         except (TypeError, ValueError):

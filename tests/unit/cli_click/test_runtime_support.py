@@ -177,10 +177,12 @@ def test_register_service_groups_merges_existing_shortcut_group(monkeypatch: Any
     service_group.register_service_groups(root)
 
     merged = root.commands["bitable"]
+    assert isinstance(merged, click.Group)
     assert "+create-from-csv" in merged.commands
     assert "app" in merged.commands
-    assert isinstance(merged.commands["app"], click.Group)
-    assert "list" in merged.commands["app"].commands
+    app_group = merged.commands["app"]
+    assert isinstance(app_group, click.Group)
+    assert "list" in app_group.commands
 
 
 def test_sleep_between_pages_sleeps_in_small_chunks(monkeypatch: Any) -> None:
