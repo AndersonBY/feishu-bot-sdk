@@ -1,8 +1,9 @@
-from typing import Any
+from typing import Any, cast
 
 from feishu_bot_sdk.config import FeishuConfig
 from feishu_bot_sdk.exceptions import FeishuError
 from feishu_bot_sdk.feishu import FeishuClient, _initial_user_token_cache
+from feishu_bot_sdk.http_client import JsonHttpClient
 
 
 class _HttpClientStub:
@@ -83,7 +84,7 @@ def test_get_user_info_refreshes_only_after_token_failure() -> None:
             user_access_token="stale-access",
             user_refresh_token="refresh-token",
         ),
-        http_client=http,
+        http_client=cast(JsonHttpClient, http),
     )
 
     info = client.get_user_info()
