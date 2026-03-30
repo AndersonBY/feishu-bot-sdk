@@ -117,7 +117,7 @@ feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type mar
 # 8) 上传云空间文件
 feishu drive root-folder-meta --as user --format json
 feishu drive create-folder --as user --folder-token <root_token> --name "Uploads" --format json
-feishu drive requester-upload-file ./final.csv --folder-name "Requester Uploads" --format json
+feishu drive +requester-upload ./final.csv --folder-name "Requester Uploads" --as user --format json
 feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx
 feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx --as user --check-requester-owner --format json
 feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
@@ -125,7 +125,7 @@ feishu drive meta --request-docs-json '[{"doc_token":"file_xxx","doc_type":"file
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id me --permission edit --as user --format json
 
-对“文件必须归当前用户本人所有”的上传，不要直接把 `root-folder-meta` 返回的 token 当上传目标。优先使用 `requester-upload-file`，它会强制走 user auth、在 requester root 下新建子文件夹、上传文件并做 owner 校验；如果 owner 仍不匹配，命令会直接失败。
+对“文件必须归当前用户本人所有”的上传，不要直接把 `root-folder-meta` 返回的 token 当上传目标。优先使用 `+requester-upload`，它会强制走 user auth、在 requester root 下新建子文件夹、上传文件并做 owner 校验；如果 owner 仍不匹配，命令会直接失败。
 
 # 9) 搜索 Wiki 节点
 feishu wiki search-nodes --query "项目周报" --all --format json

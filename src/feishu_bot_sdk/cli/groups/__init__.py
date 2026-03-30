@@ -3,6 +3,7 @@ from .auth import auth_group
 from .completion import completion_command
 from .config import config_group
 from .doctor import doctor_command
+from .docx import docx_group
 from .media import media_group
 from .schema import schema_group
 from .server import server_group
@@ -16,6 +17,7 @@ __all__ = [
     "completion_command",
     "config_group",
     "doctor_command",
+    "docx_group",
     "media_group",
     "register_service_groups",
     "schema_group",

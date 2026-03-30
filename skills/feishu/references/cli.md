@@ -196,6 +196,20 @@ feishu bitable +create-from-csv data.csv --app-name "Sales" --table-name "Q1" --
 feishu bitable +create-from-csv data.csv --app-name "Sales" --table-name "Q1" --dry-run --format json
 ```
 
+### docx create
+
+创建原生飞书 Docx 云文档：
+
+```bash
+feishu docx create --title "日报" --folder-token fld_xxx --format json
+feishu docx create --title "日报" --as user --format json
+```
+
+说明：
+
+- `docx create` 是常规命令，不是 `+shortcut`
+- 它可能不会出现在 `feishu schema list docx` 的 shortcuts 列表里；需要创建文档时优先看 `feishu docx --help`
+
 ### docx +insert-content
 
 将 Markdown/HTML 内容插入云文档：

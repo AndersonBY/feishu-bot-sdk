@@ -13,6 +13,7 @@ from .groups import (
     completion_command,
     config_group,
     doctor_command,
+    docx_group,
     media_group,
     register_service_groups,
     schema_group,
@@ -52,11 +53,12 @@ def _register_static_groups() -> None:
     app.add_command(schema_group)
     app.add_command(doctor_command)
     app.add_command(completion_command)
+    app.add_command(docx_group)
     app.add_command(webhook_group)
     app.add_command(ws_group)
     app.add_command(server_group)
     app.add_command(media_group)
-    for shortcut_only_service in ("bitable", "docx"):
+    for shortcut_only_service in ("bitable",):
         group = click.Group(shortcut_only_service, help=f"{shortcut_only_service} shortcuts")
         attach_shortcuts(group, shortcut_only_service)
         app.add_command(group)

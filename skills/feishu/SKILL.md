@@ -34,6 +34,7 @@ description: >
   - 先用 `feishu auth whoami --format json` 确认当前用户身份
   - 对 requester-owned 上传优先用 `feishu drive +requester-upload`
   - 做最终 owner 校验：`feishu drive meta --check-requester-owner --as user --format json`
+  - 如果目标是原生飞书云文档，优先 `feishu docx create`，再 `feishu docx +insert-content`
 
 ---
 
@@ -47,6 +48,7 @@ CLI 按用途分为三层，从高到低：
 
 ```bash
 feishu bitable +create-from-csv data.csv --app-name "Sales" --table-name "Q1" --format json
+feishu docx create --title "日报" --folder-token fld_xxx --as user --format json
 feishu docx +insert-content --document-id doccn_xxx --content-file report.md --format json
 feishu calendar +attach-material --calendar-id cal_xxx --event-id evt_xxx ./agenda.md --format json
 feishu drive +requester-upload ./report.pdf --as user --format json
@@ -72,6 +74,8 @@ feishu schema list                        # 列出所有 service
 feishu schema list drive                  # 列出 drive 下的 resource/method
 feishu schema show drive.files.list       # 查看参数、scopes、文档链接
 ```
+
+注意：`schema list <service>` 主要覆盖 metadata service command 和 `+shortcut`，不保证列出所有手写命令；例如创建原生云文档时，还要看 `feishu docx --help` 里的 `docx create`。
 
 ### Layer 3: Raw API — 兜底调试
 
@@ -229,7 +233,8 @@ feishu bitable app_table_record records list --params '{"app_token":"app_xxx","t
 ### 云文档
 
 ```bash
-feishu docx +insert-content --document-id doccn_xxx --content-file report.md --format json
+feishu docx create --title "日报" --folder-token fld_xxx --as user --format json
+feishu docx +insert-content --document-id doccn_xxx --content-file report.md --as user --format json
 feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --output ./report.md
 ```
 

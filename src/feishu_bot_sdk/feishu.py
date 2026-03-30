@@ -191,8 +191,34 @@ class FeishuClient:
         return token
 
     def get_user_info(self, *, user_access_token: Optional[str] = None) -> OAuthUserInfo:
-        token = user_access_token or self._resolve_user_access_token()
-        data = self._request_with_bearer("GET", "/authen/v1/user_info", bearer_token=token)
+        refreshed_once = False
+        while True:
+            token = user_access_token or self._resolve_user_access_token()
+            try:
+                data = self._request_with_bearer("GET", "/authen/v1/user_info", bearer_token=token)
+            except HTTPRequestError as exc:
+                if (
+                    user_access_token is None
+                    and not refreshed_once
+                    and _is_token_http_error(exc)
+                    and self._can_refresh_user_token()
+                ):
+                    self._force_refresh_user_access_token()
+                    refreshed_once = True
+                    continue
+                raise
+            except FeishuError as exc:
+                if (
+                    user_access_token is None
+                    and not refreshed_once
+                    and _is_token_feishu_error(exc)
+                    and self._can_refresh_user_token()
+                ):
+                    self._force_refresh_user_access_token()
+                    refreshed_once = True
+                    continue
+                raise
+            break
         payload = data.get("data")
         if not isinstance(payload, Mapping):
             payload = {}
@@ -577,8 +603,34 @@ class AsyncFeishuClient:
         return token
 
     async def get_user_info(self, *, user_access_token: Optional[str] = None) -> OAuthUserInfo:
-        token = user_access_token or await self._resolve_user_access_token()
-        data = await self._request_with_bearer("GET", "/authen/v1/user_info", bearer_token=token)
+        refreshed_once = False
+        while True:
+            token = user_access_token or await self._resolve_user_access_token()
+            try:
+                data = await self._request_with_bearer("GET", "/authen/v1/user_info", bearer_token=token)
+            except HTTPRequestError as exc:
+                if (
+                    user_access_token is None
+                    and not refreshed_once
+                    and _is_token_http_error(exc)
+                    and self._can_refresh_user_token()
+                ):
+                    await self._force_refresh_user_access_token()
+                    refreshed_once = True
+                    continue
+                raise
+            except FeishuError as exc:
+                if (
+                    user_access_token is None
+                    and not refreshed_once
+                    and _is_token_feishu_error(exc)
+                    and self._can_refresh_user_token()
+                ):
+                    await self._force_refresh_user_access_token()
+                    refreshed_once = True
+                    continue
+                raise
+            break
         payload = data.get("data")
         if not isinstance(payload, Mapping):
             payload = {}
@@ -950,6 +1002,16 @@ def _is_token_http_error(exc: HTTPRequestError) -> bool:
     )
 
 
+def _is_token_feishu_error(exc: FeishuError) -> bool:
+    message = str(exc or "").lower()
+    return bool(
+        "token" in message
+        or "unauthorized" in message
+        or "invalid access token" in message
+        or "expired" in message
+    )
+
+
 def _derive_open_domain(base_url: str) -> str:
     marker = "/open-apis"
     index = base_url.find(marker)
@@ -1021,9 +1083,6 @@ def _initial_user_token_cache(config: FeishuConfig) -> Optional[_UserTokenCache]
     expires_at = config.user_access_token_expires_at
     if expires_at is None:
         expires_at = float("inf")
-        if config.user_refresh_token:
-            # Unknown exact expire time; refresh once to ensure rotation info.
-            expires_at = 0.0
     refresh_expires_at: Optional[float] = config.user_refresh_token_expires_at
     return _UserTokenCache(
         access_token=config.user_access_token,

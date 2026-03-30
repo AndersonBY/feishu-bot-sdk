@@ -151,6 +151,48 @@ def test_api_dry_run_and_shortcut_dry_run() -> None:
     assert shortcut_payload["shortcut"] == "docx.+insert-content"
 
 
+def test_docx_create_help_and_execution(monkeypatch: Any) -> None:
+    runner = CliRunner()
+    captured: dict[str, Any] = {}
+
+    def _fake_create_document(self: Any, title: str, *, folder_token: str | None = None) -> dict[str, Any]:
+        captured["title"] = title
+        captured["folder_token"] = folder_token
+        return {"document": {"document_id": "doc_123", "title": title}}
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.docx.DocxService.create_document",
+        _fake_create_document,
+    )
+
+    help_result = runner.invoke(app, ["docx", "create", "--help"])
+    assert help_result.exit_code == 0
+    assert "--title" in help_result.output
+    assert "--folder-token" in help_result.output
+
+    run_result = runner.invoke(
+        app,
+        [
+            "docx",
+            "create",
+            "--title",
+            "日报",
+            "--folder-token",
+            "fld_123",
+            "--app-id",
+            "cli_app",
+            "--app-secret",
+            "cli_secret",
+            "--format",
+            "json",
+        ],
+    )
+    assert run_result.exit_code == 0
+    assert captured == {"title": "日报", "folder_token": "fld_123"}
+    payload = json.loads(run_result.output)
+    assert payload["document"]["document_id"] == "doc_123"
+
+
 def test_config_set_default_as_and_auth_status(monkeypatch: Any, tmp_path: Path) -> None:
     _configure_cli_paths(monkeypatch, tmp_path)
     runner = CliRunner()
