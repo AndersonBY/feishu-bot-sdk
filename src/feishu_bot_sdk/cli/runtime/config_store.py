@@ -42,9 +42,15 @@ class CLIProfile:
     auth_mode: str | None = None
     base_url: str | None = None
     timeout_seconds: float | None = None
-    default_identity: str | None = None
+    default_as: str | None = None
     token_store_path: str | None = None
     updated_at: float | None = None
+
+    @property
+    def default_identity(self) -> str | None:
+        # Backward-compatible alias for legacy runtime/tests while the public
+        # product surface converges on `default_as`.
+        return self.default_as
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -53,7 +59,8 @@ class CLIProfile:
             "auth_mode": self.auth_mode,
             "base_url": self.base_url,
             "timeout_seconds": self.timeout_seconds,
-            "default_identity": self.default_identity,
+            "default_as": self.default_as,
+            "default_identity": self.default_as,
             "token_store_path": self.token_store_path,
             "updated_at": self.updated_at,
         }
@@ -84,7 +91,10 @@ class CLIProfile:
             auth_mode=_optional_str(value.get("auth_mode")),
             base_url=_optional_str(value.get("base_url")),
             timeout_seconds=normalized_timeout,
-            default_identity=_optional_str(value.get("default_identity")),
+            default_as=(
+                _optional_str(value.get("default_as"))
+                or _optional_str(value.get("default_identity"))
+            ),
             token_store_path=_optional_str(value.get("token_store_path")),
             updated_at=normalized_updated_at,
         )
@@ -215,7 +225,7 @@ def make_profile(
     auth_mode: str | None,
     base_url: str | None,
     timeout_seconds: float | None,
-    default_identity: str | None,
+    default_as: str | None,
     token_store_path: str | None,
 ) -> CLIProfile:
     return CLIProfile(
@@ -225,7 +235,7 @@ def make_profile(
         auth_mode=_optional_str(auth_mode),
         base_url=_optional_str(base_url),
         timeout_seconds=float(timeout_seconds) if timeout_seconds is not None else None,
-        default_identity=_optional_str(default_identity),
+        default_as=_optional_str(default_as),
         token_store_path=_optional_str(token_store_path),
         updated_at=time.time(),
     )

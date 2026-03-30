@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import dataclasses
+import csv
+import io
 import json
 import re
 import sys
@@ -15,6 +17,7 @@ _PREVIEW_MAPPING_ITEM_OPTIONS = (40, 20, 10, 5)
 _PREVIEW_STRING_CHAR_OPTIONS = (4000, 2000, 1000, 500, 200, 80)
 _PREVIEW_MAX_DEPTH = 6
 _MAX_TRUNCATION_NOTES = 8
+_ERROR_CODE_PATTERN = re.compile(r"""["']code["']\s*[:=]\s*["']?(\d+)["']?""")
 
 
 def _print_result(
@@ -28,6 +31,7 @@ def _print_result(
     cli_args: Any = None,
 ) -> None:
     normalized = _to_jsonable(result)
+    output_format = _normalize_output_format(output_format)
     max_output_chars_value = _normalize_output_char_limit(max_output_chars)
     output_offset_value = _normalize_output_offset(output_offset)
     if full_output and output_offset_value:
@@ -35,6 +39,9 @@ def _print_result(
     save_output_path = _resolve_output_path(save_output)
     if save_output_path is not None:
         _write_json_file(save_output_path, normalized)
+    if output_format in {"table", "csv", "ndjson"}:
+        _print_structured(normalized, output_format=output_format)
+        return
     prepared = _prepare_regular_output(
         normalized,
         max_output_chars=max_output_chars_value,
@@ -73,6 +80,80 @@ def _print_human(result: Any) -> None:
             print(f"{index}. {item}")
         return
     print(result)
+
+
+def _print_structured(result: Any, *, output_format: str) -> None:
+    rows = _normalize_rows(result)
+    if output_format == "ndjson":
+        for row in rows:
+            print(json.dumps(_to_jsonable(row), ensure_ascii=False))
+        return
+    if not rows:
+        print("")
+        return
+    fieldnames = _collect_fieldnames(rows)
+    if output_format == "csv":
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({name: _stringify_scalar(row.get(name)) for name in fieldnames})
+        sys.stdout.write(buffer.getvalue())
+        return
+    widths = {name: len(name) for name in fieldnames}
+    string_rows: list[dict[str, str]] = []
+    for row in rows:
+        rendered = {name: _stringify_scalar(row.get(name)) for name in fieldnames}
+        string_rows.append(rendered)
+        for name, value in rendered.items():
+            widths[name] = max(widths[name], len(value))
+    header = "  ".join(name.ljust(widths[name]) for name in fieldnames)
+    divider = "  ".join("-" * widths[name] for name in fieldnames)
+    print(header)
+    print(divider)
+    for row in string_rows:
+        print("  ".join(row[name].ljust(widths[name]) for name in fieldnames))
+
+
+def _normalize_rows(result: Any) -> list[dict[str, Any]]:
+    if isinstance(result, list):
+        return [_row_to_mapping(item) for item in result]
+    if isinstance(result, Mapping):
+        items = result.get("items")
+        if isinstance(items, list):
+            return [_row_to_mapping(item) for item in items]
+        return [_row_to_mapping(result)]
+    return [{"value": result}]
+
+
+def _row_to_mapping(value: Any) -> dict[str, Any]:
+    if isinstance(value, Mapping):
+        return {str(key): item for key, item in value.items()}
+    return {"value": value}
+
+
+def _collect_fieldnames(rows: list[dict[str, Any]]) -> list[str]:
+    names: list[str] = []
+    for row in rows:
+        for key in row:
+            if key not in names:
+                names.append(key)
+    return names
+
+
+def _stringify_scalar(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        return json.dumps(_to_jsonable(value), ensure_ascii=False)
+    return str(value)
+
+
+def _normalize_output_format(value: str) -> str:
+    normalized = str(value or "").strip().lower() or "json"
+    if normalized == "human":
+        return "pretty"
+    return normalized
 
 
 def _build_event_view(ctx: Any, *, include_payload: bool) -> Mapping[str, Any]:
@@ -161,88 +242,32 @@ def _print_runtime_error(message: str, *, output_format: str) -> None:
         print(f"Runtime error: {message}", file=sys.stderr)
 
 
-def _print_error(message: str, *, exit_code: int, output_format: str) -> int:
+def _print_error(
+    error: str | Mapping[str, Any],
+    *,
+    exit_code: int,
+    output_format: str,
+    error_type: str | None = None,
+) -> int:
+    detail = _coerce_error_detail(error, exit_code=exit_code, error_type=error_type)
     if output_format == "json":
         print(
             json.dumps(
                 {
                     "ok": False,
-                    "error": message,
+                    "error": detail,
                     "exit_code": exit_code,
                 },
                 ensure_ascii=False,
             )
         )
     else:
-        print(f"Error: {message}", file=sys.stderr)
+        print(f"Error: {_render_error_message(detail)}", file=sys.stderr)
     return exit_code
 
 
 def _format_http_error(exc: HTTPRequestError) -> str:
-    parts = [str(exc)]
-    if exc.status_code is not None:
-        parts.append(f"status_code={exc.status_code}")
-    if exc.response_text:
-        parts.append(f"response={exc.response_text[:500]}")
-        response_lower = exc.response_text.lower()
-        if '"code":20029' in response_lower or "redirect_uri" in response_lower and "illegal" in response_lower:
-            parts.append(
-                "hint=oauth redirect_uri is invalid; configure exact redirect URL in "
-                "Feishu console: Development Config -> Security -> Redirect URL."
-            )
-        if '"code":193107' in response_lower or "no permission to access attachment file token" in response_lower:
-            parts.append(
-                "hint=calendar attachments require media upload with "
-                "parent_type='calendar' and parent_node='<calendar_id>'; "
-                "prefer `feishu calendar attach-material`."
-            )
-        if '"code":234001' in response_lower and "invalid request param" in response_lower:
-            parts.append(
-                "hint=invalid request parameters. For IM image/file resources from received messages, "
-                "use message resource download with message_id, for example: "
-                "`feishu media download-file <resource_key> <output> --message-id <om_xxx> --resource-type image|file --auth-mode tenant`."
-            )
-        if '"code":99991668' in response_lower and "user access token not support" in response_lower:
-            parts.append(
-                "hint=this endpoint does not support user access token; "
-                "retry with tenant auth: `--auth-mode tenant` (or provide app_id/app_secret)."
-            )
-        if '"code":99991679' in response_lower or "required one of these privileges under the user identity" in response_lower:
-            scope_hint = _extract_required_user_scopes(exc.response_text)
-            if scope_hint:
-                parts.append(
-                    "hint=missing user scopes; re-authorize with:\n"
-                    f"feishu auth login --scope \"offline_access {scope_hint}\" --format json"
-                )
-            else:
-                parts.append(
-                    "hint=missing user scope; run `feishu auth login --scope \"offline_access <required_scope>\"` "
-                    "and retry."
-                )
-        if '"code":99991672' in response_lower or "one of the following scopes is required" in response_lower:
-            scope_hint = _extract_required_tenant_scopes(exc.response_text)
-            if scope_hint:
-                parts.append(
-                    "hint=missing tenant app scopes; enable one of these scopes in the "
-                    f"Feishu app console and retry: {scope_hint}. This is not fixed by "
-                    "switching to user auth."
-                )
-            else:
-                parts.append(
-                    "hint=missing tenant app scope; enable the required scope in the "
-                    "Feishu app console and retry. This is not fixed by switching to user auth."
-                )
-        if '"code":99991663' in response_lower or '"code":99991668' in response_lower:
-            parts.append(
-                "hint=invalid access token; prefer user auth for search APIs: "
-                "`feishu auth login --scope \"offline_access search:app search:message search:docs:read\" --format json`"
-            )
-        if '"code":234008' in response_lower or "not the resource sender" in response_lower:
-            parts.append(
-                "hint=resource belongs to a message sender. For user-sent image/file, use message resource download: "
-                "`feishu media download-file <resource_key> <output> --message-id <om_xxx> --resource-type image|file`."
-            )
-    return "; ".join(parts)
+    return _render_error_message(_build_http_error_detail(exc))
 
 
 def _extract_required_user_scopes(response_text: str) -> str:
@@ -282,40 +307,260 @@ def _extract_required_tenant_scopes(response_text: str) -> str:
 
 
 def _format_configuration_error_message(message: str) -> str:
+    return _render_error_message(_build_configuration_error_detail(message))
+
+
+def _format_feishu_error_message(message: str) -> str:
+    return _render_error_message(_build_feishu_error_detail(message))
+
+
+def _build_http_error_detail(exc: HTTPRequestError) -> dict[str, Any]:
+    response_text = exc.response_text or ""
+    hint = _http_error_hint(response_text)
+    detail = _build_error_detail(
+        error_type="http_error",
+        code=_extract_error_code(response_text) or "http_request_failed",
+        message=str(exc),
+        hint=hint,
+        retryable=_is_retryable_http_status(exc.status_code),
+    )
+    if exc.status_code is not None:
+        detail["status_code"] = exc.status_code
+    if response_text:
+        detail["response_excerpt"] = response_text[:500]
+    return detail
+
+
+def _build_configuration_error_detail(message: str) -> dict[str, Any]:
     lower = message.lower()
-    parts = [message]
+    hint: str | None = None
     if "user mode requires user_access_token/access_token or user_refresh_token" in lower:
-        parts.append(
-            "hint=user auth is unavailable. In a v-claw managed session, run "
+        hint = (
+            "user auth is unavailable. In a v-claw managed session, run "
             "`vclawctl auth current --provider feishu`; if "
             "`capabilities.requester_auth_available=false`, do not retry user-mode "
             "commands and re-authorize requester access from v-claw settings. "
             "Otherwise provide `FEISHU_USER_ACCESS_TOKEN`/`FEISHU_USER_REFRESH_TOKEN` "
-            "or switch to tenant auth."
+            "or switch to bot identity."
         )
-    if "auth whoami requires user_access_token/access_token or user_refresh_token" in lower:
-        parts.append(
-            "hint=user identity lookup requires requester auth. In a v-claw managed "
+    elif "auth whoami requires user_access_token/access_token or user_refresh_token" in lower:
+        hint = (
+            "user identity lookup requires requester auth. In a v-claw managed "
             "session, confirm `requester_auth_available=true` before calling "
-            "`feishu auth whoami --auth-mode user`."
+            "`feishu auth whoami`."
         )
-    return "; ".join(parts)
+    return _build_error_detail(
+        error_type="configuration_error",
+        code="configuration_error",
+        message=message,
+        hint=hint,
+        retryable=False,
+    )
 
 
-def _format_feishu_error_message(message: str) -> str:
+def _build_feishu_error_detail(message: str) -> dict[str, Any]:
     lower = message.lower()
-    parts = [message]
+    hint: str | None = None
     if "code': 20005" in lower or '"code": 20005' in lower or "invalid access token" in lower:
-        parts.append(
-            "hint=user access token is invalid or expired; re-login with:\n"
+        hint = (
+            "user access token is invalid or expired; re-login with:\n"
             "feishu auth login --scope \"offline_access search:app search:message search:docs:read\" --format json"
         )
-    if "code': 20026" in lower or '"code": 20026' in lower or "refresh token is invalid" in lower:
-        parts.append(
-            "hint=refresh token is invalid/rotated; run `feishu auth login` again, "
+    elif "code': 20026" in lower or '"code": 20026' in lower or "refresh token is invalid" in lower:
+        hint = (
+            "refresh token is invalid/rotated; run `feishu auth login` again, "
             "or clear FEISHU_USER_REFRESH_TOKEN to use static user access token only."
         )
-    return "; ".join(parts)
+    return _build_error_detail(
+        error_type="feishu_error",
+        code=_extract_error_code(message) or "feishu_api_error",
+        message=message,
+        hint=hint,
+        retryable=False,
+    )
+
+
+def _build_error_detail(
+    *,
+    error_type: str,
+    code: Any,
+    message: str,
+    hint: str | None,
+    retryable: bool,
+) -> dict[str, Any]:
+    return {
+        "type": error_type,
+        "code": code,
+        "message": message,
+        "hint": hint,
+        "retryable": retryable,
+    }
+
+
+def _coerce_error_detail(
+    error: str | Mapping[str, Any],
+    *,
+    exit_code: int,
+    error_type: str | None,
+) -> dict[str, Any]:
+    if isinstance(error, Mapping):
+        detail = _build_error_detail(
+            error_type=str(error.get("type") or error_type or _default_error_type(exit_code)),
+            code=error.get("code") if "code" in error else _default_error_code(error_type, exit_code),
+            message=str(error.get("message") or error.get("error") or ""),
+            hint=_optional_text(error.get("hint")),
+            retryable=bool(error.get("retryable", False)),
+        )
+        for key in ("status_code", "response_excerpt"):
+            if key in error:
+                detail[key] = error[key]
+        if "details" in error:
+            detail["details"] = _to_jsonable(error.get("details"))
+        return detail
+    return _build_error_detail(
+        error_type=error_type or _default_error_type(exit_code),
+        code=_default_error_code(error_type, exit_code),
+        message=str(error),
+        hint=None,
+        retryable=False,
+    )
+
+
+def _render_error_message(detail: Mapping[str, Any]) -> str:
+    parts = [str(detail.get("message") or "")]
+    status_code = detail.get("status_code")
+    if status_code is not None:
+        parts.append(f"status_code={status_code}")
+    response_excerpt = _optional_text(detail.get("response_excerpt"))
+    if response_excerpt:
+        parts.append(f"response={response_excerpt}")
+    hint = _optional_text(detail.get("hint"))
+    if hint:
+        parts.append(f"hint={hint}")
+    return "; ".join(part for part in parts if part)
+
+
+def _default_error_type(exit_code: int) -> str:
+    if exit_code == 2:
+        return "usage_error"
+    if exit_code == 3:
+        return "feishu_error"
+    if exit_code == 4:
+        return "http_error"
+    return "runtime_error"
+
+
+def _default_error_code(error_type: str | None, exit_code: int) -> str:
+    normalized = str(error_type or _default_error_type(exit_code)).strip().lower()
+    if normalized in {"usage_error", "validation_error"}:
+        return "invalid_input"
+    if normalized == "configuration_error":
+        return "configuration_error"
+    if normalized == "feishu_error":
+        return "feishu_api_error"
+    if normalized == "http_error":
+        return "http_request_failed"
+    if normalized == "internal_error":
+        return "internal_error"
+    return f"exit_{exit_code}"
+
+
+def _optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _extract_error_code(value: str | None) -> int | str | None:
+    text = _optional_text(value)
+    if not text:
+        return None
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        payload = None
+    if isinstance(payload, Mapping):
+        code = payload.get("code")
+        if isinstance(code, bool):
+            return None
+        if isinstance(code, int):
+            return code
+        if isinstance(code, float):
+            return int(code)
+        if isinstance(code, str) and code.strip():
+            stripped = code.strip()
+            return int(stripped) if stripped.isdigit() else stripped
+    match = _ERROR_CODE_PATTERN.search(text)
+    if match is None:
+        return None
+    return int(match.group(1))
+
+
+def _http_error_hint(response_text: str) -> str | None:
+    response_lower = response_text.lower()
+    if '"code":20029' in response_lower or "redirect_uri" in response_lower and "illegal" in response_lower:
+        return (
+            "oauth redirect_uri is invalid; configure exact redirect URL in "
+            "Feishu console: Development Config -> Security -> Redirect URL."
+        )
+    if '"code":193107' in response_lower or "no permission to access attachment file token" in response_lower:
+        return (
+            "calendar attachments require media upload with "
+            "parent_type='calendar' and parent_node='<calendar_id>'; "
+            "prefer `feishu calendar attach-material`."
+        )
+    if '"code":234001' in response_lower and "invalid request param" in response_lower:
+        return (
+            "invalid request parameters. For IM image/file resources from received messages, "
+            "use message resource download with message_id, for example: "
+            "`feishu media download-file <resource_key> <output> --message-id <om_xxx> --resource-type image|file`."
+        )
+    if '"code":99991668' in response_lower and "user access token not support" in response_lower:
+        return (
+            "this endpoint does not support user access token; "
+            "retry with bot identity: `--as bot` (or provide app_id/app_secret)."
+        )
+    if '"code":99991679' in response_lower or "required one of these privileges under the user identity" in response_lower:
+        scope_hint = _extract_required_user_scopes(response_text)
+        if scope_hint:
+            return (
+                "missing user scopes; re-authorize with:\n"
+                f"feishu auth login --scope \"offline_access {scope_hint}\" --format json"
+            )
+        return (
+            "missing user scope; run `feishu auth login --scope \"offline_access <required_scope>\"` "
+            "and retry."
+        )
+    if '"code":99991672' in response_lower or "one of the following scopes is required" in response_lower:
+        scope_hint = _extract_required_tenant_scopes(response_text)
+        if scope_hint:
+            return (
+                "missing tenant app scopes; enable one of these scopes in the "
+                f"Feishu app console and retry: {scope_hint}. This is not fixed by "
+                "switching to user auth."
+            )
+        return (
+            "missing tenant app scope; enable the required scope in the "
+            "Feishu app console and retry. This is not fixed by switching to user auth."
+        )
+    if '"code":99991663' in response_lower or '"code":99991668' in response_lower:
+        return (
+            "invalid access token; prefer user auth for search APIs: "
+            "`feishu auth login --scope \"offline_access search:app search:message search:docs:read\" --format json`"
+        )
+    if '"code":234008' in response_lower or "not the resource sender" in response_lower:
+        return (
+            "resource belongs to a message sender. For user-sent image/file, use message resource download: "
+            "`feishu media download-file <resource_key> <output> --message-id <om_xxx> --resource-type image|file`."
+        )
+    return None
+
+
+def _is_retryable_http_status(status_code: int | None) -> bool:
+    if status_code is None:
+        return False
+    return status_code in {408, 409, 429} or 500 <= status_code <= 599
 
 
 def _is_flat_mapping(mapping: Mapping[str, Any]) -> bool:

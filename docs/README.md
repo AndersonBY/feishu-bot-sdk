@@ -16,6 +16,8 @@
 - [08 FeishuBotServer 长连接服务](./zh/08-bot-server.md)
 - [09 类型、异常与限流](./zh/09-types-errors-rate-limit.md)
 - [10 CLI 命令行工具](./zh/10-cli.md)
+- [CLI 框架决策](./cli-framework-decision.md)
+- [CLI 命令映射](./cli-command-mapping.md)
 - [11 日历（Calendar）](./zh/11-calendar.md)
 - [12 通讯录（Contact）](./zh/12-contact.md)
 - [13 搜索（Search）](./zh/13-search.md)

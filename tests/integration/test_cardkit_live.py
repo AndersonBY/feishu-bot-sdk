@@ -14,6 +14,8 @@ import os
 import sys
 import time
 
+import pytest
+
 _examples_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "examples")
 sys.path.insert(0, _examples_dir)
 
@@ -26,7 +28,14 @@ from feishu_bot_sdk import (  # noqa: E402
     FeishuConfig,
 )
 
-settings = load_settings()
+if os.getenv("FEISHU_RUN_LIVE_TESTS") != "1":
+    pytest.skip("set FEISHU_RUN_LIVE_TESTS=1 to run CardKit live integration tests", allow_module_level=True)
+
+try:
+    settings = load_settings()
+except RuntimeError as exc:
+    pytest.skip(str(exc), allow_module_level=True)
+
 config = FeishuConfig(
     app_id=settings.app_id,
     app_secret=settings.app_secret,

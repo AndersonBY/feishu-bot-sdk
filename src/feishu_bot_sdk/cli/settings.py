@@ -1,43 +1,8 @@
 from __future__ import annotations
 
-import argparse
-
 DEFAULT_BASE_URL = "https://open.feishu.cn/open-apis"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 DEFAULT_OAUTH_CALLBACK_HOST = "127.0.0.1"
 DEFAULT_OAUTH_CALLBACK_PORT = 18080
 DEFAULT_OAUTH_CALLBACK_PATH = "/callback"
 DEFAULT_USER_TOKEN_REFRESH_BEFORE_SECONDS = 300.0
-HELP_FORMATTER = argparse.RawTextHelpFormatter
-
-ROOT_HELP_EPILOG = (
-    "Quick start (Agent-friendly):\n"
-    "  1) printf 'app_secret' | feishu config init --profile default --app-id cli_xxx --app-secret-stdin --set-default --format json\n"
-    "  2) feishu auth login --scope \"offline_access contact:user:search\" --no-browser --format json\n"
-    "  3) feishu auth whoami --auth-mode user --format json\n"
-    "  4) feishu contact user search --query \"name\" --auth-mode auto --format json\n"
-    "  5) feishu calendar create-event --auth-mode auto --calendar-id <id> --event-file event.json --format json\n"
-    "  6) non-text message resource: feishu media download-file <resource_key> <output> "
-    "--message-id <om_xxx> --resource-type image|file --auth-mode tenant --format json\n"
-    "\n"
-    "Large output controls:\n"
-    "  - default stdout is capped to 25000 chars for regular command results\n"
-    "  - use --output-offset <n> to inspect the next JSON slice\n"
-    "  - use --save-output <file> to keep the full normalized JSON on disk\n"
-    "  - use --full-output to disable truncation\n"
-    "\n"
-    "Token precedence: env vars > CLI flags > CLI profile > local token store profile.\n"
-    "With auth_mode=auto, the CLI prefers user auth for user-centric APIs and falls back to tenant only when needed."
-)
-
-AUTH_HELP_EPILOG = (
-    "Common flow:\n"
-    "  feishu auth login --scope \"offline_access contact:user:search calendar:calendar.event:create\" --no-browser --format json\n"
-    "  feishu auth whoami --auth-mode user --format json\n"
-    "  feishu auth refresh --auth-mode user --format json\n"
-    "\n"
-    "If login fails with redirect_uri error:\n"
-    "  Configure redirect URL in Feishu console:\n"
-    "  Development Config -> Security -> Redirect URL\n"
-    "  Example: http://127.0.0.1:18080/callback"
-)

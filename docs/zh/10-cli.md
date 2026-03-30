@@ -4,6 +4,26 @@
 
 `feishu-bot-sdk` 提供 `feishu` 命令，适合脚本、CI 和 LLM Agent 直接调用。
 
+## CLI 架构
+
+CLI 基于 Click 框架，采用三层命令模型：
+
+- 顶层命令：`api`、`schema`、`doctor`、`completion`、`webhook`、`ws`、`server`、`media`
+- 高价值工作流命令：`+shortcut`（如 `bitable +create-from-csv`、`docx +insert-content`）
+- service command：metadata 驱动的 API 调用，`feishu <service> <resource> <method> --params ... --data ...`
+
+优先级建议：
+
+1. 有 `+shortcut` 先用 `+shortcut`
+2. 需要底层能力时先看 `feishu schema ...`
+3. 再执行 generated service command
+4. 最后使用 `feishu api` 直接调用
+
+补充说明见：
+
+- [CLI 框架决策](../cli-framework-decision.md)
+- [CLI 命令映射](../cli-command-mapping.md)
+
 ## 安装
 
 ```bash
@@ -11,23 +31,16 @@ uv tool install feishu-bot-sdk
 feishu --help
 ```
 
-## 全局参数
+## 公开运行时参数
 
-- `--format human|json`：默认 `human`，机器调用建议 `json`
-- `--app-id` / `--app-secret`：飞书应用凭证；`--app-secret` 仅建议临时调试，日常推荐 `feishu config init --app-secret-stdin`
-- `--auth-mode tenant|user`：认证模式，默认 `tenant`
-- `--access-token`：当前认证模式的静态 access token（可选）
-- `--app-access-token`：OAuth code/refresh 交换使用（可选）
-- `--user-access-token` / `--user-refresh-token`：用户态 token（`auth_mode=user` 常用）
-- `--profile`：CLI profile，默认读取 `FEISHU_PROFILE` 或当前配置的 default profile
-- `--token-store`：本地 token 存储路径
-- `--no-store`：禁用本地 token 读写
-- `--base-url`：默认 `https://open.feishu.cn/open-apis`
-- `--timeout`：请求超时秒数
-- `--max-output-chars`：常规命令 stdout 最大字符数，默认 `25000`
-- `--output-offset`：输出过大时，按完整 JSON 序列化后的字符偏移查看后续片段
-- `--save-output`：先把完整标准化 JSON 写入文件，再按 stdout 限制输出
-- `--full-output`：关闭常规命令 stdout 截断
+所有 Click 命令的统一参数：
+
+- `--format json|pretty|table|csv|ndjson`
+- `--as user|bot|auto`
+- `--profile`
+- `--app-id` / `--app-secret`
+- `--max-output-chars` / `--output-offset` / `--save-output` / `--full-output`
+- service/raw API 额外支持：`--params` / `--data` / `--page-all` / `--page-size` / `--page-limit` / `--page-delay` / `--output` / `--dry-run`
 
 认证优先级：环境变量 > 命令行参数 > CLI profile > 本地 token store profile。
 
@@ -42,10 +55,10 @@ feishu --help
 推荐先配置一个 CLI profile，再执行后续 `auth` / domain 命令：
 
 ```bash
-printf 'app_secret' | feishu config init --profile default --app-id cli_xxx --app-secret-stdin --set-default --auth-mode auto --format json
+printf 'app_secret' | feishu config init --profile default --app-id cli_xxx --app-secret-stdin --default-as auto --set-default --format json
 feishu config show --format json
 feishu config list-profiles --format json
-feishu config migrate-token-store --from ~/.config/feishu-bot-sdk/tokens.json --app-id cli_xxx --format json
+feishu config migrate-token-store --source-path ~/.config/feishu-bot-sdk/tokens.json --app-id cli_xxx --format json
 ```
 
 如果你已经有旧版 `tokens.json`，可用 `config migrate-token-store` 把旧 profile 名称与 token store 路径导入到新版 CLI config；旧 token 文件本身不会被删除。
@@ -61,6 +74,26 @@ feishu config migrate-token-store --from ~/.config/feishu-bot-sdk/tokens.json --
 - 保留完整结果：`feishu ... --save-output ./full.json --format json`
 - 如果命令本身支持翻页，优先用 `--page-size` / `--page-token`，谨慎使用 `--all`
 
+## JSON 错误 Envelope
+
+当使用 `--format json` 时，失败结果统一返回结构化 envelope：
+
+```json
+{
+  "ok": false,
+  "error": {
+    "type": "http_error",
+    "code": 99991679,
+    "message": "http request failed",
+    "hint": "missing user scopes; re-authorize with ...",
+    "retryable": false
+  },
+  "exit_code": 4
+}
+```
+
+`error` 对象还可能额外带上 `status_code`、`response_excerpt` 等传输层诊断字段。
+
 ## 常用命令
 
 ```bash
@@ -68,117 +101,51 @@ feishu config migrate-token-store --from ~/.config/feishu-bot-sdk/tokens.json --
 feishu config init --profile default --app-id cli_xxx --app-secret-file ./.secrets/feishu_app_secret --set-default --format json
 feishu config show --profile default --format json
 feishu config set-default-profile default --format json
-feishu config migrate-token-store --from ./tokens.json --default-profile default --format json
+feishu config migrate-token-store --source-path ./tokens.json --default-profile default --format json
 feishu config remove-profile default --format json
 
-# 鉴权（推荐：无公网 localhost 回调）
+# 鉴权
 feishu auth token --format json
 feishu auth login --scope "offline_access contact:user.base:readonly" --no-browser --format json
 feishu auth whoami --format json
 feishu auth refresh --format json
 feishu auth logout --format json
+feishu auth status --format json
+feishu auth check --scope "contact:user:search" --format json
 
-# 低层 OAuth 调试命令
-feishu oauth authorize-url --redirect-uri https://example.com/callback --format json
-feishu oauth exchange-code --code CODE --format json
-
-# 发消息
-feishu im send-text --receive-id ou_xxx --text "hello"
-feishu im send-markdown --receive-id ou_xxx --markdown-file ./msg.md --format json
-feishu im push-follow-up om_xxx --follow-ups-json '[{"content":"继续处理"}]' --format json
-feishu im forward-thread omt_xxx --receive-id-type chat_id --receive-id oc_xxx --format json
-feishu im update-url-previews --preview-token token_1 --preview-token token_2 --open-id ou_xxx --format json
-
-# 群组与群公告
-feishu chat list --all --format json
-feishu chat create --chat-json '{"name":"Ops War Room","owner_id":"ou_xxx","user_id_list":["ou_xxx"],"chat_mode":"group","chat_type":"private"}' --user-id-type open_id --format json
-feishu group member add --chat-id oc_xxx --member-id ou_xxx --member-id-type open_id --format json
-feishu chat announcement get --chat-id oc_xxx --format json
-feishu chat announcement list-blocks --chat-id oc_xxx --revision-id -1 --all --format json
-feishu chat announcement batch-update --chat-id oc_xxx --requests-json '[{"update_text_elements":{"block_id":"doxxx","elements":[]}}]' --revision-id -1 --client-token token_1 --format json
+# 通用 API 调用
+feishu api GET /open-apis/contact/v3/users/ou_xxx --format json
+feishu api POST /open-apis/im/v1/messages --data '{"receive_id":"ou_xxx","content":"{\"text\":\"hello\"}","msg_type":"text"}' --params '{"receive_id_type":"open_id"}' --format json
 
 # 文件与文档
 feishu media upload-file ./final.csv --format json
 feishu media download-file file_xxx ./downloads/file.bin --format json
 feishu media download-file img_v3_xxx ./downloads/image.jpg --format json
-# 用户发送的消息资源需带 message_id
 feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx --resource-type image --format json
-feishu bitable create-from-csv ./final.csv --app-name "任务结果" --table-name "结果表"
-feishu bitable list-tables --app-token app_xxx --format json
-feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
-feishu bitable list-views --app-token app_xxx --format json
-feishu docx create --title "日报" --folder-token fld_xxx --format json
-feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
-# 默认返回精简摘要；需要完整 converted/inserted_batches 时加 --full-response
-feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --output ./report.md --format json
-feishu docx list-blocks --document-id doccn_xxx --all --format json
-feishu drive root-folder-meta --auth-mode user --format json
-feishu drive create-folder --auth-mode user --folder-token <root_token> --name "Uploads" --format json
-feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx --auth-mode user --check-requester-owner --format json
-feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
-feishu drive meta --request-docs-json '[{"doc_token":"file_xxx","doc_type":"file"}]' --auth-mode user --check-requester-owner --format json
-feishu drive version-list doccn_xxx --obj-type docx --page-size 50 --all --format json
-feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
-feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id me --member-id-type open_id --permission edit --auth-mode user --format json
+feishu bitable +create-from-csv ./final.csv --app-name "任务结果" --table-name "结果表"
+feishu docx +insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
+feishu drive +requester-upload ./final.csv --folder-name "Uploads" --format json
 
-# Wiki
-feishu wiki search-nodes --query "项目周报" --all --format json
-feishu wiki list-spaces --all --format json
-
-# 搜索
-feishu search app --query "审批" --auth-mode user --format json
-feishu search message --query "故障" --chat-type group_chat --auth-mode user --format json
-feishu search doc-wiki --query "项目周报" --doc-filter-json '{"only_title": true}' --auth-mode user --format json
-
-# 通讯录
-feishu contact user get --user-id ou_xxx --user-id-type open_id --format json
-feishu contact user by-department --department-id od_xxx --page-size 20 --format json
-feishu contact department search --query "研发" --format json
-feishu contact scope get --page-size 100 --format json
-
-# 日历
-feishu calendar list-calendars --page-size 50 --format json
-feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json
-feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
+# 日历附件
+feishu calendar +attach-material ./agenda.md --calendar-id cal_xxx --event-id evt_xxx --format json
 
 # 邮件
-feishu mail address query-status --email ops@example.com --email alerts@example.com --format json
-feishu mail message list --user-mailbox-id me --folder-id INBOX --all --format json
-feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
-feishu mail mailbox alias create --user-mailbox-id me --email-alias alias@example.com --format json
-feishu mail group create --mailgroup-json '{"email":"ops@example.com","name":"Ops Group"}' --format json
-feishu mail public-mailbox member batch-create --public-mailbox-id support@example.com --items-file ./members.json --format json
+feishu mail +send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
 ```
-
-`mail message send-markdown` 会自动把 Markdown 里的本地图片路径和可访问的远程图片 URL 转成内联 CID 图片，Agent 不需要先手动下载。
 
 ## User Auth（CLI 最佳实践）
 
-`feishu auth login` 默认走本地回调（`http://127.0.0.1:18080/callback`），并支持 PKCE。
+`feishu auth login` 默认优先走 device flow；当你显式传入 `--localhost`，或使用 `--redirect-uri` / `--state` / `--no-browser` / `--no-pkce` 这类本地回调参数时，会切回 localhost callback。
 
-- 第一步：在飞书开发者后台安全设置中添加本地重定向 URL（localhost）
-- 第二步：执行 `feishu auth login`
-- 第三步：后续直接执行 `feishu auth whoami` 或其它 `auth_mode=user` 命令
+- 第一步：无浏览器/Agent 场景优先直接执行 `feishu auth login --device-code`
+- 第二步：如果你要本地浏览器回调，再去飞书开发者后台安全设置中添加 localhost 重定向 URL，并执行 `feishu auth login --localhost`
+- 第三步：后续直接执行 `feishu auth whoami` 或其它需要 user identity 的命令
 
 自动处理策略：
 
 - access token 临近过期（默认提前 300 秒）会自动 refresh
 - 接口返回 token 失效相关错误时会自动 refresh 并重试 1 次
 - refresh 成功后会自动更新本地 token store（包含新 refresh token）
-
-## 内容类命令（Agent 建议）
-
-- 群公告建议先跑 `chat announcement get`，确认当前 `announcement_type` 与 `revision_id`，再继续 `list-blocks` / `get-block` / `list-children`
-- 修改群公告时优先使用 `chat announcement batch-update`；新增块用 `create-children`，删除块用 `delete-children`
-- 群组成员管理可直接使用 `feishu group member ...`，它是 `feishu chat member ...` 的别名，适合更接近自然语言的 Agent 提示
-- 分页查询优先使用 `--all`：`bitable list-records`、`wiki list-spaces`、`wiki search-nodes`、`wiki list-nodes`
-- `bitable list-tables` 也支持 `--all`
-- `docx list-blocks`、`docx list-children`、`drive view-records`、`drive version-list` 也支持 `--all`
-- `bitable list-records` 现已支持 `--view-id`、`--filter`、`--sort`、`--field-names`、`--text-field-as-array`
-- `bitable list-records` / `list-views` / `create-record` / `get-view` / `create-view` / `update-view` / `delete-view` / `get-field` 在应用存在默认表，或只有唯一一张表时，可省略 `--table-id`
-- `bitable get-app` / `copy-app` 如果发现 `default_table_id` 为空，会尝试补充 `data.table_id`；若应用里有多张表，先执行 `bitable list-tables`
-- 授权参数已做强约束：`--member-id-type`、`--resource-type`、`--permission`，可减少参数拼写错误
-- 云文档写入建议直接用 `docx insert-content`，不要再自己拼 markdown 块
 
 ## 日历附件（Agent 强烈建议）
 
@@ -187,7 +154,7 @@ feishu mail public-mailbox member batch-create --public-mailbox-id support@examp
 直接使用：
 
 ```bash
-feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
+feishu calendar +attach-material ./agenda.md --calendar-id cal_xxx --event-id evt_xxx --format json
 ```
 
 该命令会自动：
@@ -195,20 +162,6 @@ feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path 
 - 上传素材时使用 `parent_type=calendar`
 - 上传素材时使用 `parent_node=<calendar_id>`
 - 更新日程 `attachments`（默认追加模式，可通过 `--mode replace` 覆盖）
-
-## Stdin（Agent 推荐）
-
-很多命令支持直接从标准输入读取，适合 LLM/脚本管道：
-
-```bash
-# Markdown from stdin
-cat report.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --format json
-cat report.md | feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-stdin --format json
-
-# JSON from stdin
-echo '{"text":"hello"}' | feishu im send --receive-id ou_xxx --msg-type text --content-stdin --format json
-echo '{"x":1}' | feishu auth request POST /some/path --payload-stdin --format json
-```
 
 ## 事件与长连接
 

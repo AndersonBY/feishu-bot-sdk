@@ -1,0 +1,2664 @@
+{
+  "resources": {
+    "files": {
+      "methods": {
+        "copy": {
+          "danger": true,
+          "parameters": {
+            "file_token": {
+              "example": "doccngpahSdXrFPIBD4XdIabcef",
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "被复制的文件token"
+            },
+            "user_id_type": {
+              "default": "",
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "以user_id来识别用户"
+                },
+                {
+                  "description": "以union_id来识别用户",
+                  "value": "union_id"
+                },
+                {
+                  "description": "以open_id来识别用户",
+                  "value": "open_id"
+                }
+              ],
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "此次调用中使用的用户ID的类型"
+            }
+          },
+          "scopes": [
+            "drive:drive",
+            "docs:document:copy"
+          ],
+          "id": "files.copy",
+          "path": "files/{file_token}/copy",
+          "responseBody": {
+            "file": {
+              "type": "object",
+              "description": "复制后的文件资源",
+              "required": false,
+              "ref": "file",
+              "properties": {
+                "shortcut_info": {
+                  "type": "object",
+                  "description": "快捷方式文件信息",
+                  "required": false,
+                  "ref": "shortcut_info",
+                  "properties": {
+                    "target_type": {
+                      "type": "string",
+                      "description": "快捷方式指向的源文件类型",
+                      "required": true,
+                      "example": "doc"
+                    },
+                    "target_token": {
+                      "required": true,
+                      "example": "doccn4dTWHr5K1Ibg2wKCh3arMg",
+                      "type": "string",
+                      "description": "快捷方式指向的源文件token"
+                    }
+                  }
+                },
+                "owner_id": {
+                  "annotations": [
+                    "open:x_user_id"
+                  ],
+                  "type": "string",
+                  "description": "文件所有者",
+                  "required": false,
+                  "example": "ou_b13d41c02edc52ce66aaae67bf1abcef"
+                },
+                "parent_token": {
+                  "description": "父文件夹标识",
+                  "required": false,
+                  "example": "fldcnP8B5Fpr3UwVi24JykpuOic",
+                  "type": "string"
+                },
+                "modified_time": {
+                  "type": "string",
+                  "description": "文件最近修改时间",
+                  "required": false,
+                  "example": "1686125119"
+                },
+                "token": {
+                  "required": true,
+                  "example": "fldcnP8B5Fpr3UwVi24JykpuOic",
+                  "type": "string",
+                  "description": "文件标识符"
+                },
+                "name": {
+                  "required": true,
+                  "example": "测试",
+                  "type": "string",
+                  "description": "文件名"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "在浏览器中查看的链接",
+                  "required": false,
+                  "example": "https://bytedance.feishu.cn/drive/folder/fldcnP8B5Fpr3UwVi24JykpuOic"
+                },
+                "type": {
+                  "type": "string",
+                  "description": "文件类型",
+                  "required": true,
+                  "example": "doc"
+                },
+                "created_time": {
+                  "type": "string",
+                  "description": "文件创建时间",
+                  "required": false,
+                  "example": "1686125119"
+                }
+              }
+            }
+          },
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file/copy",
+          "description": "复制文件",
+          "parameterOrder": [
+            "file_token"
+          ],
+          "requestBody": {
+            "folder_token": {
+              "type": "string",
+              "description": "文件被复制到的目标文件夹token",
+              "required": true,
+              "example": "fldbcO1UuPz8VwnpPx5a92abcef"
+            },
+            "extra": {
+              "type": "array",
+              "description": "用户自定义请求附加参数，用于实现特殊的复制语义",
+              "required": false,
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "description": "自定义属性值对象",
+                  "required": true
+                },
+                "key": {
+                  "required": true,
+                  "type": "string",
+                  "description": "自定义属性键对象"
+                }
+              }
+            },
+            "name": {
+              "example": "test.txt",
+              "type": "string",
+              "description": "被复制文件的新名称",
+              "required": true
+            },
+            "type": {
+              "options": [
+                {
+                  "value": "file",
+                  "description": "文件类型"
+                },
+                {
+                  "value": "doc",
+                  "description": "云文档类型"
+                },
+                {
+                  "value": "sheet",
+                  "description": "电子表格类型"
+                },
+                {
+                  "description": "多维表格类型",
+                  "value": "bitable"
+                },
+                {
+                  "value": "docx",
+                  "description": "新版云文档类型"
+                },
+                {
+                  "value": "mindnote",
+                  "description": "思维笔记类型"
+                },
+                {
+                  "value": "slides",
+                  "description": "幻灯片类型"
+                }
+              ],
+              "enum": [
+                "file",
+                "doc",
+                "sheet",
+                "bitable",
+                "docx",
+                "mindnote",
+                "slides"
+              ],
+              "type": "string",
+              "description": "被复制文件的类型，如果该值为空或者与文件实际类型不匹配，接口会返回失败。",
+              "required": false,
+              "example": "doc"
+            }
+          },
+          "httpMethod": "POST",
+          "accessTokens": [
+            "tenant",
+            "user"
+          ]
+        }
+      }
+    },
+    "file.comments": {
+      "methods": {
+        "create_v2": {
+          "path": "files/{file_token}/new_comments",
+          "requestBody": {
+            "file_type": {
+              "type": "string",
+              "description": "文档类型标识，用于区分不同类型的云文档。需与目标文档的实际类型严格匹配，可通过文档详情接口获取。",
+              "required": true,
+              "example": "docx"
+            },
+            "idempotency_key": {
+              "required": false,
+              "example": "uuid-12345678-1234-5678-1234-567812345678",
+              "type": "string",
+              "description": "幂等键，用于防止重复提交。调用方需保证全局唯一，若重复提交相同幂等键的请求，系统将返回首次提交的处理结果。"
+            },
+            "anchor": {
+              "properties": {
+                "block_id": {
+                  "example": "block1234567890abcdef",
+                  "type": "string",
+                  "description": "文档块级元素的唯一标识,用于将评论锚定到指定的内容块。可通过「获取文档所有块」接口获取目标文档的块级元素ID。",
+                  "required": true
+                },
+                "parent_file_token": {
+                  "example": "fldabc123xyz7sfjsfjh89",
+                  "type": "string",
+                  "description": "父文件token，可选",
+                  "required": false
+                },
+                "parent_file_type": {
+                  "description": "父文件类型，可选",
+                  "required": false,
+                  "example": "docx",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "description": "评论锚点配置,用于指定评论在文档中的关联位置。当不传入该对象时,创建全局评论;当传入时,将锚定到block_id指定的块级元素。",
+              "required": false,
+              "ref": "file_comment_v2_create_anchor"
+            },
+            "reply_elements": {
+              "type": "array",
+              "description": "评论内容元素集合，支持文本、@用户、链接等多种元素类型的组合，用于构建结构化的评论内容。每个元素需指定对应的类型及匹配的内容参数。",
+              "required": true,
+              "properties": {
+                "link": {
+                  "type": "string",
+                  "description": "跳转链接地址。仅当 type 为 link 时生效，需符合 HTTP/HTTPS 协议规范，长度限制为 1-2000 字符。",
+                  "required": false,
+                  "example": "https://example.com/docs/approval-guide"
+                },
+                "type": {
+                  "type": "string",
+                  "description": "text | mention_user | link",
+                  "required": true,
+                  "example": "text"
+                },
+                "text": {
+                  "example": "请尽快处理这份文件的审批流程",
+                  "type": "string",
+                  "description": "评论元素的文本内容。仅当 type 为 text 时生效，支持普通文本输入，长度限制为 1-1000 字符。",
+                  "required": false
+                },
+                "mention_user": {
+                  "example": "ou_1234567890abcdef1234567890abcdef",
+                  "type": "string",
+                  "description": "被@用户的唯一标识。仅当 type 为 mention_user 时生效，可通过调用「获取用户信息」接口获取目标用户的 ID。",
+                  "required": false
+                }
+              }
+            }
+          },
+          "httpMethod": "POST",
+          "parameters": {
+            "file_token": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "文档 Token",
+              "example": "TLLKdcpDro9ijQxA33ycNMabcef"
+            }
+          },
+          "parameterOrder": [
+            "file_token"
+          ],
+          "scopes": [
+            "docs:document.comment:create",
+            "docs:document.comment:write_only"
+          ],
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "docUrl": "https://open.feishu.cn/api-explorer?from=op_doc_tab&apiName=create_v2&project=drive&resource=file.comment&version=v1",
+          "description": "添加全文/局部（划词）评论",
+          "responseBody": {
+            "idempotency_key": {
+              "type": "string",
+              "description": "返回请求中传入的幂等键，用于关联请求与响应结果。",
+              "required": false,
+              "example": "uuid-12345678-1234-5678-1234-567812345678"
+            },
+            "comment_id": {
+              "required": true,
+              "example": "comment-1234567890abcdef1234567890abcdef",
+              "type": "string",
+              "description": "新增评论的唯一标识，可用于后续的评论回复、删除等操作。"
+            },
+            "created_at": {
+              "required": true,
+              "example": "2024-05-20T14:30:00.123Z",
+              "type": "string",
+              "description": "评论创建时间，采用ISO 8601格式，精确到毫秒。"
+            }
+          },
+          "id": "file.comments.create_v2",
+          "danger": true
+        },
+        "list": {
+          "scopes": [
+            "drive:drive",
+            "docs:doc",
+            "sheets:spreadsheet",
+            "drive:drive:readonly",
+            "docs:doc:readonly",
+            "sheets:spreadsheet:readonly",
+            "docs:document.comment:read"
+          ],
+          "parameters": {
+            "user_id_type": {
+              "required": false,
+              "description": "此次调用中使用的用户ID的类型",
+              "default": "",
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "以user_id来识别用户"
+                },
+                {
+                  "value": "union_id",
+                  "description": "以union_id来识别用户"
+                },
+                {
+                  "value": "open_id",
+                  "description": "以open_id来识别用户"
+                }
+              ],
+              "type": "string",
+              "location": "query"
+            },
+            "file_token": {
+              "description": "文档token",
+              "example": "XIHSdYSI7oMEU1xrsnxc8fabcef",
+              "type": "string",
+              "location": "path",
+              "required": true
+            },
+            "file_type": {
+              "description": "文档类型",
+              "default": "",
+              "example": "doc",
+              "options": [
+                {
+                  "value": "doc",
+                  "description": "文档"
+                },
+                {
+                  "value": "docx",
+                  "description": "新版文档"
+                },
+                {
+                  "value": "sheet",
+                  "description": "表格"
+                },
+                {
+                  "value": "file",
+                  "description": "文件"
+                },
+                {
+                  "value": "slides",
+                  "description": "幻灯片"
+                }
+              ],
+              "type": "string",
+              "location": "query",
+              "required": true
+            },
+            "is_whole": {
+              "example": "false",
+              "type": "boolean",
+              "location": "query",
+              "required": false,
+              "description": "是否全文评论",
+              "default": ""
+            },
+            "is_solved": {
+              "required": false,
+              "description": "是否已解决（可选）",
+              "default": "",
+              "example": "false",
+              "type": "boolean",
+              "location": "query"
+            },
+            "page_token": {
+              "location": "query",
+              "required": false,
+              "description": "评论分页参数",
+              "default": "",
+              "example": "7153511712153412356",
+              "type": "string"
+            },
+            "page_size": {
+              "default": "",
+              "example": "10",
+              "type": "integer",
+              "location": "query",
+              "required": false,
+              "description": "获取满足 commen_id > page_token 的评论数量"
+            }
+          },
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file-comment/list",
+          "path": "files/{file_token}/comments",
+          "httpMethod": "GET",
+          "parameterOrder": [
+            "file_token"
+          ],
+          "description": "分页获取文档评论",
+          "responseBody": {
+            "has_more": {
+              "type": "boolean",
+              "description": "是否有下一页数据",
+              "required": false
+            },
+            "page_token": {
+              "type": "string",
+              "description": "下一页分页的 Token",
+              "required": false
+            },
+            "items": {
+              "type": "array",
+              "description": "评论列表",
+              "required": false,
+              "properties": {
+                "reply_list": {
+                  "ref": "reply_list",
+                  "properties": {
+                    "replies": {
+                      "type": "array",
+                      "description": "回复列表",
+                      "required": true
+                    }
+                  },
+                  "type": "object",
+                  "description": "评论里的回复列表",
+                  "required": false
+                },
+                "user_id": {
+                  "type": "string",
+                  "description": "用户 ID",
+                  "required": false,
+                  "annotations": [
+                    "readOnly"
+                  ]
+                },
+                "create_time": {
+                  "example": "1610281603",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "integer",
+                  "description": "创建时间",
+                  "required": false
+                },
+                "page_token": {
+                  "description": "回复分页标记",
+                  "required": false,
+                  "example": "6916106822734512356",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string"
+                },
+                "quote": {
+                  "example": "hello",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "局部评论的引用字段",
+                  "required": false
+                },
+                "comment_id": {
+                  "example": "69161068xxxxx512356",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "评论 ID",
+                  "required": false
+                },
+                "is_solved": {
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "boolean",
+                  "description": "是否已解决",
+                  "required": false
+                },
+                "solved_time": {
+                  "type": "integer",
+                  "description": "解决评论时间",
+                  "required": false,
+                  "example": "1610281603",
+                  "annotations": [
+                    "readOnly"
+                  ]
+                },
+                "has_more": {
+                  "required": false,
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "boolean",
+                  "description": "是否有更多回复"
+                },
+                "is_whole": {
+                  "required": false,
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "boolean",
+                  "description": "是否是全文评论"
+                },
+                "update_time": {
+                  "description": "更新时间",
+                  "required": false,
+                  "example": "1610281603",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "integer"
+                },
+                "solver_user_id": {
+                  "type": "string",
+                  "description": "解决评论者的用户 ID",
+                  "required": false,
+                  "annotations": [
+                    "readOnly"
+                  ]
+                }
+              }
+            }
+          },
+          "id": "file.comments.list"
+        },
+        "patch": {
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file-comment/patch",
+          "path": "files/{file_token}/comments/{comment_id}",
+          "parameterOrder": [
+            "file_token",
+            "comment_id"
+          ],
+          "responseBody": {
+            "data": {
+              "type": "string",
+              "description": "",
+              "required": true
+            }
+          },
+          "parameters": {
+            "comment_id": {
+              "location": "path",
+              "required": true,
+              "description": "评论ID",
+              "example": "6916106822734578184",
+              "type": "string"
+            },
+            "file_type": {
+              "example": "doc",
+              "options": [
+                {
+                  "value": "doc",
+                  "description": "文档"
+                },
+                {
+                  "description": "新版文档",
+                  "value": "docx"
+                },
+                {
+                  "value": "sheet",
+                  "description": "表格"
+                },
+                {
+                  "value": "file",
+                  "description": "文件"
+                },
+                {
+                  "value": "slides",
+                  "description": "幻灯片"
+                }
+              ],
+              "type": "string",
+              "location": "query",
+              "required": true,
+              "description": "文档类型",
+              "default": ""
+            },
+            "file_token": {
+              "description": "文档token",
+              "example": "doccnGp4UK1UskrOEJwBXd3****",
+              "type": "string",
+              "location": "path",
+              "required": true
+            }
+          },
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "requestBody": {
+            "is_solved": {
+              "type": "boolean",
+              "description": "评论解决标志",
+              "required": true,
+              "example": "true"
+            }
+          },
+          "danger": true,
+          "description": "解决/恢复 评论",
+          "scopes": [
+            "drive:drive",
+            "docs:doc",
+            "sheets:spreadsheet",
+            "drive:drive:readonly",
+            "docs:doc:readonly",
+            "sheets:spreadsheet:readonly",
+            "docs:document.comment:write_only",
+            "docs:document.comment:update"
+          ],
+          "id": "file.comments.patch",
+          "httpMethod": "PATCH"
+        },
+        "batch_query": {
+          "parameters": {
+            "file_token": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "文档Token",
+              "example": "doxbcdl03Vsxhm7Qmnj110abcef"
+            },
+            "file_type": {
+              "required": true,
+              "description": "文档类型",
+              "default": "",
+              "example": "doc;docx;sheet;file",
+              "options": [
+                {
+                  "value": "doc",
+                  "description": "文档"
+                },
+                {
+                  "value": "docx",
+                  "description": "新版文档"
+                },
+                {
+                  "value": "sheet",
+                  "description": "表格"
+                },
+                {
+                  "value": "file",
+                  "description": "文件"
+                },
+                {
+                  "value": "slides",
+                  "description": "幻灯片"
+                }
+              ],
+              "type": "string",
+              "location": "query"
+            },
+            "user_id_type": {
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "以user_id来识别用户"
+                },
+                {
+                  "value": "union_id",
+                  "description": "以union_id来识别用户"
+                },
+                {
+                  "value": "open_id",
+                  "description": "以open_id来识别用户"
+                }
+              ],
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "此次调用中使用的用户ID的类型",
+              "default": ""
+            }
+          },
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file-comment/batch_query",
+          "requestBody": {
+            "comment_ids": {
+              "description": "需要获取数据的评论id",
+              "required": true,
+              "example": "1654857036541812356",
+              "type": "array"
+            }
+          },
+          "responseBody": {
+            "items": {
+              "properties": {
+                "create_time": {
+                  "required": false,
+                  "example": "1610281603",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "integer",
+                  "description": "创建时间"
+                },
+                "update_time": {
+                  "example": "1610281603",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "integer",
+                  "description": "更新时间",
+                  "required": false
+                },
+                "is_solved": {
+                  "description": "是否已解决",
+                  "required": false,
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "boolean"
+                },
+                "solved_time": {
+                  "description": "解决评论时间",
+                  "required": false,
+                  "example": "1610281603",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "integer"
+                },
+                "solver_user_id": {
+                  "description": "解决评论者的用户 ID",
+                  "required": false,
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string"
+                },
+                "page_token": {
+                  "example": "6916106822734512356",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "回复分页标记",
+                  "required": false
+                },
+                "has_more": {
+                  "type": "boolean",
+                  "description": "是否有更多回复",
+                  "required": false,
+                  "annotations": [
+                    "readOnly"
+                  ]
+                },
+                "is_whole": {
+                  "required": false,
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "boolean",
+                  "description": "是否是全文评论"
+                },
+                "user_id": {
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "用户 ID",
+                  "required": false
+                },
+                "comment_id": {
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "评论 ID",
+                  "required": false,
+                  "example": "69161068xxxxx512356"
+                },
+                "quote": {
+                  "example": "hello",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "局部评论的引用字段",
+                  "required": false
+                },
+                "reply_list": {
+                  "description": "评论里的回复列表",
+                  "required": false,
+                  "ref": "reply_list",
+                  "properties": {
+                    "replies": {
+                      "type": "array",
+                      "description": "回复列表",
+                      "required": true
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "type": "array",
+              "description": "评论的相关信息、回复的信息、回复分页的信息",
+              "required": false
+            }
+          },
+          "scopes": [
+            "drive:drive",
+            "drive:drive:readonly",
+            "docs:document.comment:read"
+          ],
+          "danger": true,
+          "parameterOrder": [
+            "file_token"
+          ],
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "description": "批量获取评论",
+          "httpMethod": "POST",
+          "id": "file.comments.batch_query",
+          "path": "files/{file_token}/comments/batch_query"
+        }
+      }
+    },
+    "file.comment.replys": {
+      "methods": {
+        "create": {
+          "parameters": {
+            "user_id_type": {
+              "required": false,
+              "description": "此次调用中使用的用户ID的类型",
+              "default": "",
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "以user_id来识别用户"
+                },
+                {
+                  "description": "以union_id来识别用户",
+                  "value": "union_id"
+                },
+                {
+                  "value": "open_id",
+                  "description": "以open_id来识别用户"
+                }
+              ],
+              "type": "string",
+              "location": "query"
+            },
+            "file_token": {
+              "example": "TLLKdcpDro9ijQxA33ycNMabcef",
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "文档token"
+            },
+            "comment_id": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "评论ID",
+              "example": "69161068xxxxx512356"
+            },
+            "file_type": {
+              "options": [
+                {
+                  "value": "doc",
+                  "description": "文档"
+                },
+                {
+                  "value": "sheet",
+                  "description": "表格"
+                },
+                {
+                  "value": "file",
+                  "description": "文件"
+                },
+                {
+                  "description": "新版文档",
+                  "value": "docx"
+                }
+              ],
+              "type": "string",
+              "location": "query",
+              "required": true,
+              "description": "文档类型",
+              "default": ""
+            }
+          },
+          "danger": true,
+          "id": "file.comment.replys.create",
+          "parameterOrder": [
+            "file_token",
+            "comment_id"
+          ],
+          "requestBody": {
+            "content": {
+              "type": "object",
+              "description": "回复内容",
+              "required": true,
+              "ref": "reply_content",
+              "properties": {
+                "elements": {
+                  "type": "array",
+                  "description": "回复内容的元素列表",
+                  "required": true,
+                  "properties": {
+                    "person": {
+                      "description": "联系人",
+                      "required": false,
+                      "ref": "person",
+                      "type": "object"
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "回复内容的元素类型",
+                      "required": true,
+                      "example": "docs_link",
+                      "options": [
+                        {
+                          "value": "text_run",
+                          "description": "普通文本"
+                        },
+                        {
+                          "description": "at 云文档链接",
+                          "value": "docs_link"
+                        },
+                        {
+                          "value": "person",
+                          "description": "at 联系人"
+                        }
+                      ],
+                      "enum": [
+                        "text_run",
+                        "docs_link",
+                        "person"
+                      ]
+                    },
+                    "text_run": {
+                      "type": "object",
+                      "description": "文本内容",
+                      "required": false,
+                      "ref": "text_run"
+                    },
+                    "docs_link": {
+                      "type": "object",
+                      "description": "云文档链接",
+                      "required": false,
+                      "ref": "docs_link"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "scopes": [
+            "drive:drive",
+            "docs:doc",
+            "sheets:spreadsheet",
+            "drive:drive:readonly",
+            "docs:doc:readonly",
+            "sheets:spreadsheet:readonly",
+            "docs:document.comment:create"
+          ],
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "path": "files/{file_token}/comments/{comment_id}/replies",
+          "description": "",
+          "docUrl": "https://open.feishu.cn/api-explorer?from=op_doc_tab&apiName=create&project=drive&resource=file.comment.reply&version=v1",
+          "httpMethod": "POST",
+          "responseBody": {
+            "file.comment.reply": {
+              "required": false,
+              "ref": "file.comment.reply",
+              "properties": {
+                "create_time": {
+                  "description": "创建时间",
+                  "required": false,
+                  "example": "1610281603",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "integer"
+                },
+                "update_time": {
+                  "example": "1610281603",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "integer",
+                  "description": "更新时间",
+                  "required": false
+                },
+                "extra": {
+                  "description": "回复的其他内容，图片 Token 等",
+                  "required": false,
+                  "ref": "reply_extra",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "properties": {
+                    "image_list": {
+                      "type": "array",
+                      "description": "",
+                      "required": false
+                    }
+                  },
+                  "type": "object"
+                },
+                "reactions": {
+                  "type": "object",
+                  "description": "评论回复卡片上对应的表情回复信息",
+                  "required": false,
+                  "ref": "file_comment_v2_batch_query_reaction_data",
+                  "properties": {
+                    "ahead_users": {
+                      "description": "用于在界面优先展示核心互动用户。用户ID可通过用户信息查询接口获取。",
+                      "required": false,
+                      "type": "array"
+                    },
+                    "reaction_key": {
+                      "type": "string",
+                      "description": "表情回复的唯一标识，用于区分不同类型的评论表情（如点赞、鼓掌等）。",
+                      "required": true,
+                      "example": "like"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "该表情回复的累计使用次数，统计范围为当前评论下所有用户的有效回复记录。",
+                      "required": true,
+                      "example": "10"
+                    }
+                  }
+                },
+                "content": {
+                  "type": "object",
+                  "description": "回复内容",
+                  "required": true,
+                  "ref": "reply_content",
+                  "properties": {
+                    "elements": {
+                      "type": "array",
+                      "description": "回复内容的元素列表",
+                      "required": true
+                    }
+                  }
+                },
+                "reply_id": {
+                  "required": false,
+                  "example": "6916106xxxxx4512356",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "回复 ID"
+                },
+                "user_id": {
+                  "type": "string",
+                  "description": "用户 ID",
+                  "required": false,
+                  "example": "ou_cc19b2bfb93f8a44db4b4d6eab2abcef",
+                  "annotations": [
+                    "readOnly"
+                  ]
+                }
+              },
+              "type": "object",
+              "description": ""
+            }
+          }
+        },
+        "delete": {
+          "id": "file.comment.replys.delete",
+          "parameters": {
+            "file_token": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "文档token",
+              "example": "doccnHh7U87HOFpii5u5G*****"
+            },
+            "comment_id": {
+              "description": "评论ID",
+              "example": "6916106822734578184",
+              "type": "string",
+              "location": "path",
+              "required": true
+            },
+            "reply_id": {
+              "description": "回复ID",
+              "example": "6916106822734594568",
+              "type": "string",
+              "location": "path",
+              "required": true
+            },
+            "file_type": {
+              "default": "",
+              "example": "doc",
+              "options": [
+                {
+                  "value": "doc",
+                  "description": "文档"
+                },
+                {
+                  "description": "新版文档",
+                  "value": "docx"
+                },
+                {
+                  "value": "sheet",
+                  "description": "表格"
+                },
+                {
+                  "value": "file",
+                  "description": "文件"
+                },
+                {
+                  "value": "slides",
+                  "description": "幻灯片"
+                }
+              ],
+              "type": "string",
+              "location": "query",
+              "required": true,
+              "description": "文档类型"
+            }
+          },
+          "parameterOrder": [
+            "file_token",
+            "comment_id",
+            "reply_id"
+          ],
+          "httpMethod": "DELETE",
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "scopes": [
+            "drive:drive",
+            "docs:doc",
+            "sheets:spreadsheet",
+            "drive:drive:readonly",
+            "docs:doc:readonly",
+            "sheets:spreadsheet:readonly",
+            "docs:document.comment:write_only",
+            "docs:document.comment:delete"
+          ],
+          "danger": true,
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file-comment-reply/delete",
+          "description": "删除回复",
+          "path": "files/{file_token}/comments/{comment_id}/replies/{reply_id}",
+          "responseBody": {
+            "data": {
+              "required": true,
+              "type": "string",
+              "description": ""
+            }
+          }
+        },
+        "list": {
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file-comment-reply/list",
+          "parameters": {
+            "comment_id": {
+              "description": "评论ID",
+              "example": "1654857036541812356",
+              "type": "string",
+              "location": "path",
+              "required": true
+            },
+            "page_size": {
+              "type": "integer",
+              "location": "query",
+              "required": false,
+              "description": "分页大小",
+              "default": "",
+              "example": "10"
+            },
+            "page_token": {
+              "description": "分页标记，第一次请求不填，表示从头开始遍历；分页查询结果还有更多项时会同时返回新的 page_token，下次遍历可采用该 page_token 获取查询结果",
+              "default": "",
+              "example": "1654857036541812356",
+              "type": "string",
+              "location": "query",
+              "required": false
+            },
+            "file_type": {
+              "example": "docx",
+              "options": [
+                {
+                  "value": "doc",
+                  "description": "文档"
+                },
+                {
+                  "value": "docx",
+                  "description": "新版本文档"
+                },
+                {
+                  "description": "表格",
+                  "value": "sheet"
+                },
+                {
+                  "value": "file",
+                  "description": "文件"
+                },
+                {
+                  "value": "slides",
+                  "description": "幻灯片"
+                }
+              ],
+              "type": "string",
+              "location": "query",
+              "required": true,
+              "description": "文档类型",
+              "default": ""
+            },
+            "user_id_type": {
+              "default": "",
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "以user_id来识别用户"
+                },
+                {
+                  "value": "union_id",
+                  "description": "以union_id来识别用户"
+                },
+                {
+                  "value": "open_id",
+                  "description": "以open_id来识别用户"
+                }
+              ],
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "此次调用中使用的用户ID的类型"
+            },
+            "file_token": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "文档Token",
+              "example": "doxbcdl03Vsxhm7Qmnj110abcef"
+            }
+          },
+          "scopes": [
+            "drive:drive",
+            "drive:drive:readonly",
+            "docs:document.comment:read"
+          ],
+          "httpMethod": "GET",
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "description": "获取回复",
+          "parameterOrder": [
+            "file_token",
+            "comment_id"
+          ],
+          "responseBody": {
+            "items": {
+              "type": "array",
+              "description": "回复列表",
+              "required": false,
+              "properties": {
+                "content": {
+                  "ref": "reply_content",
+                  "properties": {
+                    "elements": {
+                      "type": "array",
+                      "description": "回复内容的元素列表",
+                      "required": true
+                    }
+                  },
+                  "type": "object",
+                  "description": "回复内容",
+                  "required": true
+                },
+                "reply_id": {
+                  "required": false,
+                  "example": "6916106xxxxx4512356",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "回复 ID"
+                },
+                "user_id": {
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "用户 ID",
+                  "required": false,
+                  "example": "ou_cc19b2bfb93f8a44db4b4d6eab2abcef"
+                },
+                "create_time": {
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "integer",
+                  "description": "创建时间",
+                  "required": false,
+                  "example": "1610281603"
+                },
+                "update_time": {
+                  "description": "更新时间",
+                  "required": false,
+                  "example": "1610281603",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "integer"
+                },
+                "extra": {
+                  "type": "object",
+                  "description": "回复的其他内容，图片 Token 等",
+                  "required": false,
+                  "ref": "reply_extra",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "properties": {
+                    "image_list": {
+                      "type": "array",
+                      "description": "",
+                      "required": false
+                    }
+                  }
+                },
+                "reactions": {
+                  "type": "object",
+                  "description": "评论回复卡片上对应的表情回复信息",
+                  "required": false,
+                  "ref": "file_comment_v2_batch_query_reaction_data",
+                  "properties": {
+                    "reaction_key": {
+                      "type": "string",
+                      "description": "表情回复的唯一标识，用于区分不同类型的评论表情（如点赞、鼓掌等）。",
+                      "required": true,
+                      "example": "like"
+                    },
+                    "count": {
+                      "description": "该表情回复的累计使用次数，统计范围为当前评论下所有用户的有效回复记录。",
+                      "required": true,
+                      "example": "10",
+                      "type": "integer"
+                    },
+                    "ahead_users": {
+                      "type": "array",
+                      "description": "用于在界面优先展示核心互动用户。用户ID可通过用户信息查询接口获取。",
+                      "required": false
+                    }
+                  }
+                }
+              }
+            },
+            "page_token": {
+              "example": "6916106822734512356",
+              "type": "string",
+              "description": "",
+              "required": false
+            },
+            "has_more": {
+              "type": "boolean",
+              "description": "",
+              "required": true,
+              "example": "true"
+            }
+          },
+          "id": "file.comment.replys.list",
+          "path": "files/{file_token}/comments/{comment_id}/replies"
+        },
+        "update": {
+          "parameters": {
+            "user_id_type": {
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "此次调用中使用的用户ID的类型",
+              "default": "",
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "以user_id来识别用户"
+                },
+                {
+                  "value": "union_id",
+                  "description": "以union_id来识别用户"
+                },
+                {
+                  "value": "open_id",
+                  "description": "以open_id来识别用户"
+                }
+              ]
+            },
+            "file_token": {
+              "location": "path",
+              "required": true,
+              "description": "文档token",
+              "example": "doccnHh7U87HOFpii5u5G*****",
+              "type": "string"
+            },
+            "comment_id": {
+              "example": "6916106822734578184",
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "评论ID"
+            },
+            "reply_id": {
+              "required": true,
+              "description": "回复ID",
+              "example": "6916106822734594568",
+              "type": "string",
+              "location": "path"
+            },
+            "file_type": {
+              "required": true,
+              "description": "文档类型",
+              "default": "",
+              "example": "doc",
+              "options": [
+                {
+                  "description": "文档",
+                  "value": "doc"
+                },
+                {
+                  "value": "docx",
+                  "description": "新版文档"
+                },
+                {
+                  "value": "sheet",
+                  "description": "表格"
+                },
+                {
+                  "value": "file",
+                  "description": "文件"
+                },
+                {
+                  "value": "slides",
+                  "description": "幻灯片"
+                }
+              ],
+              "type": "string",
+              "location": "query"
+            }
+          },
+          "parameterOrder": [
+            "file_token",
+            "comment_id",
+            "reply_id"
+          ],
+          "responseBody": {
+            "data": {
+              "type": "string",
+              "description": "",
+              "required": true
+            }
+          },
+          "scopes": [
+            "drive:drive",
+            "docs:doc",
+            "sheets:spreadsheet",
+            "drive:drive:readonly",
+            "docs:doc:readonly",
+            "sheets:spreadsheet:readonly",
+            "docs:document.comment:write_only",
+            "docs:document.comment:update"
+          ],
+          "danger": true,
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file-comment-reply/update",
+          "id": "file.comment.replys.update",
+          "httpMethod": "PUT",
+          "description": "更新回复",
+          "requestBody": {
+            "content": {
+              "properties": {
+                "elements": {
+                  "required": true,
+                  "properties": {
+                    "type": {
+                      "description": "回复内容的元素类型",
+                      "required": true,
+                      "example": "docs_link",
+                      "options": [
+                        {
+                          "value": "text_run",
+                          "description": "普通文本"
+                        },
+                        {
+                          "description": "at 云文档链接",
+                          "value": "docs_link"
+                        },
+                        {
+                          "value": "person",
+                          "description": "at 联系人"
+                        }
+                      ],
+                      "enum": [
+                        "text_run",
+                        "docs_link",
+                        "person"
+                      ],
+                      "type": "string"
+                    },
+                    "text_run": {
+                      "ref": "text_run",
+                      "type": "object",
+                      "description": "文本内容",
+                      "required": false
+                    },
+                    "docs_link": {
+                      "type": "object",
+                      "description": "云文档链接",
+                      "required": false,
+                      "ref": "docs_link"
+                    },
+                    "person": {
+                      "ref": "person",
+                      "type": "object",
+                      "description": "联系人",
+                      "required": false
+                    }
+                  },
+                  "type": "array",
+                  "description": "回复内容的元素列表"
+                }
+              },
+              "type": "object",
+              "description": "回复内容",
+              "required": true,
+              "ref": "reply_content"
+            }
+          },
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "path": "files/{file_token}/comments/{comment_id}/replies/{reply_id}"
+        }
+      }
+    },
+    "permission.members": {
+      "methods": {
+        "auth": {
+          "responseBody": {
+            "auth_result": {
+              "required": true,
+              "example": "true",
+              "type": "boolean",
+              "description": "是否有权限"
+            }
+          },
+          "docUrl": "https://open.feishu.cn/api-explorer?from=op_doc_tab&apiName=auth&project=drive&resource=permission.member&version=v1",
+          "path": "permissions/{token}/members/auth",
+          "httpMethod": "GET",
+          "description": "",
+          "id": "permission.members.auth",
+          "parameterOrder": [
+            "token"
+          ],
+          "scopes": [
+            "drive:drive",
+            "docs:doc",
+            "sheets:spreadsheet",
+            "bitable:bitable",
+            "wiki:wiki",
+            "bitable:app",
+            "docs:permission.member:auth"
+          ],
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "parameters": {
+            "token": {
+              "location": "path",
+              "required": true,
+              "description": "文件的 token",
+              "example": "doccnBKgoMyY5OMbUG6FioTXuBe",
+              "type": "string"
+            },
+            "type": {
+              "enumName": "TokenType",
+              "type": "string",
+              "location": "query",
+              "required": true,
+              "description": "文件类型，需要与文件的 token 相匹配",
+              "default": "",
+              "example": "doc",
+              "options": [
+                {
+                  "value": "doc",
+                  "description": "文档"
+                },
+                {
+                  "description": "电子表格",
+                  "value": "sheet"
+                },
+                {
+                  "description": "云空间文件",
+                  "value": "file"
+                },
+                {
+                  "value": "wiki",
+                  "description": "知识库节点"
+                },
+                {
+                  "value": "bitable",
+                  "description": "多维表格"
+                },
+                {
+                  "value": "docx",
+                  "description": "新版文档"
+                },
+                {
+                  "value": "mindnote",
+                  "description": "思维笔记"
+                },
+                {
+                  "value": "minutes",
+                  "description": "妙记"
+                },
+                {
+                  "value": "slides",
+                  "description": "幻灯片"
+                }
+              ]
+            },
+            "action": {
+              "options": [
+                {
+                  "value": "view",
+                  "description": "阅读"
+                },
+                {
+                  "description": "编辑",
+                  "value": "edit"
+                },
+                {
+                  "value": "share",
+                  "description": "分享"
+                },
+                {
+                  "value": "comment",
+                  "description": "评论"
+                },
+                {
+                  "value": "export",
+                  "description": "导出"
+                },
+                {
+                  "value": "copy",
+                  "description": "拷贝"
+                },
+                {
+                  "value": "print",
+                  "description": "打印"
+                },
+                {
+                  "value": "manage_public",
+                  "description": "管理权限设置"
+                }
+              ],
+              "enumName": "Perm",
+              "type": "string",
+              "location": "query",
+              "required": true,
+              "description": "需要判断的权限",
+              "default": "",
+              "example": "view"
+            }
+          }
+        },
+        "create": {
+          "responseBody": {
+            "member": {
+              "required": false,
+              "ref": "base_member",
+              "properties": {
+                "perm_type": {
+                  "type": "string",
+                  "description": "协作者的权限角色类型",
+                  "required": false,
+                  "example": "container",
+                  "options": [
+                    {
+                      "value": "container",
+                      "description": "当前页面及子页面"
+                    },
+                    {
+                      "description": "仅当前页面，当且仅当在知识库文档中该参数有效",
+                      "value": "single_page"
+                    }
+                  ],
+                  "enum": [
+                    "container",
+                    "single_page"
+                  ]
+                },
+                "type": {
+                  "example": "user",
+                  "options": [
+                    {
+                      "value": "user",
+                      "description": "用户"
+                    },
+                    {
+                      "value": "chat",
+                      "description": "群组"
+                    },
+                    {
+                      "value": "department",
+                      "description": "组织架构"
+                    },
+                    {
+                      "description": "用户组",
+                      "value": "group"
+                    },
+                    {
+                      "value": "wiki_space_member",
+                      "description": "知识库成员"
+                    },
+                    {
+                      "value": "wiki_space_viewer",
+                      "description": "知识库可阅读成员"
+                    },
+                    {
+                      "value": "wiki_space_editor",
+                      "description": "知识库可编辑成员"
+                    }
+                  ],
+                  "enum": [
+                    "user",
+                    "chat",
+                    "department",
+                    "group",
+                    "wiki_space_member",
+                    "wiki_space_viewer",
+                    "wiki_space_editor"
+                  ],
+                  "type": "string",
+                  "description": "协作者类型",
+                  "required": false
+                },
+                "member_type": {
+                  "example": "openid",
+                  "options": [
+                    {
+                      "value": "email",
+                      "description": "飞书邮箱"
+                    },
+                    {
+                      "value": "openid",
+                      "description": "开放平台OpenID"
+                    },
+                    {
+                      "description": "开放平台UnionID",
+                      "value": "unionid"
+                    },
+                    {
+                      "description": "开放平台群组ID",
+                      "value": "openchat"
+                    },
+                    {
+                      "value": "opendepartmentid",
+                      "description": "开放平台部门ID"
+                    },
+                    {
+                      "value": "userid",
+                      "description": "用户自定义ID"
+                    },
+                    {
+                      "description": "自定义用户组ID",
+                      "value": "groupid"
+                    },
+                    {
+                      "value": "wikispaceid",
+                      "description": "知识空间的唯一标识"
+                    }
+                  ],
+                  "enum": [
+                    "email",
+                    "openid",
+                    "unionid",
+                    "openchat",
+                    "opendepartmentid",
+                    "userid",
+                    "groupid",
+                    "wikispaceid"
+                  ],
+                  "type": "string",
+                  "description": "协作者ID类型",
+                  "required": true
+                },
+                "member_id": {
+                  "description": "协作者ID，与协作者ID类型需要对应",
+                  "required": true,
+                  "example": "string",
+                  "type": "string"
+                },
+                "perm": {
+                  "options": [
+                    {
+                      "description": "可阅读角色",
+                      "value": "view"
+                    },
+                    {
+                      "value": "edit",
+                      "description": "可编辑角色"
+                    },
+                    {
+                      "value": "full_access",
+                      "description": "可管理角色"
+                    }
+                  ],
+                  "enum": [
+                    "view",
+                    "edit",
+                    "full_access"
+                  ],
+                  "type": "string",
+                  "description": "协作者的权限角色",
+                  "required": true,
+                  "example": "view"
+                }
+              },
+              "type": "object",
+              "description": "本次添加权限的用户信息"
+            }
+          },
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/permission-member/create",
+          "id": "permission.members.create",
+          "path": "permissions/{token}/members",
+          "parameters": {
+            "need_notification": {
+              "location": "query",
+              "required": false,
+              "description": "添加权限后是否通知对方",
+              "default": "false",
+              "example": "false",
+              "type": "boolean"
+            },
+            "token": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "文件的 token，获取方式见 [如何获取云文档资源相关 token](https://open.feishu.cn/document/ukTMukTMukTM/uczNzUjL3czM14yN3MTN#08bb5df6)",
+              "example": "doccnBKgoMyY5OMbUG6FioTXuBe"
+            },
+            "type": {
+              "enumName": "TokenTypeV2",
+              "type": "string",
+              "location": "query",
+              "required": true,
+              "description": "文件类型，需要与文件的 token 相匹配",
+              "default": "",
+              "example": "doc",
+              "options": [
+                {
+                  "value": "doc",
+                  "description": "文档"
+                },
+                {
+                  "value": "sheet",
+                  "description": "电子表格"
+                },
+                {
+                  "value": "file",
+                  "description": "云空间文件"
+                },
+                {
+                  "description": "知识库节点",
+                  "value": "wiki"
+                },
+                {
+                  "value": "bitable",
+                  "description": "多维表格"
+                },
+                {
+                  "value": "docx",
+                  "description": "新版文档"
+                },
+                {
+                  "description": "文件夹",
+                  "value": "folder"
+                },
+                {
+                  "value": "mindnote",
+                  "description": "思维笔记"
+                },
+                {
+                  "value": "minutes",
+                  "description": "妙记"
+                },
+                {
+                  "value": "slides",
+                  "description": "幻灯片"
+                }
+              ]
+            }
+          },
+          "requestBody": {
+            "perm": {
+              "required": false,
+              "example": "view",
+              "options": [
+                {
+                  "value": "view",
+                  "description": "可阅读角色"
+                },
+                {
+                  "value": "edit",
+                  "description": "可编辑角色"
+                },
+                {
+                  "value": "full_access",
+                  "description": "可管理角色"
+                }
+              ],
+              "enum": [
+                "view",
+                "edit",
+                "full_access"
+              ],
+              "type": "string",
+              "description": "协作者的权限角色"
+            },
+            "perm_type": {
+              "type": "string",
+              "description": "协作者的权限角色类型",
+              "required": false,
+              "example": "container",
+              "options": [
+                {
+                  "value": "container",
+                  "description": "当前页面及子页面"
+                },
+                {
+                  "description": "仅当前页面，当且仅当在知识库文档中该参数有效",
+                  "value": "single_page"
+                }
+              ],
+              "enum": [
+                "container",
+                "single_page"
+              ]
+            },
+            "type": {
+              "required": false,
+              "example": "user",
+              "options": [
+                {
+                  "value": "user",
+                  "description": "用户"
+                },
+                {
+                  "value": "chat",
+                  "description": "群组"
+                },
+                {
+                  "value": "department",
+                  "description": "组织架构"
+                },
+                {
+                  "value": "group",
+                  "description": "用户组"
+                },
+                {
+                  "value": "wiki_space_member",
+                  "description": "知识库成员"
+                },
+                {
+                  "value": "wiki_space_viewer",
+                  "description": "知识库可阅读成员"
+                },
+                {
+                  "value": "wiki_space_editor",
+                  "description": "知识库可编辑成员"
+                }
+              ],
+              "enum": [
+                "user",
+                "chat",
+                "department",
+                "group",
+                "wiki_space_member",
+                "wiki_space_viewer",
+                "wiki_space_editor"
+              ],
+              "type": "string",
+              "description": "协作者类型"
+            },
+            "member_type": {
+              "description": "协作者ID类型",
+              "required": false,
+              "example": "openid",
+              "options": [
+                {
+                  "value": "email",
+                  "description": "飞书邮箱"
+                },
+                {
+                  "description": "开放平台OpenID",
+                  "value": "openid"
+                },
+                {
+                  "value": "unionid",
+                  "description": "开放平台UnionID"
+                },
+                {
+                  "description": "开放平台群组ID",
+                  "value": "openchat"
+                },
+                {
+                  "description": "开放平台部门ID",
+                  "value": "opendepartmentid"
+                },
+                {
+                  "value": "userid",
+                  "description": "用户自定义ID"
+                },
+                {
+                  "description": "自定义用户组ID",
+                  "value": "groupid"
+                },
+                {
+                  "value": "wikispaceid",
+                  "description": "知识空间的唯一标识"
+                }
+              ],
+              "enum": [
+                "email",
+                "openid",
+                "unionid",
+                "openchat",
+                "opendepartmentid",
+                "userid",
+                "groupid",
+                "wikispaceid"
+              ],
+              "type": "string"
+            },
+            "member_id": {
+              "description": "协作者ID，与协作者ID类型需要对应",
+              "required": false,
+              "example": "string",
+              "type": "string"
+            }
+          },
+          "scopes": [
+            "drive:drive",
+            "drive:file",
+            "docs:doc",
+            "sheets:spreadsheet",
+            "wiki:wiki",
+            "bitable:bitable",
+            "bitable:app",
+            "docs:permission.member:create"
+          ],
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "httpMethod": "POST",
+          "description": "增加协作者权限",
+          "parameterOrder": [
+            "token"
+          ],
+          "danger": true
+        },
+        "transfer_owner": {
+          "requestBody": {
+            "member_type": {
+              "example": "openid",
+              "options": [
+                {
+                  "value": "email",
+                  "description": "飞书邮箱"
+                },
+                {
+                  "value": "openid",
+                  "description": "开放平台ID"
+                },
+                {
+                  "description": "用户自定义ID",
+                  "value": "userid"
+                }
+              ],
+              "enum": [
+                "email",
+                "openid",
+                "userid"
+              ],
+              "type": "string",
+              "description": "文档拥有者的ID类型",
+              "required": false
+            },
+            "member_id": {
+              "description": "文档拥有者的ID，与文档拥有者的ID类型需要对应",
+              "required": false,
+              "example": "string",
+              "type": "string"
+            }
+          },
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "path": "permissions/{token}/members/transfer_owner",
+          "parameters": {
+            "type": {
+              "options": [
+                {
+                  "description": "文档",
+                  "value": "doc"
+                },
+                {
+                  "value": "sheet",
+                  "description": "电子表格"
+                },
+                {
+                  "value": "file",
+                  "description": "云空间文件"
+                },
+                {
+                  "value": "wiki",
+                  "description": "知识库节点"
+                },
+                {
+                  "value": "bitable",
+                  "description": "多维表格"
+                },
+                {
+                  "value": "docx",
+                  "description": "新版文档"
+                },
+                {
+                  "value": "mindnote",
+                  "description": "思维笔记"
+                },
+                {
+                  "value": "minutes",
+                  "description": "妙记"
+                },
+                {
+                  "value": "slides",
+                  "description": "幻灯片"
+                },
+                {
+                  "value": "folder",
+                  "description": "文件夹"
+                }
+              ],
+              "enumName": "TokenType",
+              "type": "string",
+              "location": "query",
+              "required": true,
+              "description": "文件类型，需要与文件的 token 相匹配",
+              "default": "",
+              "example": "doc"
+            },
+            "need_notification": {
+              "type": "boolean",
+              "location": "query",
+              "required": false,
+              "description": "是否需要通知新 Owner",
+              "default": "true",
+              "example": "true"
+            },
+            "remove_old_owner": {
+              "location": "query",
+              "required": false,
+              "description": "转移后是否需要移除原 Owner 的权限",
+              "default": "false",
+              "example": "false",
+              "type": "boolean"
+            },
+            "stay_put": {
+              "required": false,
+              "description": "仅当内容不在共享文件夹中，此参数才会生效。如果设为false，系统会将该内容移至新所有者的个人空间根文件夹。如果设为 true，则留在原位置。",
+              "default": "false",
+              "example": "false",
+              "type": "boolean",
+              "location": "query"
+            },
+            "old_owner_perm": {
+              "default": "full_access",
+              "example": "view",
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "仅当 remove_old_owner = false 时，此参数才会生效 保留原文件所有者指定的权限角色"
+            },
+            "token": {
+              "example": "doccnBKgoMyY5OMbUG6FioTXuBe",
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "文件的 token"
+            }
+          },
+          "danger": true,
+          "docUrl": "https://open.feishu.cn/api-explorer?from=op_doc_tab&apiName=transfer_owner&project=drive&resource=permission.member&version=v1",
+          "id": "permission.members.transfer_owner",
+          "httpMethod": "POST",
+          "parameterOrder": [
+            "token"
+          ],
+          "scopes": [
+            "drive:drive",
+            "docs:doc",
+            "sheets:spreadsheet",
+            "bitable:bitable",
+            "wiki:wiki",
+            "bitable:app",
+            "docs:permission.member:transfer"
+          ],
+          "description": ""
+        }
+      }
+    },
+    "metas": {
+      "methods": {
+        "batch_query": {
+          "id": "metas.batch_query",
+          "parameters": {
+            "user_id_type": {
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "此次调用中使用的用户ID的类型",
+              "default": "",
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "以user_id来识别用户"
+                },
+                {
+                  "value": "union_id",
+                  "description": "以union_id来识别用户"
+                },
+                {
+                  "value": "open_id",
+                  "description": "以open_id来识别用户"
+                }
+              ]
+            }
+          },
+          "responseBody": {
+            "metas": {
+              "required": true,
+              "properties": {
+                "doc_token": {
+                  "example": "doccnfYZzTlvXqZIGTdAHKabcef",
+                  "type": "string",
+                  "description": "文件token",
+                  "required": true
+                },
+                "latest_modify_time": {
+                  "type": "string",
+                  "description": "最后编辑时间（Unix时间戳）",
+                  "required": true,
+                  "example": "1652066345"
+                },
+                "owner_id": {
+                  "annotations": [
+                    "open:x_user_id"
+                  ],
+                  "type": "string",
+                  "description": "文件所有者",
+                  "required": true,
+                  "example": "ou_b13d41c02edc52ce66aaae67bf1abcef"
+                },
+                "create_time": {
+                  "required": true,
+                  "example": "1652066345",
+                  "type": "string",
+                  "description": "创建时间（Unix时间戳）"
+                },
+                "latest_modify_user": {
+                  "description": "最后编辑者",
+                  "required": true,
+                  "example": "ou_b13d41c02edc52ce66aaae67bf1abcef",
+                  "annotations": [
+                    "open:x_user_id"
+                  ],
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "文档链接",
+                  "required": true,
+                  "example": "https://sample.feishu.cn/docs/doccnfYZzTlvXqZIGTdAHKabcef"
+                },
+                "request_doc_info": {
+                  "required": false,
+                  "ref": "request_doc",
+                  "properties": {
+                    "doc_token": {
+                      "type": "string",
+                      "description": "文件的 token，获取方式见[概述](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/files/guide/introduction)",
+                      "required": true,
+                      "example": "TLLKdcpDro9ijQxA33ycNMabcef"
+                    },
+                    "doc_type": {
+                      "description": "文件类型",
+                      "required": true,
+                      "example": "docx",
+                      "options": [
+                        {
+                          "value": "doc",
+                          "description": "飞书文档"
+                        },
+                        {
+                          "description": "飞书电子表格",
+                          "value": "sheet"
+                        },
+                        {
+                          "value": "bitable",
+                          "description": "飞书多维表格"
+                        },
+                        {
+                          "value": "mindnote",
+                          "description": "飞书思维笔记"
+                        },
+                        {
+                          "value": "file",
+                          "description": "飞书文件"
+                        },
+                        {
+                          "value": "wiki",
+                          "description": "飞书wiki"
+                        },
+                        {
+                          "value": "docx",
+                          "description": "飞书新版文档"
+                        },
+                        {
+                          "value": "folder",
+                          "description": "飞书文件夹"
+                        },
+                        {
+                          "value": "synced_block",
+                          "description": "文档同步块"
+                        },
+                        {
+                          "value": "slides",
+                          "description": "文档幻灯片"
+                        }
+                      ],
+                      "enum": [
+                        "doc",
+                        "sheet",
+                        "bitable",
+                        "mindnote",
+                        "file",
+                        "wiki",
+                        "docx",
+                        "folder",
+                        "synced_block",
+                        "slides"
+                      ],
+                      "enumName": "doc_type",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "description": "请求的request_doc"
+                },
+                "doc_type": {
+                  "description": "文件类型",
+                  "required": true,
+                  "example": "doc",
+                  "type": "string"
+                },
+                "title": {
+                  "required": true,
+                  "example": "sampletitle",
+                  "type": "string",
+                  "description": "标题"
+                },
+                "sec_label_name": {
+                  "example": "L2-内部",
+                  "annotations": [
+                    "lark:data:file.meta.sec_label"
+                  ],
+                  "type": "string",
+                  "description": "文档密级标签名称",
+                  "required": false
+                }
+              },
+              "type": "array",
+              "description": "文档元数据列表"
+            },
+            "failed_list": {
+              "description": "无法获取元数据的文档列表",
+              "required": false,
+              "properties": {
+                "token": {
+                  "required": true,
+                  "type": "string",
+                  "description": "获取元数据失败的文档token"
+                },
+                "code": {
+                  "type": "integer",
+                  "description": "获取元数据失败的错误码",
+                  "required": true,
+                  "options": [
+                    {
+                      "value": "970002",
+                      "description": "Unsupported doc-type"
+                    },
+                    {
+                      "description": "No permission to access meta",
+                      "value": "970003"
+                    },
+                    {
+                      "description": "Record not found",
+                      "value": "970005"
+                    }
+                  ],
+                  "enum": [
+                    "970002",
+                    "970003",
+                    "970005"
+                  ]
+                }
+              },
+              "type": "array"
+            }
+          },
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/meta/batch_query",
+          "path": "metas/batch_query",
+          "requestBody": {
+            "with_url": {
+              "required": false,
+              "type": "boolean",
+              "description": "是否获取文档链接"
+            },
+            "request_docs": {
+              "description": "请求文档,  一次不超过200个",
+              "required": true,
+              "properties": {
+                "doc_token": {
+                  "example": "TLLKdcpDro9ijQxA33ycNMabcef",
+                  "type": "string",
+                  "description": "文件的 token，获取方式见[概述](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/files/guide/introduction)",
+                  "required": true
+                },
+                "doc_type": {
+                  "description": "文件类型",
+                  "required": true,
+                  "example": "docx",
+                  "options": [
+                    {
+                      "description": "飞书文档",
+                      "value": "doc"
+                    },
+                    {
+                      "value": "sheet",
+                      "description": "飞书电子表格"
+                    },
+                    {
+                      "description": "飞书多维表格",
+                      "value": "bitable"
+                    },
+                    {
+                      "value": "mindnote",
+                      "description": "飞书思维笔记"
+                    },
+                    {
+                      "description": "飞书文件",
+                      "value": "file"
+                    },
+                    {
+                      "description": "飞书wiki",
+                      "value": "wiki"
+                    },
+                    {
+                      "value": "docx",
+                      "description": "飞书新版文档"
+                    },
+                    {
+                      "description": "飞书文件夹",
+                      "value": "folder"
+                    },
+                    {
+                      "value": "synced_block",
+                      "description": "文档同步块"
+                    },
+                    {
+                      "value": "slides",
+                      "description": "文档幻灯片"
+                    }
+                  ],
+                  "enum": [
+                    "doc",
+                    "sheet",
+                    "bitable",
+                    "mindnote",
+                    "file",
+                    "wiki",
+                    "docx",
+                    "folder",
+                    "synced_block",
+                    "slides"
+                  ],
+                  "enumName": "doc_type",
+                  "type": "string"
+                }
+              },
+              "type": "array"
+            }
+          },
+          "danger": true,
+          "scopes": [
+            "drive:drive",
+            "drive:drive.metadata:readonly"
+          ],
+          "httpMethod": "POST",
+          "description": "获取文档元数据",
+          "accessTokens": [
+            "tenant",
+            "user"
+          ]
+        }
+      }
+    },
+    "user": {
+      "methods": {
+        "remove_subscription": {
+          "path": "user/remove_subscription",
+          "scopes": [
+            "docs:event:subscribe"
+          ],
+          "id": "user.remove_subscription",
+          "description": "取消订阅用户、应用维度事件",
+          "parameters": {
+            "event_type": {
+              "default": "",
+              "example": "drive.notice.comment_add_v1",
+              "type": "string",
+              "location": "query",
+              "required": true,
+              "description": "事件类型"
+            }
+          },
+          "docUrl": "https://open.feishu.cn/api-explorer?from=op_doc_tab&apiName=remove_subscription&project=drive&resource=user&version=v1",
+          "danger": true,
+          "httpMethod": "DELETE",
+          "accessTokens": [
+            "user",
+            "tenant"
+          ]
+        },
+        "subscription": {
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "docUrl": "https://open.feishu.cn/api-explorer?from=op_doc_tab&apiName=subscription&project=drive&resource=user&version=v1",
+          "id": "user.subscription",
+          "path": "user/subscription",
+          "httpMethod": "POST",
+          "description": "订阅用户、应用维度事件（本次开放评论添加事件）",
+          "requestBody": {
+            "event_type": {
+              "type": "string",
+              "description": "事件类型",
+              "required": true,
+              "example": "drive.notice.comment_add_v1"
+            }
+          },
+          "scopes": [
+            "docs:event:subscribe"
+          ]
+        },
+        "subscription_status": {
+          "docUrl": "https://open.feishu.cn/api-explorer?from=op_doc_tab&apiName=subscription_status&project=drive&resource=user&version=v1",
+          "httpMethod": "GET",
+          "parameters": {
+            "event_type": {
+              "default": "",
+              "example": "drive.notice.comment_add_v1",
+              "type": "string",
+              "location": "query",
+              "required": true,
+              "description": "事件类型"
+            }
+          },
+          "responseBody": {
+            "data": {
+              "type": "string",
+              "description": "订阅状态",
+              "required": true,
+              "example": "{\"is_subscribe\": true}"
+            }
+          },
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "scopes": [
+            "docs:event:subscribe"
+          ],
+          "id": "user.subscription_status",
+          "description": "查询用户、应用对指定事件的订阅状态",
+          "path": "user/subscription_status"
+        }
+      }
+    }
+  },
+  "name": "drive",
+  "version": "v1",
+  "title": "云空间 API",
+  "description": "文件管理、文档评论、素材上传下载、文档权限管理",
+  "servicePath": "/open-apis/drive/v1"
+}

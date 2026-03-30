@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import json
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -207,6 +208,42 @@ def _attach_requester_owner_diagnostics(
     )
     result["_cli_diagnostics"] = diagnostics
     return result
+
+
+def _default_requester_upload_folder_name(path_value: str) -> str:
+    stem = Path(path_value).stem.strip() or "upload"
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return f"{stem}-requester-upload-{timestamp}"
+
+
+def _requester_upload_owner_mismatch_message(
+    *,
+    payload: Mapping[str, Any],
+    created_folder_token: str,
+) -> str:
+    data = _extract_response_data(payload)
+    file_token = _optional_string(data.get("file_token")) or _optional_string(data.get("token"))
+    diagnostics = payload.get("_cli_diagnostics")
+    if not isinstance(diagnostics, Mapping):
+        raise ValueError("requester-owned upload did not return ownership diagnostics")
+    requester_identity = diagnostics.get("requester_identity")
+    requester_open_id = None
+    if isinstance(requester_identity, Mapping):
+        requester_open_id = _optional_string(requester_identity.get("open_id"))
+    ownership_checks = diagnostics.get("ownership_checks")
+    first_check = ownership_checks[0] if isinstance(ownership_checks, list) and ownership_checks else {}
+    owner_id = None
+    if isinstance(first_check, Mapping):
+        owner_id = _optional_string(first_check.get("owner_id"))
+    message = (
+        "requester-owned upload owner verification failed: "
+        f"file_token={file_token or '<unknown>'}; "
+        f"created_folder_token={created_folder_token}; "
+        f"requester_open_id={requester_open_id or '<unknown>'}; "
+        f"owner_id={owner_id or '<unknown>'}. "
+        "Do not treat this upload as requester-owned."
+    )
+    return message
 
 
 def _describe_bitable_table(item: Mapping[str, Any]) -> str:
@@ -1045,6 +1082,74 @@ def _cmd_drive_upload_file(args: argparse.Namespace) -> Mapping[str, Any]:
         args=args,
         payload=result_payload,
         metas=metas,
+    )
+
+
+def _cmd_drive_requester_upload_file(args: argparse.Namespace) -> Mapping[str, Any]:
+    client = _build_client(args, force_user_auth=True)
+    service = DriveFileService(client)
+    path_value = str(args.path)
+
+    root_meta = _mapping_to_plain_dict(service.get_root_folder_meta())
+    root_data = _extract_response_data(root_meta)
+    root_token = _optional_string(root_data.get("token")) or _optional_string(root_meta.get("token"))
+    if root_token is None:
+        raise ValueError("drive root-folder-meta response missing token")
+
+    folder_name = _require_non_empty_string_arg(
+        getattr(args, "folder_name", None) or _default_requester_upload_folder_name(path_value),
+        name="folder-name",
+    )
+    created_folder = _mapping_to_plain_dict(
+        service.create_folder(name=folder_name, folder_token=root_token)
+    )
+    created_folder_data = _extract_response_data(created_folder)
+    created_folder_token = _optional_string(created_folder_data.get("token")) or _optional_string(
+        created_folder.get("token")
+    )
+    if created_folder_token is None:
+        raise ValueError("drive create-folder response missing token")
+
+    upload_result = _mapping_to_plain_dict(
+        service.upload_file(
+            path_value,
+            parent_type="explorer",
+            parent_node=created_folder_token,
+            file_name=getattr(args, "file_name", None),
+            checksum=getattr(args, "checksum", None),
+            content_type=getattr(args, "content_type", None),
+        )
+    )
+    upload_data = _extract_response_data(upload_result)
+    file_token = _optional_string(upload_data.get("file_token")) or _optional_string(
+        upload_result.get("token")
+    )
+    if file_token is None:
+        raise ValueError("drive upload response missing file_token")
+
+    meta_result = service.batch_query_metas(
+        [{"doc_token": file_token, "doc_type": "file"}],
+        with_url=True,
+    )
+    metas = _extract_drive_meta_items(_mapping_to_plain_dict(meta_result))
+    payload = _attach_requester_owner_diagnostics(
+        args=args,
+        payload={
+            "workflow": "requester_upload_file",
+            "root_folder": root_meta,
+            "created_folder": created_folder,
+            **upload_result,
+        },
+        metas=metas,
+    )
+    diagnostics = payload.get("_cli_diagnostics")
+    if isinstance(diagnostics, Mapping) and bool(diagnostics.get("requester_owner_verified")):
+        return payload
+    raise ValueError(
+        _requester_upload_owner_mismatch_message(
+            payload=payload,
+            created_folder_token=created_folder_token,
+        )
     )
 
 

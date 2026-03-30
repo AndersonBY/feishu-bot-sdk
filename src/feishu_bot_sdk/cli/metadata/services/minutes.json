@@ -1,0 +1,126 @@
+{
+  "resources": {
+    "minutes": {
+      "methods": {
+        "get": {
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "id": "minute.get",
+          "parameters": {
+            "minute_token": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "妙记唯一标识。可从妙记的 URL 链接中获取，一般为最后一串字符：https://sample.feishu.cn/minutes/==obcnq3b9jl72l83w4f14xxxx==;",
+              "example": "obcnq3b9jl72l83w4f14xxxx"
+            },
+            "user_id_type": {
+              "location": "query",
+              "required": false,
+              "description": "此次调用中使用的用户ID的类型",
+              "default": "",
+              "options": [
+                {
+                  "description": "以user_id来识别用户",
+                  "value": "user_id"
+                },
+                {
+                  "description": "以union_id来识别用户",
+                  "value": "union_id"
+                },
+                {
+                  "value": "open_id",
+                  "description": "以open_id来识别用户"
+                }
+              ],
+              "type": "string"
+            }
+          },
+          "path": "minutes/{minute_token}",
+          "parameterOrder": [
+            "minute_token"
+          ],
+          "responseBody": {
+            "minute": {
+              "type": "object",
+              "description": "妙记基本信息",
+              "required": false,
+              "ref": "minute",
+              "properties": {
+                "create_time": {
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "妙记创建时间timestamp（ms级别）",
+                  "required": false,
+                  "example": "1669098360477"
+                },
+                "title": {
+                  "description": "妙记标题",
+                  "required": false,
+                  "example": "xxx的视频会议",
+                  "type": "string"
+                },
+                "cover": {
+                  "description": "妙记封面链接",
+                  "required": false,
+                  "example": "https://example.com/space/api/box/stream/download/all/boxcncsI4EIhCSA1RLDsXDpxxxx",
+                  "type": "string"
+                },
+                "duration": {
+                  "type": "string",
+                  "description": "妙记时长（ms级别）",
+                  "required": false,
+                  "example": "314000"
+                },
+                "url": {
+                  "required": false,
+                  "example": "https://sample.feishu.cn/minutes/obcnq3b9jl72l83w4f14xxxx",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "妙记链接"
+                },
+                "token": {
+                  "type": "string",
+                  "description": "妙记token",
+                  "required": false,
+                  "example": "obcnq3b9jl72l83w4f14xxxx",
+                  "annotations": [
+                    "readOnly"
+                  ]
+                },
+                "owner_id": {
+                  "type": "string",
+                  "description": "所有者ID",
+                  "required": false,
+                  "example": "ou_612b787ccd3259fb3c816b3f678dxxxx",
+                  "annotations": [
+                    "open:x_user_id"
+                  ]
+                }
+              }
+            }
+          },
+          "scopes": [
+            "minutes:minutes",
+            "minutes:minutes:readonly",
+            "minutes:minutes.basic:read"
+          ],
+          "docUrl": "https://open.feishu.cn/api-explorer?from=op_doc_tab&apiName=get&project=minutes&resource=minute&version=v1",
+          "description": "获取妙记信息",
+          "httpMethod": "GET"
+        }
+      }
+    }
+  },
+  "name": "minutes",
+  "version": "v1",
+  "title": "妙记 API",
+  "description": "妙记信息获取、内容查询",
+  "servicePath": "/open-apis/minutes/v1"
+}

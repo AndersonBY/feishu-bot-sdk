@@ -5,15 +5,35 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Protocol
 
 from Crypto.Cipher import AES
+import keyring
+from keyring.errors import KeyringError, NoKeyringError
 
 from .config_store import SecretReference, default_cli_config_root
 
 
 _SECRET_STORE_VERSION = 1
 _SECRET_BACKEND = "encrypted_file"
+_KEYRING_BACKEND = "keyring"
+_KEYRING_SERVICE_NAME = "feishu-bot-sdk"
+
+
+class SecretStore(Protocol):
+    backend_name: str
+
+    @property
+    def store_path(self) -> Path: ...
+
+    @property
+    def key_path(self) -> Path: ...
+
+    def put(self, key: str, secret: str) -> SecretReference: ...
+
+    def get(self, reference: SecretReference | str) -> str | None: ...
+
+    def delete(self, reference: SecretReference | str) -> bool: ...
 
 
 class EncryptedFileSecretStore:
@@ -138,6 +158,61 @@ class EncryptedFileSecretStore:
         return key
 
 
+class KeyringSecretStore:
+    backend_name = _KEYRING_BACKEND
+
+    def __init__(self, *, service_name: str = _KEYRING_SERVICE_NAME) -> None:
+        self._service_name = service_name
+
+    @property
+    def store_path(self) -> Path:
+        return Path(f"keyring://{self._service_name}")
+
+    @property
+    def key_path(self) -> Path:
+        return Path(f"keyring://{self._service_name}#backend")
+
+    def put(self, key: str, secret: str) -> SecretReference:
+        normalized_key = _normalize_key(key)
+        if not secret:
+            raise ValueError("secret value cannot be empty")
+        try:
+            keyring.set_password(self._service_name, normalized_key, secret)
+        except (KeyringError, NoKeyringError) as exc:
+            raise ValueError(f"keyring backend is unavailable: {exc}") from exc
+        return SecretReference(backend=self.backend_name, key=normalized_key)
+
+    def get(self, reference: SecretReference | str) -> str | None:
+        normalized_key = self._resolve_reference(reference)
+        try:
+            value = keyring.get_password(self._service_name, normalized_key)
+        except (KeyringError, NoKeyringError):
+            return None
+        if value is None:
+            return None
+        return str(value)
+
+    def delete(self, reference: SecretReference | str) -> bool:
+        normalized_key = self._resolve_reference(reference)
+        existing = self.get(normalized_key)
+        if existing is None:
+            return False
+        try:
+            keyring.delete_password(self._service_name, normalized_key)
+        except (KeyringError, NoKeyringError):
+            return False
+        return True
+
+    def _resolve_reference(self, reference: SecretReference | str) -> str:
+        if isinstance(reference, SecretReference):
+            if reference.backend != self.backend_name:
+                raise ValueError(
+                    f"unsupported secret backend {reference.backend!r}, expected {self.backend_name!r}"
+                )
+            return _normalize_key(reference.key)
+        return _normalize_key(reference)
+
+
 def default_secret_store_path() -> Path:
     override = os.getenv("FEISHU_SECRET_STORE_PATH")
     if override:
@@ -152,14 +227,36 @@ def default_secret_key_path() -> Path:
     return default_cli_config_root() / "cli-secrets.key"
 
 
-def resolve_secret_store() -> EncryptedFileSecretStore:
-    backend = os.getenv("FEISHU_SECRET_STORE_BACKEND", _SECRET_BACKEND).strip().lower() or _SECRET_BACKEND
-    if backend != _SECRET_BACKEND:
+def resolve_secret_store() -> SecretStore:
+    backend = (os.getenv("FEISHU_SECRET_STORE_BACKEND") or "auto").strip().lower() or "auto"
+    if backend in {"auto", _KEYRING_BACKEND}:
+        if backend == _KEYRING_BACKEND or (
+            not os.getenv("FEISHU_SECRET_STORE_PATH") and not os.getenv("FEISHU_SECRET_STORE_KEY_PATH")
+        ):
+            keyring_store = _build_keyring_store()
+            if keyring_store is not None:
+                return keyring_store
+            if backend == _KEYRING_BACKEND:
+                raise ValueError("FEISHU_SECRET_STORE_BACKEND=keyring but no OS keyring backend is available")
+    if backend not in {"auto", _SECRET_BACKEND, "file"}:
         raise ValueError(f"unsupported FEISHU_SECRET_STORE_BACKEND {backend!r}")
     return EncryptedFileSecretStore(
         store_path=default_secret_store_path(),
         key_path=default_secret_key_path(),
     )
+
+
+def _build_keyring_store() -> KeyringSecretStore | None:
+    try:
+        backend = keyring.get_keyring()
+    except (KeyringError, NoKeyringError):
+        return None
+    if backend is None:
+        return None
+    backend_name = type(backend).__name__.lower()
+    if "fail" in backend_name or "null" in backend_name:
+        return None
+    return KeyringSecretStore()
 
 
 def _normalize_key(value: str) -> str:
@@ -214,6 +311,8 @@ def _try_chmod(path: Path, mode: int) -> None:
 
 __all__ = [
     "EncryptedFileSecretStore",
+    "KeyringSecretStore",
+    "SecretStore",
     "default_secret_key_path",
     "default_secret_store_path",
     "resolve_secret_store",

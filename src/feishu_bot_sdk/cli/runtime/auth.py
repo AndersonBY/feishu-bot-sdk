@@ -30,6 +30,15 @@ _DEFAULT_OAUTH_CALLBACK_PATH = "/callback"
 _DEFAULT_USER_TOKEN_REFRESH_BEFORE_SECONDS = 300.0
 
 
+def _identity_to_auth_mode(value: str | None) -> str | None:
+    text = str(value or "").strip().lower()
+    if not text:
+        return None
+    if text == "bot":
+        return "tenant"
+    return text
+
+
 @dataclasses.dataclass(frozen=True)
 class _UserTokenStoreContext:
     enabled: bool
@@ -80,7 +89,10 @@ def _build_config(
 ) -> FeishuConfig:
     env_app_id = os.getenv("FEISHU_APP_ID") or os.getenv("APP_ID")
     env_app_secret = os.getenv("FEISHU_APP_SECRET") or os.getenv("APP_SECRET")
-    env_auth_mode = os.getenv("FEISHU_AUTH_MODE")
+    env_auth_mode = _identity_to_auth_mode(os.getenv("FEISHU_AUTH_MODE"))
+    env_default_as = _identity_to_auth_mode(
+        os.getenv("FEISHU_DEFAULT_AS") or os.getenv("LARKSUITE_CLI_DEFAULT_AS")
+    )
     env_access_token = os.getenv("FEISHU_ACCESS_TOKEN")
     env_user_access_token = os.getenv("FEISHU_USER_ACCESS_TOKEN")
     env_user_refresh_token = os.getenv("FEISHU_USER_REFRESH_TOKEN")
@@ -90,7 +102,11 @@ def _build_config(
     _, cli_profile = _resolve_cli_profile(args)
     profile_app_id = cli_profile.app_id if cli_profile is not None else None
     profile_app_secret = _resolve_profile_app_secret(cli_profile)
-    profile_auth_mode = cli_profile.auth_mode if cli_profile is not None else None
+    profile_auth_mode = (
+        _identity_to_auth_mode(cli_profile.auth_mode) if cli_profile is not None else None
+    )
+    if profile_auth_mode is None and cli_profile is not None:
+        profile_auth_mode = _identity_to_auth_mode(cli_profile.default_as)
     profile_base_url = cli_profile.base_url if cli_profile is not None else None
 
     app_id = env_app_id or getattr(args, "app_id", None) or profile_app_id
@@ -98,19 +114,31 @@ def _build_config(
     if force_user_auth:
         auth_mode = "user"
     else:
-        auth_mode = (env_auth_mode or getattr(args, "auth_mode", None) or profile_auth_mode or "tenant").strip().lower()
+        auth_mode = (
+            _identity_to_auth_mode(getattr(args, "auth_mode", None))
+            or env_auth_mode
+            or env_default_as
+            or profile_auth_mode
+            or "tenant"
+        ).strip().lower()
     base_url = getattr(args, "base_url", None) or env_base_url or profile_base_url or _DEFAULT_BASE_URL
     app_access_token = env_app_access_token or getattr(args, "app_access_token", None)
     stored_token = token_context.loaded_token if token_context is not None else None
     stored_access_token = stored_token.access_token if stored_token is not None else None
     stored_refresh_token = stored_token.refresh_token if stored_token is not None else None
+    explicit_user_access_token = env_user_access_token or getattr(args, "user_access_token", None)
+    explicit_generic_access_token = env_access_token or getattr(args, "access_token", None)
+    explicit_access_token_supplied = bool(
+        explicit_user_access_token or explicit_generic_access_token
+    )
     user_access_from_store = (
-        env_user_access_token is None
-        and getattr(args, "user_access_token", None) is None
+        not explicit_access_token_supplied
         and stored_token is not None
         and bool(stored_access_token)
     )
     user_refresh_from_store = (
+        not explicit_access_token_supplied
+        and
         env_user_refresh_token is None
         and getattr(args, "user_refresh_token", None) is None
         and stored_token is not None
@@ -145,7 +173,8 @@ def _build_config(
 
     if auth_mode not in {"tenant", "user", "auto"}:
         raise ConfigurationError(
-            "invalid auth mode: FEISHU_AUTH_MODE/--auth-mode must be 'tenant', 'user', or 'auto'"
+            "invalid auth mode: FEISHU_AUTH_MODE, FEISHU_DEFAULT_AS, or the CLI identity flag "
+            "must resolve to 'tenant', 'user', or 'auto'"
         )
 
     group = getattr(args, "group", None)

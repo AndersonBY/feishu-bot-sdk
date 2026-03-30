@@ -1,0 +1,3576 @@
+{
+  "resources": {
+    "chat.members": {
+      "methods": {
+        "create": {
+          "parameterOrder": [
+            "chat_id"
+          ],
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat-members/create",
+          "description": "将用户或机器人拉入群聊。Identity: supports `user` and `bot`; the caller must be in the target chat; for `bot` calls, added users must be within the app's availability; for internal chats the operator must belong to the same tenant; if only owners/admins can add members, the caller must be an owner/admin, or a chat-creator bot with `im:chat:operate_as_owner`.",
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "path": "chats/{chat_id}/members",
+          "parameters": {
+            "succeed_type": {
+              "description": "出现不可用ID后的处理方式 0/1/2;;**默认值**：`0`",
+              "default": "",
+              "example": "0",
+              "options": [
+                {
+                  "value": "0",
+                  "description": "不存在/不可见的 ID 会拉群失败，并返回错误响应。存在已离职 ID 时，会将其他可用 ID 拉入群聊，返回拉群成功的响应。"
+                },
+                {
+                  "value": "1",
+                  "description": "将参数中可用的 ID 全部拉入群聊，返回拉群成功的响应，并展示剩余不可用的 ID 及原因。"
+                },
+                {
+                  "value": "2",
+                  "description": "参数中只要存在任一不可用的 ID ，就会拉群失败，返回错误响应，并展示出不可用的 ID。"
+                }
+              ],
+              "enumName": "InviteMemberSucceedType",
+              "type": "integer",
+              "location": "query",
+              "required": false
+            },
+            "chat_id": {
+              "example": "oc_a0553eda9014c201e6969b478895c230",
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "群 ID。获取方式：;;- [创建群](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/create)，从返回结果中获取该群的 chat_id。;- 调用[获取用户或机器人所在的群列表](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/list)接口，可以查询用户或机器人所在群的 chat_id。;- 调用[搜索对用户或机器人可见的群列表](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/search)，可搜索用户或机器人所在的群、对用户或机器人公开的群的 chat_id。;;**注意**：仅支持群模式为 **群组（group）**、**话题（topic）** 的群组 ID。你可以调用[获取群信息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/get)接口，在返回结果中查看 `chat_mode` 参数取值是否为 `group`、`topic`。"
+            },
+            "member_id_type": {
+              "default": "open_id",
+              "example": "open_id",
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "标识一个用户在某个租户内的身份。同一个用户在租户 A 和租户 B 内的 User ID 是不同的。在同一个租户内，一个用户的 User ID 在所有应用（包括商店应用）中都保持一致。User ID 主要用于在不同的应用间打通用户数据。[了解更多：如何获取 User ID？](/ssl:ttdoc/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-user-id)"
+                },
+                {
+                  "description": "标识一个用户在某个应用开发商下的身份。同一用户在同一开发商下的应用中的 Union ID 是相同的，在不同开发商下的应用中的 Union ID 是不同的。通过 Union ID，应用开发商可以把同个用户在多个应用中的身份关联起来。[了解更多：如何获取 Union ID？](/ssl:ttdoc/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-union-id)",
+                  "value": "union_id"
+                },
+                {
+                  "description": "标识一个用户在某个应用中的身份。同一个用户在不同应用中的 Open ID 不同。[了解更多：如何获取 Open ID？](/ssl:ttdoc/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-openid)",
+                  "value": "open_id"
+                },
+                {
+                  "value": "app_id",
+                  "description": "飞书开放平台应用的唯一标识。在创建应用时，由系统自动生成，用户不能自行修改。[了解更多：如何获取应用的 App ID？](/ssl:ttdoc/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-app-id)"
+                }
+              ],
+              "enumName": "InviteMemberMemberIDType",
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "用户 ID 类型"
+            }
+          },
+          "scopes": [
+            "im:chat",
+            "im:chat.members:write_only"
+          ],
+          "danger": true,
+          "responseBody": {
+            "invalid_id_list": {
+              "type": "array",
+              "description": "无效成员列表;;**注意**：;- 当`success_type` 取值为 `0`时，`invalid_id_list`只包含已离职的用户ID;- 当`success_type` 取值为 `1`时，`invalid_id_list`中包含已离职的、不可见的、应用未激活的 ID",
+              "required": false
+            },
+            "not_existed_id_list": {
+              "type": "array",
+              "description": "ID 不存在的成员列表",
+              "required": false
+            },
+            "pending_approval_id_list": {
+              "type": "array",
+              "description": "等待群主或管理员审批的成员 ID 列表",
+              "required": false
+            }
+          },
+          "id": "chat.members.create",
+          "httpMethod": "POST",
+          "requestBody": {
+            "id_list": {
+              "type": "array",
+              "description": "成员 ID 列表。;;- 邀请用户进群时推荐使用 OpenID，获取方式可参考文档[如何获取 Open ID？](https://open.feishu.cn/document/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-openid);;- 邀请机器人进群时需填写应用的 App ID，请参考[如何获取应用的 App ID？](https://open.feishu.cn/document/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-app-id);;**注意**：;- 成员列表不可为空;- 列表中填写的成员 ID 类型应与 ==member_id_type== 参数中选择的类型相对应;- 每次请求最多拉 50 个用户且不超过群人数上限。对于已认证企业的飞书的群人数默认上限：普通群 5000 人，会议群 3000 人，话题群 5000 人。若租户管理员配置了群人数上限，则群人数上限为该人数上限;- 最多同时邀请 5 个机器人，且邀请后群组中机器人数量不能超过 15 个",
+              "required": false,
+              "annotations": [
+                "open:x_user_id",
+                "tolerate_idtrans_failure"
+              ]
+            }
+          }
+        },
+        "get": {
+          "description": "获取群成员列表。Identity: supports `user` and `bot`; the caller must be in the target chat and must belong to the same tenant for internal chats.",
+          "parameterOrder": [
+            "chat_id"
+          ],
+          "responseBody": {
+            "items": {
+              "properties": {
+                "member_id_type": {
+                  "type": "string",
+                  "description": "成员的用户 ID 类型，与查询参数中的 member_id_type 相同。取值为：`open_id`、`user_id`、`union_id`其中之一。",
+                  "required": false,
+                  "example": "user_id"
+                },
+                "member_id": {
+                  "description": "成员的用户ID，ID 值与查询参数中的 member_id_type 对应。;;不同 ID 的说明参见 [用户相关的 ID 概念](https://open.feishu.cn/document/home/user-identity-introduction/introduction)",
+                  "required": false,
+                  "example": "4d7a3c6g",
+                  "annotations": [
+                    "open:x_user_id"
+                  ],
+                  "type": "string"
+                },
+                "name": {
+                  "required": false,
+                  "example": "张三",
+                  "type": "string",
+                  "description": "名字"
+                },
+                "tenant_key": {
+                  "annotations": [
+                    "open:tenant_id"
+                  ],
+                  "type": "string",
+                  "description": "租户Key，为租户在飞书上的唯一标识，用来换取对应的tenant_access_token，也可以用作租户在应用中的唯一标识",
+                  "required": false,
+                  "example": "736588c9260f175d"
+                }
+              },
+              "type": "array",
+              "description": "成员列表",
+              "required": false
+            },
+            "page_token": {
+              "type": "string",
+              "description": "分页标记，当 has_more 为 true 时，会同时返回新的 page_token，否则不返回 page_token",
+              "required": false,
+              "example": "0"
+            },
+            "has_more": {
+              "type": "boolean",
+              "description": "是否还有更多项",
+              "required": false,
+              "example": "true"
+            },
+            "member_total": {
+              "type": "integer",
+              "description": "成员总数",
+              "required": false,
+              "example": "2"
+            },
+            "trigger_security_conf_limit": {
+              "description": "是否触发了安全配置",
+              "required": false,
+              "type": "boolean"
+            },
+            "security_conf_limit": {
+              "required": false,
+              "example": "100",
+              "type": "integer",
+              "description": "安全配置支持的最大查询群成员数量"
+            }
+          },
+          "parameters": {
+            "page_size": {
+              "type": "integer",
+              "location": "query",
+              "required": false,
+              "description": "分页大小，用来限制一次请求所返回的数据条目数。;;- 由于返回的群成员列表会过滤掉机器人成员，因此返回的群成员个数可能会小于指定的 page_size。; - 如果有同一时间加入群的群成员，会一次性返回，这会导致返回的群成员个数可能会大于指定的 page_size。",
+              "default": "",
+              "example": "20;;**默认值**：`20`;;**数据校验规则**：;;- 最大值：`100`"
+            },
+            "page_token": {
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "分页标记，第一次请求不填，表示从头开始遍历；分页查询结果还有更多项时会同时返回新的 page_token，下次遍历可采用该 page_token 获取查询结果",
+              "default": "",
+              "example": "WWxHTStrOEs5WHZpNktGbU94bUcvMWlxdDUzTWt1OXNrRmlLaGRNVG0yaz0="
+            },
+            "check_security_conf": {
+              "required": false,
+              "description": "是否检查安全配置",
+              "default": "",
+              "type": "boolean",
+              "location": "query"
+            },
+            "chat_id": {
+              "description": "群 ID。获取方式：;;- [创建群](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/create)，从返回结果中获取该群的 chat_id。;- 调用[获取用户或机器人所在的群列表](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/list)接口，可以查询用户或机器人所在群的 chat_id。;- 调用[搜索对用户或机器人可见的群列表](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/search)，可搜索用户或机器人所在的群、对用户或机器人公开的群的 chat_id。",
+              "example": "oc_a0553eda9014c201e6969b478895c230",
+              "type": "string",
+              "location": "path",
+              "required": true
+            },
+            "member_id_type": {
+              "description": "用户 ID 类型",
+              "default": "",
+              "example": "open_id",
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "标识一个用户在某个租户内的身份。同一个用户在租户 A 和租户 B 内的 User ID 是不同的。在同一个租户内，一个用户的 User ID 在所有应用（包括商店应用）中都保持一致。User ID 主要用于在不同的应用间打通用户数据。[了解更多：如何获取 User ID？](/ssl:ttdoc/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-user-id)"
+                },
+                {
+                  "description": "标识一个用户在某个应用开发商下的身份。同一用户在同一开发商下的应用中的 Union ID 是相同的，在不同开发商下的应用中的 Union ID 是不同的。通过 Union ID，应用开发商可以把同个用户在多个应用中的身份关联起来。[了解更多：如何获取 Union ID？](/ssl:ttdoc/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-union-id)",
+                  "value": "union_id"
+                },
+                {
+                  "description": "标识一个用户在某个应用中的身份。同一个用户在不同应用中的 Open ID 不同。[了解更多：如何获取 Open ID？](/ssl:ttdoc/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-openid)",
+                  "value": "open_id"
+                }
+              ],
+              "enumName": "ListMemberMemberIDType",
+              "type": "string",
+              "location": "query",
+              "required": false
+            }
+          },
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat-members/get",
+          "id": "chat.members.get",
+          "httpMethod": "GET",
+          "scopes": [
+            "im:chat:readonly",
+            "im:chat",
+            "im:chat.group_info:readonly",
+            "im:chat.members:read"
+          ],
+          "path": "chats/{chat_id}/members",
+          "accessTokens": [
+            "user",
+            "tenant"
+          ]
+        }
+      }
+    },
+    "messages": {
+      "methods": {
+        "forward": {
+          "accessTokens": [
+            "tenant"
+          ],
+          "danger": true,
+          "docUrl": "https://open.feishu.cn/api-explorer?from=op_doc_tab&apiName=forward&project=im&resource=message&version=v1",
+          "responseBody": {
+            "updated": {
+              "annotations": [
+                "readOnly"
+              ],
+              "type": "boolean",
+              "description": "消息是否被更新。返回 false 表示未被更新。",
+              "required": false,
+              "example": "false"
+            },
+            "thread_id": {
+              "type": "string",
+              "description": "消息所属的话题 ID（不返回说明该消息非话题消息），了解话题可参见[话题概述](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/thread-introduction)。",
+              "required": false,
+              "example": "omt_d4be107c616a"
+            },
+            "deleted": {
+              "annotations": [
+                "readOnly"
+              ],
+              "type": "boolean",
+              "description": "消息是否被撤回。返回 false 表示未被撤回。",
+              "required": false,
+              "example": "false"
+            },
+            "update_time": {
+              "type": "string",
+              "description": "消息更新的时间戳。单位：毫秒",
+              "required": false,
+              "example": "1615380573411",
+              "annotations": [
+                "readOnly"
+              ]
+            },
+            "sender": {
+              "example": "object",
+              "annotations": [
+                "readOnly"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "发送者的 ID。",
+                  "required": true,
+                  "example": "cli_9f427eec54ae901b"
+                },
+                "id_type": {
+                  "type": "string",
+                  "description": "发送者的 ID 类型。;;**可能值有：**;- `open_id`：表示发送者为用户，且返回的 ID 是用户的 open_id。;- `app_id`：表示发送者为应用，切返回的 ID 是应用的 app_id。",
+                  "required": true,
+                  "example": "app_id"
+                },
+                "sender_type": {
+                  "type": "string",
+                  "description": "发送者类型。;;**可能值有：**;- `user`: 用户;- `app`: 应用;- `anonymous`: 匿名;- `unknown`: 未知",
+                  "required": true,
+                  "example": "app"
+                },
+                "tenant_key": {
+                  "example": "736588c9260f175e",
+                  "annotations": [
+                    "open:tenant_id"
+                  ],
+                  "type": "string",
+                  "description": "租户唯一标识。该标识用来识别租户，也可以用来获取租户访问凭证（tenant_access_token）。",
+                  "required": false
+                },
+                "sender_name": {
+                  "type": "string",
+                  "description": "该字段标识发送者的名称",
+                  "required": false
+                }
+              },
+              "type": "object",
+              "description": "消息的发送者信息。",
+              "required": false,
+              "ref": "sender"
+            },
+            "root_id": {
+              "description": "根消息 ID，仅在回复消息场景会有返回值。了解 root_id 可参见[消息管理概述](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/intro)。",
+              "required": false,
+              "example": "om_40eb06e7b84dc71c03e009ad3c754195",
+              "annotations": [
+                "readOnly",
+                "open:open_x_id"
+              ],
+              "type": "string"
+            },
+            "chat_id": {
+              "required": false,
+              "example": "oc_5ad11d72b830411d72b836c20",
+              "annotations": [
+                "open:open_x_id",
+                "readOnly"
+              ],
+              "type": "string",
+              "description": "消息所属的群 ID。你可以调用[获取群信息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/get)接口，根据群 ID 获取群详情。"
+            },
+            "message_id": {
+              "description": "消息 ID。消息转发后，由系统自动生成的消息唯一标识。后续对消息的管理维护操作均需要使用该 ID。",
+              "required": false,
+              "example": "om_dc13264520392913993dd051dba21dcf",
+              "annotations": [
+                "readOnly",
+                "open:open_x_id"
+              ],
+              "type": "string"
+            },
+            "body": {
+              "properties": {
+                "content": {
+                  "type": "string",
+                  "description": "消息内容，JSON 结构序列化后的字符串，不同消息类型（`msg_type`）对应不同内容。",
+                  "required": true,
+                  "example": "{\\\"text\\\":\\\"@_user_1 test content\\\"}"
+                }
+              },
+              "type": "object",
+              "description": "通过 `body` 内的 `content` 参数，返回所发送的消息内容。 ",
+              "required": false,
+              "ref": "message_body",
+              "example": "json结构",
+              "annotations": [
+                "readOnly"
+              ]
+            },
+            "mentions": {
+              "type": "array",
+              "description": "发送的消息内，被 @ 的用户或机器人列表。",
+              "required": false,
+              "annotations": [
+                "readOnly"
+              ],
+              "properties": {
+                "key": {
+                  "required": true,
+                  "example": "@_user_1",
+                  "type": "string",
+                  "description": "被 @ 的用户或机器人序号。例如，第 3 个被 @ 到的成员，取值为 `@_user_3`。"
+                },
+                "id": {
+                  "example": "ou_155184d1e73cbfb8973e5a9e698e74f2",
+                  "type": "string",
+                  "description": "被 @ 的用户或者机器人的 open_id。",
+                  "required": true
+                },
+                "id_type": {
+                  "type": "string",
+                  "description": "被 @ 的用户或机器人 ID 类型，目前仅支持 `open_id` ([什么是 Open ID](https://open.feishu.cn/document/home/user-identity-introduction/open-id))。",
+                  "required": true,
+                  "example": "open_id"
+                },
+                "name": {
+                  "description": "被 @ 的用户或机器人的姓名。",
+                  "required": true,
+                  "example": "Tom",
+                  "type": "string"
+                },
+                "tenant_key": {
+                  "type": "string",
+                  "description": "租户唯一标识。该标识用来识别被 @ 用户或机器人的租户，也可以用来获取租户访问凭证（tenant_access_token）。",
+                  "required": false,
+                  "example": "736588c9260f175e",
+                  "annotations": [
+                    "open:tenant_id"
+                  ]
+                }
+              }
+            },
+            "msg_type": {
+              "type": "string",
+              "description": "消息类型。包括 text、post、image、file、audio、media、sticker、interactive、share_chat、share_user 等。各类型定义参考[接收消息内容](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/im-v1/message/events/message_content)。",
+              "required": false,
+              "example": "text"
+            },
+            "upper_message_id": {
+              "type": "string",
+              "description": "合并转发消息中，上一层级的消息 ID，仅在合并转发场景会有返回值。了解 upper_message_id 可参见[消息管理概述](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/intro)。",
+              "required": false,
+              "example": "om_40eb06e7b84dc71c03e009ad3c754195",
+              "annotations": [
+                "readOnly",
+                "open:open_x_id"
+              ]
+            },
+            "message_app_link": {
+              "type": "string",
+              "description": "消息跳转链接",
+              "required": false,
+              "example": "https://xxxx/client/thread/open?chatid=xxx&threadid=xxx&thread_position=xxx"
+            },
+            "parent_id": {
+              "annotations": [
+                "readOnly",
+                "open:open_x_id"
+              ],
+              "type": "string",
+              "description": "父消息 ID，仅在回复消息场景会有返回值。了解 parent_id 可参见[消息管理概述](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/intro)。",
+              "required": false,
+              "example": "om_d4be107c616aed9c1da8ed8068570a9f"
+            },
+            "create_time": {
+              "description": "消息生成的时间戳。单位：毫秒",
+              "required": false,
+              "example": "1615380573411",
+              "annotations": [
+                "readOnly"
+              ],
+              "type": "string"
+            }
+          },
+          "parameters": {
+            "receive_id_type": {
+              "required": true,
+              "description": "消息接收者 ID 类型。",
+              "default": "",
+              "example": "open_id",
+              "options": [
+                {
+                  "description": "标识一个用户在某个应用中的身份。同一个用户在不同应用中的 Open ID 不同。[了解更多：如何获取 Open ID](/ssl:ttdoc/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-openid)",
+                  "value": "open_id"
+                },
+                {
+                  "value": "user_id",
+                  "description": "标识一个用户在某个租户内的身份。同一个用户在租户 A 和租户 B 内的 User ID 是不同的。在同一个租户内，一个用户的 User ID 在所有应用（包括商店应用）中都保持一致。User ID 主要用于在不同的应用间打通用户数据。[了解更多：如何获取 User ID？](/ssl:ttdoc/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-user-id)"
+                },
+                {
+                  "value": "union_id",
+                  "description": "标识一个用户在某个应用开发商下的身份。同一用户在同一开发商下的应用中的 Union ID 是相同的，在不同开发商下的应用中的 Union ID 是不同的。通过 Union ID，应用开发商可以把同个用户在多个应用中的身份关联起来。[了解更多：如何获取 Union ID？](/ssl:ttdoc/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-union-id)"
+                },
+                {
+                  "description": "以用户的真实邮箱来标识用户。",
+                  "value": "email"
+                },
+                {
+                  "value": "chat_id",
+                  "description": "以群 ID 来标识群聊。[了解更多：如何获取群 ID ](/ssl:ttdoc/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat-id-description)"
+                },
+                {
+                  "value": "thread_id",
+                  "description": "以话题 ID 来标识话题。了解更多：[话题介绍](/ssl:ttdoc/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/thread-introduction)\n</md-enum-item>\n\n**当值为 `user_id`，字段权限要求**：\n\n<md-perm name=\"contact:user.employee_id:readonly\" desc=\"获取用户 user ID\" support_app_types=\"custom\" tags=\"\">获取用户 user ID</md-perm>"
+                }
+              ],
+              "enumName": "ForwardMessageV1ReceiveIDType",
+              "type": "string",
+              "location": "query"
+            },
+            "uuid": {
+              "required": false,
+              "description": "自定义设置的唯一字符串序列，用于在转发消息时请求去重。持有相同 uuid 的请求，在 1 小时内向同一目标的转发只可成功一次。",
+              "default": "",
+              "example": "b13g2t38-1jd2-458b-8djf-dtbca5104204",
+              "type": "string",
+              "location": "query"
+            },
+            "message_id": {
+              "required": true,
+              "description": "待转发的消息 ID。ID 获取方式：;  ;- 调用[发送消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create)接口后，从响应结果的 `message_id` 参数获取。;- 监听[接收消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/events/receive)事件，当触发该事件后可以从事件体内获取消息的 `message_id`。;- 调用[获取会话历史消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/list)接口，从响应结果的 `message_id` 参数获取。",
+              "example": "om_dc13264520392913993dd051dba21dcf",
+              "type": "string",
+              "location": "path"
+            }
+          },
+          "requestBody": {
+            "receive_id": {
+              "example": "ou_a0553eda9014c201e6969b478895c230",
+              "annotations": [
+                "open:x_user_id"
+              ],
+              "type": "string",
+              "description": "消息接收者 ID，ID 类型与 `receive_id_type` 的值一致。",
+              "required": true
+            }
+          },
+          "scopes": [
+            "im:message:send_as_bot",
+            "im:message"
+          ],
+          "description": "转发消息。Identity: `bot` only (`tenant_access_token`).",
+          "id": "messages.forward",
+          "parameterOrder": [
+            "message_id"
+          ],
+          "path": "messages/{message_id}/forward",
+          "httpMethod": "POST"
+        },
+        "merge_forward": {
+          "scopes": [
+            "im:message:send_as_bot",
+            "im:message"
+          ],
+          "docUrl": "https://open.feishu.cn/api-explorer?from=op_doc_tab&apiName=merge_forward&project=im&resource=message&version=v1",
+          "path": "messages/merge_forward",
+          "parameters": {
+            "receive_id_type": {
+              "location": "query",
+              "required": true,
+              "description": "消息接收者 ID 类型。",
+              "default": "",
+              "example": "open_id",
+              "options": [
+                {
+                  "value": "open_id",
+                  "description": "标识一个用户在某个应用中的身份。同一个用户在不同应用中的 Open ID 不同。[了解更多：如何获取 Open ID](/ssl:ttdoc/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-openid)"
+                },
+                {
+                  "description": "标识一个用户在某个租户内的身份。同一个用户在租户 A 和租户 B 内的 User ID 是不同的。在同一个租户内，一个用户的 User ID 在所有应用（包括商店应用）中都保持一致。User ID 主要用于在不同的应用间打通用户数据。[了解更多：如何获取 User ID？](/ssl:ttdoc/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-user-id)",
+                  "value": "user_id"
+                },
+                {
+                  "value": "union_id",
+                  "description": "标识一个用户在某个应用开发商下的身份。同一用户在同一开发商下的应用中的 Union ID 是相同的，在不同开发商下的应用中的 Union ID 是不同的。通过 Union ID，应用开发商可以把同个用户在多个应用中的身份关联起来。[了解更多：如何获取 Union ID？](/ssl:ttdoc/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-union-id)"
+                },
+                {
+                  "description": "以用户的真实邮箱来标识用户。",
+                  "value": "email"
+                },
+                {
+                  "value": "chat_id",
+                  "description": "以群 ID 来标识群聊。[了解更多：如何获取群 ID ](/ssl:ttdoc/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat-id-description)"
+                },
+                {
+                  "value": "thread_id",
+                  "description": "以话题 ID 来标识话题。了解更多：[话题介绍](/ssl:ttdoc/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/thread-introduction)\n</md-enum-item>\n\n**当值为 `user_id`，字段权限要求**：\n\n<md-perm name=\"contact:user.employee_id:readonly\" desc=\"获取用户 user ID\" support_app_types=\"custom\" tags=\"\">获取用户 user ID</md-perm>"
+                }
+              ],
+              "enumName": "MergeForwardMessagesV1ReceiveIDType",
+              "type": "string"
+            },
+            "uuid": {
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "自定义设置的唯一字符串序列，用于在合并转发消息时请求去重。持有相同 uuid 的请求，在 1 小时内向同一目标的合并转发只可成功一次。",
+              "default": "",
+              "example": "b13g2t38-1jd2-458b-8djf-dtbca5104204"
+            }
+          },
+          "id": "messages.merge_forward",
+          "responseBody": {
+            "message": {
+              "required": false,
+              "ref": "message",
+              "example": "--",
+              "properties": {
+                "root_id": {
+                  "type": "string",
+                  "description": "根消息 ID，仅在回复消息场景会有返回值。了解 root_id 可参见[消息管理概述](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/intro)。",
+                  "required": false,
+                  "example": "om_40eb06e7b84dc71c03e009ad3c754195",
+                  "annotations": [
+                    "readOnly",
+                    "open:open_x_id"
+                  ]
+                },
+                "body": {
+                  "example": "json结构",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "properties": {
+                    "content": {
+                      "type": "string",
+                      "description": "消息内容，JSON 结构序列化后的字符串，合并转发生成的新消息的消息内容为固定值==Merged and Forwarded Message==，其中的子消息可以使用[获取指定消息的内容](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/get)接口获取。",
+                      "required": true,
+                      "example": "Merged and Forwarded Message"
+                    }
+                  },
+                  "type": "object",
+                  "description": "通过 `body` 内的 `content` 参数，返回所发送的消息内容。 ",
+                  "required": false,
+                  "ref": "message_body"
+                },
+                "mentions": {
+                  "required": false,
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "properties": {
+                    "id": {
+                      "example": "ou_155184d1e73cbfb8973e5a9e698e74f2",
+                      "type": "string",
+                      "description": "被 @ 的用户或者机器人的 open_id。",
+                      "required": true
+                    },
+                    "id_type": {
+                      "type": "string",
+                      "description": "被 @ 的用户或机器人 ID 类型，目前仅支持 `open_id` ([什么是 Open ID](https://open.feishu.cn/document/home/user-identity-introduction/open-id))。",
+                      "required": true,
+                      "example": "open_id"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "被 @ 的用户或机器人的姓名。",
+                      "required": true,
+                      "example": "Tom"
+                    },
+                    "tenant_key": {
+                      "description": "租户唯一标识。该标识用来识别被 @ 用户或机器人的租户，也可以用来获取租户访问凭证（tenant_access_token）。",
+                      "required": false,
+                      "example": "736588c9260f175e",
+                      "annotations": [
+                        "open:tenant_id"
+                      ],
+                      "type": "string"
+                    },
+                    "key": {
+                      "description": "被 @ 的用户或机器人序号。例如，第 3 个被 @ 到的成员，取值为 `@_user_3`。",
+                      "required": true,
+                      "example": "@_user_1",
+                      "type": "string"
+                    }
+                  },
+                  "type": "array",
+                  "description": "发送的消息内，被 @ 的用户或机器人列表。"
+                },
+                "message_id": {
+                  "type": "string",
+                  "description": "消息 ID。合并转发后由系统自动生成的消息唯一标识。后续对消息的管理维护操作均需要使用该 ID。",
+                  "required": false,
+                  "example": "om_dc13264520392913993dd051dba21dcf",
+                  "annotations": [
+                    "readOnly",
+                    "open:open_x_id"
+                  ]
+                },
+                "deleted": {
+                  "example": "false",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "boolean",
+                  "description": "消息是否被撤回。返回 false 表示未被撤回。",
+                  "required": false
+                },
+                "upper_message_id": {
+                  "example": "om_40eb06e7b84dc71c03e009ad3c754195",
+                  "annotations": [
+                    "readOnly",
+                    "open:open_x_id"
+                  ],
+                  "type": "string",
+                  "description": "合并转发消息中，上一层级的消息 ID。了解 upper_message_id 可参见[消息管理概述](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/intro)。",
+                  "required": false
+                },
+                "chat_id": {
+                  "type": "string",
+                  "description": "消息所属的群 ID。你可以调用[获取群信息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/get)接口，根据群 ID 获取群详情。",
+                  "required": false,
+                  "example": "oc_5ad11d72b830411d72b836c20",
+                  "annotations": [
+                    "open:open_x_id",
+                    "readOnly"
+                  ]
+                },
+                "parent_id": {
+                  "annotations": [
+                    "readOnly",
+                    "open:open_x_id"
+                  ],
+                  "type": "string",
+                  "description": "父消息 ID，仅在回复消息场景会有返回值。了解 parent_id 可参见[消息管理概述](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/intro)。",
+                  "required": false,
+                  "example": "om_d4be107c616aed9c1da8ed8068570a9f"
+                },
+                "create_time": {
+                  "description": "消息生成的时间戳。单位：毫秒",
+                  "required": false,
+                  "example": "1615380573411",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string"
+                },
+                "update_time": {
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "消息更新的时间戳。单位：毫秒",
+                  "required": false,
+                  "example": "1615380573411"
+                },
+                "updated": {
+                  "example": "false",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "boolean",
+                  "description": "消息是否被更新。返回 false 表示未被更新。",
+                  "required": false
+                },
+                "sender": {
+                  "description": "消息的发送者信息。",
+                  "required": false,
+                  "ref": "sender",
+                  "example": "object",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "发送者的 ID。",
+                      "required": true,
+                      "example": "cli_9f427eec54ae901b"
+                    },
+                    "id_type": {
+                      "description": "发送者的 ID 类型。;;**可能值有：**;- `open_id`：表示发送者为用户，且返回的 ID 是用户的 open_id。;- `app_id`：表示发送者为应用，切返回的 ID 是应用的 app_id。",
+                      "required": true,
+                      "example": "app_id",
+                      "type": "string"
+                    },
+                    "sender_type": {
+                      "example": "app",
+                      "type": "string",
+                      "description": "发送者类型。;;**可能值有：**;- `user`: 用户;- `app`: 应用;- `anonymous`: 匿名;- `unknown`: 未知",
+                      "required": true
+                    },
+                    "tenant_key": {
+                      "type": "string",
+                      "description": "租户唯一标识。该标识用来识别租户，也可以用来获取租户访问凭证（tenant_access_token）。",
+                      "required": false,
+                      "example": "736588c9260f175e",
+                      "annotations": [
+                        "open:tenant_id"
+                      ]
+                    },
+                    "sender_name": {
+                      "description": "该字段标识发送者的名称",
+                      "required": false,
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "msg_type": {
+                  "type": "string",
+                  "description": "消息类型，取值 merge_forward 表示合并转发消息。了解消息类型定义，参考[接收消息内容](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/im-v1/message/events/message_content)。",
+                  "required": false,
+                  "example": "merge_forward"
+                },
+                "message_app_link": {
+                  "example": "https://xxxx/client/thread/open?chatid=xxx&threadid=xxx&thread_position=xxx",
+                  "type": "string",
+                  "description": "消息跳转链接",
+                  "required": false
+                },
+                "thread_id": {
+                  "type": "string",
+                  "description": "消息所属的话题 ID（不返回说明该消息非话题消息），了解话题可参见[话题概述](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/thread-introduction)。",
+                  "required": false,
+                  "example": "omt_d4be107c616a"
+                }
+              },
+              "type": "object",
+              "description": "合并转发生成的新消息。"
+            },
+            "invalid_message_id_list": {
+              "description": "无效的消息 ID 列表，如不存在的消息、已被撤回的消息、当前操作者不可见的历史消息、接口不支持的消息类型等。",
+              "required": false,
+              "annotations": [
+                "readOnly",
+                "open:open_x_id"
+              ],
+              "type": "array"
+            }
+          },
+          "description": "合并转发消息。Identity: `bot` only (`tenant_access_token`).",
+          "requestBody": {
+            "receive_id": {
+              "annotations": [
+                "open:x_user_id"
+              ],
+              "type": "string",
+              "description": "消息接收者 ID，ID 类型与 `receive_id_type` 的值一致。",
+              "required": true,
+              "example": "oc_a0553eda9014c201e6969b478895c230"
+            },
+            "message_id_list": {
+              "annotations": [
+                "open:open_x_id"
+              ],
+              "type": "array",
+              "description": "待转发的消息 ID 列表，列表内的消息必须来自同一个会话。ID 获取方式：;  ;- 调用[发送消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create)接口后，从响应结果的 `message_id` 参数获取。;- 监听[接收消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/events/receive)事件，当触发该事件后可以从事件体内获取消息的 `message_id`。;- 调用[获取会话历史消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/list)接口，从响应结果的 `message_id` 参数获取。",
+              "required": true
+            }
+          },
+          "accessTokens": [
+            "tenant"
+          ],
+          "danger": true,
+          "httpMethod": "POST"
+        },
+        "read_users": {
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/read_users",
+          "id": "messages.read_users",
+          "responseBody": {
+            "items": {
+              "required": false,
+              "properties": {
+                "user_id": {
+                  "description": "用户 ID，ID 类型与查询参数 user_id_type 取值一致。",
+                  "required": true,
+                  "example": "ou_9b851f7b51a9d58d109982337c46f3de",
+                  "type": "string"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "description": "已读消息的时间，毫秒级时间戳。",
+                  "required": true,
+                  "example": "1609484183000"
+                },
+                "tenant_key": {
+                  "required": false,
+                  "example": "736588c9260f175e",
+                  "annotations": [
+                    "open:tenant_id"
+                  ],
+                  "type": "string",
+                  "description": "租户唯一标识。该标识用来识别租户，也可以用来获取租户访问凭证（tenant_access_token）。"
+                },
+                "user_id_type": {
+                  "required": true,
+                  "type": "string",
+                  "description": "用户id类型"
+                }
+              },
+              "type": "array",
+              "description": "-"
+            },
+            "has_more": {
+              "description": "是否还有更多项",
+              "required": true,
+              "example": "true",
+              "type": "boolean"
+            },
+            "page_token": {
+              "description": "分页标记，当 has_more 为 true 时，会同时返回新的 page_token，否则不返回 page_token",
+              "required": false,
+              "example": "GxmvlNRvP0NdQZpa7yIqf_Lv_QuBwTQ8tXkX7w-irAghVD_TvuYd1aoJ1LQph86O-XImC4X9j9FhUPhXQDvtrQ==",
+              "type": "string"
+            }
+          },
+          "scopes": [
+            "im:message:basic",
+            "im:message:readonly",
+            "im:message"
+          ],
+          "path": "messages/{message_id}/read_users",
+          "accessTokens": [
+            "tenant"
+          ],
+          "parameters": {
+            "page_size": {
+              "type": "integer",
+              "location": "query",
+              "required": false,
+              "description": "分页大小，用于限制单次请求所返回的数据条目数。",
+              "default": "",
+              "example": "20"
+            },
+            "page_token": {
+              "required": false,
+              "description": "分页标记，第一次请求不填，表示从头开始遍历；分页查询结果还有更多项时会同时返回新的 page_token，下次遍历可采用该 page_token 获取查询结果",
+              "default": "",
+              "example": "GxmvlNRvP0NdQZpa7yIqf_Lv_QuBwTQ8tXkX7w-irAghVD_TvuYd1aoJ1LQph86O-XImC4X9j9FhUPhXQDvtrQ==",
+              "type": "string",
+              "location": "query"
+            },
+            "message_id": {
+              "required": true,
+              "description": "待查询的消息 ID。ID 获取方式：;  ;- 调用[发送消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create)接口后，从响应结果的 `message_id` 参数获取。;- 监听[接收消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/events/receive)事件，当触发该事件后可以从事件体内获取消息的 `message_id`。;- 调用[获取会话历史消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/list)接口，从响应结果的 `message_id` 参数获取。",
+              "example": "om_dc13264520392913993dd051dba21dcf",
+              "type": "string",
+              "location": "path"
+            },
+            "user_id_type": {
+              "type": "string",
+              "location": "query",
+              "required": true,
+              "description": "此次调用中使用的用户ID的类型",
+              "default": "",
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "以user_id来识别用户"
+                },
+                {
+                  "description": "以union_id来识别用户",
+                  "value": "union_id"
+                },
+                {
+                  "value": "open_id",
+                  "description": "以open_id来识别用户"
+                }
+              ],
+              "enumName": "ReadUsersV1UserIDType"
+            }
+          },
+          "parameterOrder": [
+            "message_id"
+          ],
+          "httpMethod": "GET",
+          "description": "查询消息已读信息。Identity: `bot` only (`tenant_access_token`); the bot must be in the chat, and can only query read status for messages it sent within the last 7 days."
+        },
+        "delete": {
+          "danger": true,
+          "id": "messages.delete",
+          "scopes": [
+            "im:message:recall",
+            "im:message",
+            "im:message:send_as_bot"
+          ],
+          "parameterOrder": [
+            "message_id"
+          ],
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "httpMethod": "DELETE",
+          "description": "撤回消息。Identity: supports `user` and `bot`; for `bot` calls, the bot must be in the chat to revoke group messages; to revoke another user's group message, the bot must be the owner, an admin, or the creator; for user P2P recalls, the target user must be within the bot's availability.",
+          "parameters": {
+            "message_id": {
+              "example": "om_dc13264520392913993dd051dba21dcf",
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "待撤回的消息 ID。;;ID 获取方式：;  ;- 调用[发送消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create)接口后，从响应结果的 `message_id` 参数获取。;- 监听[接收消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/events/receive)事件，当触发该事件后可以从事件体内获取消息的 `message_id`。;- 调用[获取会话历史消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/list)接口，从响应结果的 `message_id` 参数获取。"
+            }
+          },
+          "path": "messages/{message_id}",
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/delete"
+        }
+      }
+    },
+    "reactions": {
+      "methods": {
+        "create": {
+          "parameterOrder": [
+            "message_id"
+          ],
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message-reaction/create",
+          "description": "添加消息表情回复。Identity: supports `user` and `bot`; the caller must be in the conversation that contains the message.[Must-read](references/lark-im-reactions.md)",
+          "parameters": {
+            "message_id": {
+              "description": "待添加表情回复的消息 ID。ID 获取方式：;  ;- 调用[发送消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create)接口后，从响应结果的 `message_id` 参数获取。;- 监听[接收消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/events/receive)事件，当触发该事件后可以从事件体内获取消息的 `message_id`。;- 调用[获取会话历史消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/list)接口，从响应结果的 `message_id` 参数获取。",
+              "example": "om_a8f2294b************a1a38afaac9d",
+              "type": "string",
+              "location": "path",
+              "required": true
+            }
+          },
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "path": "messages/{message_id}/reactions",
+          "httpMethod": "POST",
+          "requestBody": {
+            "reaction_type": {
+              "description": "表情回复的资源类型。",
+              "required": true,
+              "ref": "emoji",
+              "properties": {
+                "emoji_type": {
+                  "description": "emoji 类型。支持的表情与对应的 emoji_type 值参见[表情文案说明](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message-reaction/emojis-introduce)。;",
+                  "required": true,
+                  "example": "SMILE",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "responseBody": {
+            "reaction_type": {
+              "type": "object",
+              "description": "表情类型",
+              "required": false,
+              "ref": "emoji",
+              "properties": {
+                "emoji_type": {
+                  "type": "string",
+                  "description": "emoji 类型。emoji_type 值对应的表情参考[表情文案说明](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message-reaction/emojis-introduce)。",
+                  "required": true,
+                  "example": "SMILE"
+                }
+              }
+            },
+            "reaction_id": {
+              "annotations": [
+                "readOnly"
+              ],
+              "type": "string",
+              "description": "表情回复 ID。为消息添加表情回复后，会获得该表情回复的唯一标识 ID，后续使用该 ID 可以[删除消息表情回复](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message-reaction/delete)。",
+              "required": false,
+              "example": "ZCaCIjUBVVWSrm5L-3ZTw*************sNa8dHVplEzzSfJVUVLMLcS_"
+            },
+            "operator": {
+              "description": "添加消息表情回复的操作人。",
+              "required": false,
+              "ref": "operator",
+              "properties": {
+                "operator_id": {
+                  "description": "操作人 ID，具体的取值与 `operator_type` 相关：;      ;- 当 `operator_type` 取值 `app` 时返回机器人的应用 ID（app_id）。;- 当 `operator_type` 取值 `user` 时返回用户的 open_id。",
+                  "required": true,
+                  "example": "ou_ff0b7ba35fb********67dfc8b885136",
+                  "type": "string"
+                },
+                "operator_type": {
+                  "required": true,
+                  "example": "app/user",
+                  "options": [
+                    {
+                      "value": "app",
+                      "description": "\"app\""
+                    },
+                    {
+                      "description": "\"user\"",
+                      "value": "user"
+                    }
+                  ],
+                  "enum": [
+                    "app",
+                    "user"
+                  ],
+                  "type": "string",
+                  "description": "操作人身份。"
+                }
+              },
+              "type": "object"
+            },
+            "action_time": {
+              "annotations": [
+                "readOnly"
+              ],
+              "type": "string",
+              "description": "添加消息表情回复的时间。Unix 时间戳，单位：ms",
+              "required": false,
+              "example": "1663054162546"
+            }
+          },
+          "scopes": [
+            "im:message",
+            "im:message.reactions:write_only"
+          ],
+          "danger": true,
+          "id": "reactions.create"
+        },
+        "delete": {
+          "path": "messages/{message_id}/reactions/{reaction_id}",
+          "description": "删除消息表情回复。Identity: supports `user` and `bot`; the caller must be in the conversation that contains the message, and can only delete reactions added by itself.[Must-read](references/lark-im-reactions.md)",
+          "parameters": {
+            "message_id": {
+              "required": true,
+              "description": "待删除表情回复的消息 ID。ID 获取方式：;  ;- 调用[发送消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create)接口后，从响应结果的 `message_id` 参数获取。;- 监听[接收消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/events/receive)事件，当触发该事件后可以从事件体内获取消息的 `message_id`。;- 调用[获取会话历史消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/list)接口，从响应结果的 `message_id` 参数获取。",
+              "example": "om_8964d1b4*********2b31383276113",
+              "type": "string",
+              "location": "path"
+            },
+            "reaction_id": {
+              "required": true,
+              "description": "待删除的表情回复 ID，该 ID 获取方式：;;- 调用[添加消息表情回复](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message-reaction/create)接口添加表情回复后，在返回结果中获取。;;- 调用[获取消息表情回复](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message-reaction/list)接口，获取某一表情回复的 ID。",
+              "example": "ZCaCIjUBVVWSrm5L-3ZTw*************sNa8dHVplEzzSfJVUVLMLcS_",
+              "type": "string",
+              "location": "path"
+            }
+          },
+          "parameterOrder": [
+            "message_id",
+            "reaction_id"
+          ],
+          "scopes": [
+            "im:message",
+            "im:message.reactions:write_only"
+          ],
+          "id": "reactions.delete",
+          "responseBody": {
+            "reaction_id": {
+              "type": "string",
+              "description": "表情回复 ID。",
+              "required": false,
+              "example": "ZCaCIjUBVVWSrm5L-3ZTw*************sNa8dHVplEzzSfJVUVLMLcS_",
+              "annotations": [
+                "readOnly"
+              ]
+            },
+            "operator": {
+              "description": "添加表情回复的操作人。",
+              "required": false,
+              "ref": "operator",
+              "properties": {
+                "operator_id": {
+                  "type": "string",
+                  "description": "操作人 ID，具体的取值与 `operator_type` 相关：;      ;- 当 `operator_type` 取值 `app` 时返回机器人的应用 ID（app_id）。;- 当 `operator_type` 取值 `user` 时返回用户的 open_id。",
+                  "required": true,
+                  "example": "ou_ff0b7ba35fb********67dfc8b885136"
+                },
+                "operator_type": {
+                  "required": true,
+                  "example": "app/user",
+                  "options": [
+                    {
+                      "description": "\"app\"",
+                      "value": "app"
+                    },
+                    {
+                      "value": "user",
+                      "description": "\"user\""
+                    }
+                  ],
+                  "enum": [
+                    "app",
+                    "user"
+                  ],
+                  "type": "string",
+                  "description": "操作人身份。"
+                }
+              },
+              "type": "object"
+            },
+            "action_time": {
+              "type": "string",
+              "description": "添加消息表情回复的时间。Unix 时间戳，单位：ms",
+              "required": false,
+              "example": "1626086391570",
+              "annotations": [
+                "readOnly"
+              ]
+            },
+            "reaction_type": {
+              "ref": "emoji",
+              "properties": {
+                "emoji_type": {
+                  "description": "emoji 类型。emoji_type 值对应的表情参考[表情文案说明](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message-reaction/emojis-introduce)。",
+                  "required": true,
+                  "example": "SMILE",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "description": "表情类型",
+              "required": false
+            }
+          },
+          "httpMethod": "DELETE",
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "danger": true,
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message-reaction/delete"
+        },
+        "list": {
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message-reaction/list",
+          "path": "messages/{message_id}/reactions",
+          "parameters": {
+            "user_id_type": {
+              "enumName": "ListMessageReactionUserIDType",
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "当操作人为用户时返回用户ID的类型",
+              "default": "",
+              "options": [
+                {
+                  "value": "open_id",
+                  "description": "标识一个用户在某个应用中的身份。同一个用户在不同应用中的 Open ID 不同。"
+                },
+                {
+                  "value": "union_id",
+                  "description": "标识一个用户在某个应用开发商下的身份。同一用户在同一开发商下的应用中的 Union ID 是相同的，在不同开发商下的应用中的 Union ID 是不同的。通过 Union ID，应用开发商可以把同个用户在多个应用中的身份关联起来。"
+                },
+                {
+                  "value": "user_id",
+                  "description": "标识一个用户在某个租户内的身份。同一个用户在租户 A 和租户 B 内的 User ID 是不同的。在同一个租户内，一个用户的 User ID 在所有应用（包括商店应用）中都保持一致。User ID 主要用于在不同的应用间打通用户数据。"
+                }
+              ]
+            },
+            "message_id": {
+              "required": true,
+              "description": "待查询的消息ID。ID 获取方式：;  ;- 调用[发送消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create)接口后，从响应结果的 `message_id` 参数获取。;- 监听[接收消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/events/receive)事件，当触发该事件后可以从事件体内获取消息的 `message_id`。;- 调用[获取会话历史消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/list)接口，从响应结果的 `message_id` 参数获取。",
+              "example": "om_8964d1b4*********2b31383276113",
+              "type": "string",
+              "location": "path"
+            },
+            "reaction_type": {
+              "example": "LAUGH",
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "待查询的表情类型，支持的枚举值参考[表情文案说明](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message-reaction/emojis-introduce)中的 emoji_type 值。;;**注意**：该参数为可选参数，不传入该参数时将查询消息内所有的表情回复。",
+              "default": ""
+            },
+            "page_token": {
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "分页标记，第一次请求不填，表示从头开始遍历；分页查询结果还有更多项时，会同时返回新的 page_token，下次遍历可采用该 page_token 获取查询结果",
+              "default": "",
+              "example": "YhljsPiGfUgnVAg9urvRFd-BvSqRL20wMZNAWfa9xXkud6UKCybPuUgQ1vM26dj6"
+            },
+            "page_size": {
+              "type": "integer",
+              "location": "query",
+              "required": false,
+              "description": "分页大小，用于限制一次请求返回的数据条目数。;;**默认值**：20",
+              "default": "",
+              "example": "10"
+            }
+          },
+          "description": "获取消息表情回复。Identity: supports `user` and `bot`; the caller must be in the conversation that contains the message.[Must-read](references/lark-im-reactions.md)",
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "parameterOrder": [
+            "message_id"
+          ],
+          "responseBody": {
+            "has_more": {
+              "required": true,
+              "example": "true",
+              "type": "boolean",
+              "description": "是否还有更多项"
+            },
+            "page_token": {
+              "required": true,
+              "example": "YhljsPiGfUgnVAg9urvRFd-BvSqRL****",
+              "type": "string",
+              "description": "分页标记，当 has_more 为 true 时，会同时返回新的 page_token，否则不返回 page_token"
+            },
+            "items": {
+              "description": "表情回复列表。",
+              "required": true,
+              "properties": {
+                "reaction_id": {
+                  "type": "string",
+                  "description": "表情回复 ID。",
+                  "required": false,
+                  "example": "ZCaCIjUBVVWSrm5L-3ZTw*************sNa8dHVplEzzSfJVUVLMLcS_",
+                  "annotations": [
+                    "readOnly"
+                  ]
+                },
+                "operator": {
+                  "ref": "operator",
+                  "properties": {
+                    "operator_id": {
+                      "type": "string",
+                      "description": "操作人 ID，具体的取值与 `operator_type` 相关：;      ;- 当 `operator_type` 取值 `app` 时返回机器人的应用 ID（app_id）。;- 当 `operator_type` 取值 `user` 时返回用户的 ID（ID 类型与查询参数 `user_id_type` 的取值一致）。",
+                      "required": true,
+                      "example": "ou_ff0b7ba35fb********67dfc8b885136"
+                    },
+                    "operator_type": {
+                      "description": "操作人身份。",
+                      "required": true,
+                      "example": "app/user",
+                      "options": [
+                        {
+                          "value": "app",
+                          "description": "\"app\""
+                        },
+                        {
+                          "value": "user",
+                          "description": "\"user\""
+                        }
+                      ],
+                      "enum": [
+                        "app",
+                        "user"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "description": "添加表情回复的操作人",
+                  "required": false
+                },
+                "action_time": {
+                  "type": "string",
+                  "description": "添加消息表情回复的时间。Unix 时间戳，单位：ms",
+                  "required": false,
+                  "example": "1663054162546",
+                  "annotations": [
+                    "readOnly"
+                  ]
+                },
+                "reaction_type": {
+                  "ref": "emoji",
+                  "properties": {
+                    "emoji_type": {
+                      "description": "emoji 类型。emoji_type 值对应的表情参考[表情文案说明](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message-reaction/emojis-introduce)。",
+                      "required": true,
+                      "example": "SMILE",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "description": "表情类型",
+                  "required": false
+                }
+              },
+              "type": "array"
+            }
+          },
+          "httpMethod": "GET",
+          "scopes": [
+            "im:message:readonly",
+            "im:message.reactions:read"
+          ],
+          "id": "reactions.list"
+        },
+        "batch_query": {
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "path": "messages/reactions/batch_query",
+          "requestBody": {
+            "queries": {
+              "type": "array",
+              "description": "要查询的消息",
+              "required": true,
+              "properties": {
+                "message_id": {
+                  "type": "string",
+                  "description": "消息ID",
+                  "required": false,
+                  "example": "om_8964d1b4*********2b31383276113"
+                },
+                "page_token": {
+                  "description": "分页标记，第一次请求不填，表示从头开始遍历；分页查询结果还有更多项时会同时返回新的 page_token，下次遍历可采用该 page_token 获取查询结果。",
+                  "required": false,
+                  "example": "YhljsPiGfUgnVAg9urvRFd-BvSqRL20",
+                  "type": "string"
+                }
+              }
+            },
+            "page_size_per_message": {
+              "example": "10",
+              "type": "integer",
+              "description": "每个消息最多返回多少个表情",
+              "required": false
+            },
+            "reaction_type": {
+              "example": "LAUGH",
+              "type": "string",
+              "description": "表情类型",
+              "required": false
+            }
+          },
+          "responseBody": {
+            "fail_msg_reaction_details": {
+              "type": "array",
+              "description": "未成功获取的消息",
+              "required": false,
+              "properties": {
+                "fail_reason": {
+                  "enum": [
+                    "invalid",
+                    "invalid_page_token",
+                    "no_permission"
+                  ],
+                  "type": "string",
+                  "description": "获取表情失败的原因",
+                  "required": false,
+                  "options": [
+                    {
+                      "description": "无效的消息ID",
+                      "value": "invalid"
+                    },
+                    {
+                      "value": "invalid_page_token",
+                      "description": "该消息对应的page_token无效"
+                    },
+                    {
+                      "value": "no_permission",
+                      "description": "操作者对该消息无权限"
+                    }
+                  ]
+                },
+                "message_id": {
+                  "type": "string",
+                  "description": "消息id",
+                  "required": false,
+                  "example": "om_8964d1b4*********2b31383276113"
+                }
+              }
+            },
+            "success_msg_reaction_details": {
+              "required": false,
+              "properties": {
+                "has_more": {
+                  "type": "boolean",
+                  "description": "是否还有更多项",
+                  "required": false
+                },
+                "page_token": {
+                  "type": "string",
+                  "description": "分页标记，当 has_more 为 true 时，会同时返回新的 page_token，否则不返回 page_token",
+                  "required": false
+                },
+                "message_reaction_items": {
+                  "properties": {
+                    "emoji_type": {
+                      "type": "string",
+                      "description": "表情类型",
+                      "required": false,
+                      "example": "SMILE"
+                    },
+                    "reaction_id": {
+                      "required": false,
+                      "example": "ZCaCIjUBVVWSrm5L-3ZTw****",
+                      "type": "string",
+                      "description": "表情ID"
+                    },
+                    "operator": {
+                      "description": "操作者信息",
+                      "required": false,
+                      "ref": "operator",
+                      "type": "object"
+                    },
+                    "action_time": {
+                      "description": "表情添加时间",
+                      "required": false,
+                      "example": "1626086391570",
+                      "type": "string"
+                    }
+                  },
+                  "type": "array",
+                  "description": "表情实体",
+                  "required": false
+                },
+                "message_id": {
+                  "required": false,
+                  "example": "om_a8f2294b************a1a38afaac9d",
+                  "type": "string",
+                  "description": "消息id"
+                }
+              },
+              "type": "array",
+              "description": "成功获取到的表情列表"
+            },
+            "success_msg_reaction_counts": {
+              "type": "array",
+              "description": "成功获取到的表情数量统计",
+              "required": false,
+              "properties": {
+                "message_id": {
+                  "example": "om_8964d1b4*********2b31383276113",
+                  "type": "string",
+                  "description": "消息ID",
+                  "required": false
+                },
+                "reaction_count": {
+                  "type": "array",
+                  "description": "消息上不同表情的数量",
+                  "required": false,
+                  "properties": {
+                    "reaction_type": {
+                      "description": "表情类型",
+                      "required": false,
+                      "example": "LAUGH",
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "string",
+                      "description": "表情数量",
+                      "required": false,
+                      "example": "20"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "httpMethod": "POST",
+          "danger": true,
+          "parameters": {
+            "user_id_type": {
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "用户 ID 类型，控制接口返回值中表情添加者的ID",
+              "default": "open_id",
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "以user_id来识别用户"
+                },
+                {
+                  "value": "union_id",
+                  "description": "以union_id来识别用户"
+                },
+                {
+                  "description": "以open_id来识别用户",
+                  "value": "open_id"
+                }
+              ]
+            }
+          },
+          "scopes": [
+            "im:message:readonly",
+            "im:message.reactions:read"
+          ],
+          "id": "reactions.batch_query",
+          "description": "批量获取消息表情。Identity: supports `user` and `bot`.[Must-read](references/lark-im-reactions.md)",
+          "docUrl": "https://open.feishu.cn/api-explorer?from=op_doc_tab&apiName=batch_query&project=im&resource=message.reaction&version=v1"
+        }
+      }
+    },
+    "images": {
+      "methods": {
+        "create": {
+          "id": "images.create",
+          "path": "images",
+          "responseBody": {
+            "image_key": {
+              "type": "string",
+              "description": "图片的 Key",
+              "required": false,
+              "example": "img_8d5181ca-0aed-40f0-b0d1-b1452132afbg"
+            }
+          },
+          "requestBody": {
+            "image_type": {
+              "options": [
+                {
+                  "value": "message",
+                  "description": "用于发送消息"
+                },
+                {
+                  "value": "avatar",
+                  "description": "用于设置头像"
+                }
+              ],
+              "enum": [
+                "message",
+                "avatar"
+              ],
+              "enumName": "CreateImageImageType",
+              "type": "string",
+              "description": "图片类型",
+              "required": true,
+              "example": "message"
+            },
+            "image": {
+              "description": "图片内容。传值方式可以参考请求体示例。;;**注意**：;;- 上传的图片大小不能超过 10 MB，也不能上传大小为 0 的图片。;- 分辨率限制：;\t- GIF 图片分辨率不能超过 2000 x 2000，其他图片分辨率不能超过 12000 x 12000。;\t- 用于设置头像的图片分辨率不能超过 4096 x 4096。",
+              "required": true,
+              "example": "二进制文件",
+              "type": "file"
+            }
+          },
+          "scopes": [
+            "im:resource:upload",
+            "im:resource"
+          ],
+          "danger": true,
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/image/create",
+          "description": "上传图片。Identity: `bot` only (`tenant_access_token`).",
+          "accessTokens": [
+            "tenant"
+          ],
+          "httpMethod": "POST"
+        }
+      }
+    },
+    "pins": {
+      "methods": {
+        "create": {
+          "description": "Pin 消息。Identity: supports `user` and `bot`.",
+          "path": "pins",
+          "requestBody": {
+            "message_id": {
+              "description": "待 Pin 的消息 ID。ID 获取方式：;  ;- 调用[发送消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create)接口后，从响应结果的 `message_id` 参数获取。;- 监听[接收消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/events/receive)事件，当触发该事件后可以从事件体内获取消息的 `message_id`。;- 调用[获取会话历史消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/list)接口，从响应结果的 `message_id` 参数获取。",
+              "required": true,
+              "example": "om_dc13264520392913993dd051dba21dcf",
+              "type": "string"
+            }
+          },
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/pin/create",
+          "id": "pins.create",
+          "danger": true,
+          "httpMethod": "POST",
+          "responseBody": {
+            "pin": {
+              "properties": {
+                "operator_id_type": {
+                  "required": false,
+                  "example": "open_id",
+                  "type": "string",
+                  "description": "Pin 的操作人 ID 类型。可能值有：;;- open_id：表示操作人为用户，此时 `operator_id` 返回值为用户的 open_id。;- app_id：表示操作人为应用，此时 `operator_id` 返回值为应用的 app_id。"
+                },
+                "create_time": {
+                  "example": "1615380573211",
+                  "type": "string",
+                  "description": "Pin 的创建时间（毫秒级时间戳）",
+                  "required": false
+                },
+                "message_id": {
+                  "type": "string",
+                  "description": "Pin 的消息 ID",
+                  "required": true,
+                  "example": "om_dc13264520392913993dd051dba21dcf"
+                },
+                "chat_id": {
+                  "example": "oc_a0553eda9014c201e6969b478895c230",
+                  "annotations": [
+                    "open:open_x_id"
+                  ],
+                  "type": "string",
+                  "description": "Pin 消息所在的群聊 ID",
+                  "required": false
+                },
+                "operator_id": {
+                  "type": "string",
+                  "description": "Pin 的操作人 ID",
+                  "required": false,
+                  "example": "ou_7d8a6e6df7621556ce0d21922b676706ccs"
+                }
+              },
+              "type": "object",
+              "description": "Pin 的操作信息",
+              "required": false,
+              "ref": "pin"
+            }
+          },
+          "scopes": [
+            "im:message:send_as_bot",
+            "im:message",
+            "im:message.pins:write_only"
+          ],
+          "accessTokens": [
+            "tenant",
+            "user"
+          ]
+        },
+        "delete": {
+          "description": "移除 Pin 消息。Identity: supports `user` and `bot`.",
+          "parameters": {
+            "message_id": {
+              "example": "om_dc13264520392913993dd051dba21dcf",
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "待移除 Pin 的消息 ID。ID 获取方式：;  ;- 调用[发送消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create)接口后，从响应结果的 `message_id` 参数获取。;- 监听[接收消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/events/receive)事件，当触发该事件后可以从事件体内获取消息的 `message_id`。;- 调用[获取会话历史消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/list)接口，从响应结果的 `message_id` 参数获取。"
+            }
+          },
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "id": "pins.delete",
+          "path": "pins/{message_id}",
+          "scopes": [
+            "im:message:send_as_bot",
+            "im:message",
+            "im:message.pins:write_only"
+          ],
+          "httpMethod": "DELETE",
+          "danger": true,
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/pin/delete",
+          "parameterOrder": [
+            "message_id"
+          ]
+        },
+        "list": {
+          "description": "获取群内 Pin 消息。Identity: supports `user` and `bot`.",
+          "parameters": {
+            "end_time": {
+              "required": false,
+              "description": "获取 Pin 消息的结束时间，毫秒级时间戳。;;**注意**：;;- 若未传值默认从群聊内最新的 Pin 消息开始获取。;- 传值时需大于 `start_time` 值。",
+              "default": "",
+              "example": "1658731646425",
+              "type": "string",
+              "location": "query"
+            },
+            "page_size": {
+              "example": "20",
+              "type": "integer",
+              "location": "query",
+              "required": false,
+              "description": "分页大小，用于限制一次请求返回的数据条目数。",
+              "default": "20"
+            },
+            "page_token": {
+              "required": false,
+              "description": "下一页分页的token",
+              "default": "",
+              "example": "GxmvlNRvP0NdQZpa7yIqf_Lv_QuBwTQ8tXkX7w-irAghVD_TvuYd1aoJ1LQph86O-XImC4X9j9FhUPhXQDvtrQ==",
+              "type": "string",
+              "location": "query"
+            },
+            "chat_id": {
+              "required": true,
+              "description": "待获取 Pin 消息的群组 ID。获取方式参见[群 ID 说明](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat-id-description)。",
+              "default": "",
+              "example": "oc_234jsi43d3ssi993d43545f",
+              "type": "string",
+              "location": "query"
+            },
+            "start_time": {
+              "required": false,
+              "description": "获取 Pin 消息的起始时间，毫秒级时间戳。;;**注意**：;;- 若未传值默认获取到群聊内最早的 Pin 消息。;- 传值时需小于 `end_time` 值。",
+              "default": "",
+              "example": "1658632251800",
+              "type": "string",
+              "location": "query"
+            }
+          },
+          "path": "pins",
+          "httpMethod": "GET",
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/pin/list",
+          "responseBody": {
+            "items": {
+              "type": "array",
+              "description": "Pin 的操作信息",
+              "required": false,
+              "properties": {
+                "operator_id": {
+                  "type": "string",
+                  "description": "Pin 的操作人 ID",
+                  "required": false,
+                  "example": "ou_7d8a6e6df7621556ce0d21922b676706ccs"
+                },
+                "operator_id_type": {
+                  "description": "Pin 的操作人 ID 类型。可能值有：;;- open_id：表示操作人为用户，此时 `operator_id` 返回值为用户的 open_id。;- app_id：表示操作人为应用，此时 `operator_id` 返回值为应用的 app_id。",
+                  "required": false,
+                  "example": "open_id",
+                  "type": "string"
+                },
+                "create_time": {
+                  "type": "string",
+                  "description": "Pin 的创建时间（毫秒级时间戳）",
+                  "required": false,
+                  "example": "1615380573211"
+                },
+                "message_id": {
+                  "example": "om_dc13264520392913993dd051dba21dcf",
+                  "type": "string",
+                  "description": "Pin 的消息 ID",
+                  "required": true
+                },
+                "chat_id": {
+                  "description": "Pin 消息所在的群聊 ID",
+                  "required": false,
+                  "example": "oc_a0553eda9014c201e6969b478895c230",
+                  "annotations": [
+                    "open:open_x_id"
+                  ],
+                  "type": "string"
+                }
+              }
+            },
+            "has_more": {
+              "type": "boolean",
+              "description": "是否还有更多项",
+              "required": false,
+              "example": "false"
+            },
+            "page_token": {
+              "type": "string",
+              "description": "分页标记，当 has_more 为 true 时，会同时返回新的 page_token，否则不返回 page_token",
+              "required": false,
+              "example": "GxmvlNRvP0NdQZpa7yIqf_Lv_QuBwTQ8tXkX7w-irAghVD_TvuYd1aoJ1LQph86O-XImC4X9j9FhUPhXQDvtrQ=="
+            }
+          },
+          "scopes": [
+            "im:message:readonly",
+            "im:message",
+            "im:message.pins:read"
+          ],
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "id": "pins.list"
+        }
+      }
+    },
+    "chats": {
+      "methods": {
+        "create": {
+          "path": "chats",
+          "responseBody": {
+            "chat_tag": {
+              "type": "string",
+              "description": "群标签，如有多个，则按照下列顺序返回第一个;;**可选值有**：;- `inner`：内部群;- `tenant`：公司群;- `department`：部门群;- `edu`：教育群;- `meeting`：会议群;- `customer_service`：客服群",
+              "required": false,
+              "example": "inner"
+            },
+            "edit_permission": {
+              "type": "string",
+              "description": "群编辑权限;;**可选值有**：;- `only_owner`：仅群主和管理员;- `all_members`：所有成员",
+              "required": false,
+              "example": "all members"
+            },
+            "at_all_permission": {
+              "example": "all members",
+              "type": "string",
+              "description": "谁可以 at 所有人;;**可选值有**：;- `only_owner`：仅群主和管理员;- `all_members`：所有成员",
+              "required": false
+            },
+            "description": {
+              "example": "测试群描述",
+              "type": "string",
+              "description": "群描述",
+              "required": false
+            },
+            "toolkit_ids": {
+              "type": "array",
+              "description": "群快捷组件列表",
+              "required": false
+            },
+            "join_message_visibility": {
+              "type": "string",
+              "description": "入群消息可见性;;**可选值有**：;- `only_owner`：仅群主和管理员可见;- `all_members`：所有成员可见;- `not_anyone`：任何人均不可见",
+              "required": false,
+              "example": "all_members"
+            },
+            "group_message_type": {
+              "type": "string",
+              "description": "群消息形式;;**可选值有**：;- `chat`：对话消息;- `thread`：话题消息",
+              "required": false,
+              "example": "chat"
+            },
+            "external": {
+              "type": "boolean",
+              "description": "是否是外部群",
+              "required": false,
+              "example": "false"
+            },
+            "owner_id_type": {
+              "description": "群主 ID 类型，与查询参数中的 ==user_id_type== 取值相同。;;**注意**：当群主是机器人时，该字段不返回",
+              "required": false,
+              "example": "open_id",
+              "type": "string"
+            },
+            "video_conference_setting": {
+              "enum": [
+                "only_owner",
+                "all_members"
+              ],
+              "enumName": "video_conference_setting_type",
+              "type": "string",
+              "description": "谁可以发起视频会议",
+              "required": false,
+              "example": "all_members",
+              "options": [
+                {
+                  "value": "only_owner",
+                  "description": "仅群主和管理员"
+                },
+                {
+                  "value": "all_members",
+                  "description": "所有成员"
+                }
+              ]
+            },
+            "moderation_permission": {
+              "example": "all_members",
+              "type": "string",
+              "description": "发言权限;;**可选值有**：;- `only_owner`：仅群主和管理员;- `all_members`：所有成员;- `moderator_list`：指定群成员",
+              "required": false
+            },
+            "urgent_setting": {
+              "required": false,
+              "example": "all_members",
+              "options": [
+                {
+                  "value": "only_owner",
+                  "description": "仅群主和管理员"
+                },
+                {
+                  "description": "所有成员",
+                  "value": "all_members"
+                }
+              ],
+              "enum": [
+                "only_owner",
+                "all_members"
+              ],
+              "enumName": "urgent_setting_type",
+              "type": "string",
+              "description": "谁可以加急"
+            },
+            "pin_manage_setting": {
+              "options": [
+                {
+                  "description": "仅群主和管理员",
+                  "value": "only_owner"
+                },
+                {
+                  "value": "all_members",
+                  "description": "所有成员"
+                }
+              ],
+              "enum": [
+                "only_owner",
+                "all_members"
+              ],
+              "enumName": "pin_manage_setting_type",
+              "type": "string",
+              "description": "谁可以管理置顶",
+              "required": false,
+              "example": "all_members"
+            },
+            "hide_member_count_setting": {
+              "example": "all_members",
+              "options": [
+                {
+                  "value": "all_members",
+                  "description": "所有群成员可见"
+                },
+                {
+                  "description": "仅群主群管理员可见",
+                  "value": "only_owner"
+                }
+              ],
+              "enum": [
+                "all_members",
+                "only_owner"
+              ],
+              "enumName": "hide_member_count_setting_type",
+              "type": "string",
+              "description": "隐藏群成员人数设置",
+              "required": false
+            },
+            "chat_mode": {
+              "required": false,
+              "example": "group",
+              "type": "string",
+              "description": "群模式;;**可选值有**：;- `group`：群组"
+            },
+            "i18n_names": {
+              "type": "object",
+              "description": "群国际化名称",
+              "required": false,
+              "ref": "i18n_names",
+              "properties": {
+                "zh_cn": {
+                  "required": false,
+                  "example": "群聊",
+                  "type": "string",
+                  "description": "中文名"
+                },
+                "en_us": {
+                  "required": false,
+                  "example": "group chat",
+                  "type": "string",
+                  "description": "英文名"
+                },
+                "ja_jp": {
+                  "description": "日文名",
+                  "required": false,
+                  "example": "グループチャット",
+                  "type": "string"
+                }
+              }
+            },
+            "owner_id": {
+              "type": "string",
+              "description": "群主 ID，ID 类型与查询参数中的 ==user_id_type== 对应；不同 ID 的说明参见 [用户相关的 ID 概念](https://open.feishu.cn/document/home/user-identity-introduction/introduction)。;;**注意**：当群主是机器人时，该字段不返回",
+              "required": false,
+              "example": "ou_7d8a6e6df7621556ce0d21922b676706ccs"
+            },
+            "labels": {
+              "description": "群标签",
+              "required": false,
+              "type": "array"
+            },
+            "tenant_key": {
+              "example": "736588c9260f175e",
+              "annotations": [
+                "open:tenant_id"
+              ],
+              "type": "string",
+              "description": "租户在飞书上的唯一标识，用来换取对应的 tenant_access_token，也可以用作租户在应用里面的唯一标识",
+              "required": false
+            },
+            "restricted_mode_setting": {
+              "ref": "restricted_mode_setting",
+              "properties": {
+                "message_has_permission_setting": {
+                  "type": "string",
+                  "description": "允许复制和转发消息",
+                  "required": false,
+                  "example": "all_members",
+                  "options": [
+                    {
+                      "value": "all_members",
+                      "description": "所有成员允许复制和转发消息"
+                    },
+                    {
+                      "value": "not_anyone",
+                      "description": "所有成员禁止复制和转发消息"
+                    }
+                  ],
+                  "enum": [
+                    "all_members",
+                    "not_anyone"
+                  ],
+                  "enumName": "message_has_permission_setting"
+                },
+                "status": {
+                  "type": "boolean",
+                  "description": "保密模式是否开启",
+                  "required": false,
+                  "example": "false"
+                },
+                "screenshot_has_permission_setting": {
+                  "options": [
+                    {
+                      "description": "所有成员允许截屏录屏",
+                      "value": "all_members"
+                    },
+                    {
+                      "value": "not_anyone",
+                      "description": "所有成员禁止截屏录屏"
+                    }
+                  ],
+                  "enum": [
+                    "all_members",
+                    "not_anyone"
+                  ],
+                  "enumName": "screenshot_has_permission_setting",
+                  "type": "string",
+                  "description": "允许截屏录屏",
+                  "required": false,
+                  "example": "all_members"
+                },
+                "download_has_permission_setting": {
+                  "type": "string",
+                  "description": "允许下载消息中图片、视频和文件",
+                  "required": false,
+                  "example": "all_members",
+                  "options": [
+                    {
+                      "value": "all_members",
+                      "description": "所有成员允许下载资源"
+                    },
+                    {
+                      "value": "not_anyone",
+                      "description": "所有成员禁止下载资源"
+                    }
+                  ],
+                  "enum": [
+                    "all_members",
+                    "not_anyone"
+                  ],
+                  "enumName": "download_has_permission_setting"
+                }
+              },
+              "type": "object",
+              "description": "保密模式设置;;**注意**：仅企业旗舰版支持设置保密模式。保密模式的适用版本与功能介绍，参见[会话保密模式](https://www.feishu.cn/hc/zh-CN/articles/418691056559)。",
+              "required": false
+            },
+            "leave_message_visibility": {
+              "required": false,
+              "example": "all_members",
+              "type": "string",
+              "description": "出群消息可见性;;**可选值有**：;- `only_owner`：仅群主和管理员可见;- `all_members`：所有成员可见;- `not_anyone`：任何人均不可见"
+            },
+            "chat_type": {
+              "required": false,
+              "example": "private",
+              "type": "string",
+              "description": "群类型;;**可选值有**：;- `private`：私有群;- `public`：公开群"
+            },
+            "chat_id": {
+              "example": "oc_a0553eda9014c201e6969b478895c230",
+              "annotations": [
+                "open:open_x_id"
+              ],
+              "type": "string",
+              "description": "群 ID。建议保存该 ID，后续[向群发送消息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create)、[更新群信息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/update)以及[将用户或机器人拉入群聊](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat-members/create)等群组相关的操作均需使用该 ID。",
+              "required": false
+            },
+            "share_card_permission": {
+              "description": "群分享权限;;**可选值有**：;- `allowed`：允许;- `not_allowed`：不允许",
+              "required": false,
+              "example": "allowed",
+              "type": "string"
+            },
+            "avatar": {
+              "description": "群头像 URL",
+              "required": false,
+              "example": "https://p3-lark-file.byteimg.com/img/lark-avatar-staging/default-avatar_44ae0ca3-e140-494b-956f-78091e348435~100x100.jpg",
+              "type": "string"
+            },
+            "membership_approval": {
+              "type": "string",
+              "description": "加群审批;;**可选值有**：;- `no_approval_required`：无需审批;- `approval_required`：需要审批",
+              "required": false,
+              "example": "no_approval_required"
+            },
+            "name": {
+              "type": "string",
+              "description": "群名称",
+              "required": false,
+              "example": "测试群名称"
+            },
+            "add_member_permission": {
+              "description": "谁可以邀请用户或机器人入群;;**可选值有**：;- `only_owner`：仅群主和管理员;- `all_members`：所有成员",
+              "required": false,
+              "example": "all members",
+              "type": "string"
+            }
+          },
+          "scopes": [
+            "im:chat",
+            "im:chat:create",
+            "im:chat:create_by_user"
+          ],
+          "accessTokens": [
+            "tenant"
+          ],
+          "id": "chats.create",
+          "description": "创建群。Identity: `bot` only (`tenant_access_token`).",
+          "parameters": {
+            "set_bot_manager": {
+              "location": "query",
+              "required": false,
+              "description": "如果在请求体的 ==owner_id== 字段指定了某个用户为群主，可以选择是否同时设置创建此群的机器人为管理员，此标志位用于标记是否设置创建群的机器人为管理员。",
+              "default": "false",
+              "example": "false",
+              "type": "boolean"
+            },
+            "uuid": {
+              "example": "b13g2t38-1jd2-458b-8djf-dtbca5104204",
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "由开发者生成的唯一字符串序列，用于创建群组请求去重；持有相同 uuid + owner_id（若有） 的请求 10 小时内只可成功创建 1 个群聊。不传值表示不进行请求去重，每一次请求成功后都会创建一个群聊。",
+              "default": ""
+            },
+            "user_id_type": {
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "以user_id来识别用户"
+                },
+                {
+                  "description": "以union_id来识别用户",
+                  "value": "union_id"
+                },
+                {
+                  "value": "open_id",
+                  "description": "以open_id来识别用户"
+                }
+              ],
+              "enumName": "CreateChatUserIDType",
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "此次调用中使用的用户ID的类型",
+              "default": "open_id",
+              "example": "open_id"
+            }
+          },
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/create",
+          "httpMethod": "POST",
+          "requestBody": {
+            "urgent_setting": {
+              "options": [
+                {
+                  "description": "仅群主和管理员",
+                  "value": "only_owner"
+                },
+                {
+                  "value": "all_members",
+                  "description": "所有成员"
+                }
+              ],
+              "enum": [
+                "only_owner",
+                "all_members"
+              ],
+              "enumName": "urgent_setting_type",
+              "type": "string",
+              "description": "谁可以加急;;**默认值**：all_members",
+              "required": false,
+              "example": "all_members"
+            },
+            "chat_type": {
+              "required": false,
+              "example": "private",
+              "type": "string",
+              "description": "群类型;;**可选值有**：;- `private`：私有群;- `public`：公开群"
+            },
+            "video_conference_setting": {
+              "enum": [
+                "only_owner",
+                "all_members"
+              ],
+              "enumName": "video_conference_setting_type",
+              "type": "string",
+              "description": "谁可以发起视频会议;;**默认值**：all_members",
+              "required": false,
+              "example": "all_members",
+              "options": [
+                {
+                  "value": "only_owner",
+                  "description": "仅群主和管理员"
+                },
+                {
+                  "value": "all_members",
+                  "description": "所有成员"
+                }
+              ]
+            },
+            "edit_permission": {
+              "type": "string",
+              "description": "谁可以编辑群信息;;**默认值**：all_members",
+              "required": false,
+              "example": "all_members",
+              "options": [
+                {
+                  "description": "仅群主和管理员",
+                  "value": "only_owner"
+                },
+                {
+                  "description": "所有成员",
+                  "value": "all_members"
+                }
+              ],
+              "enum": [
+                "only_owner",
+                "all_members"
+              ],
+              "enumName": "edit_permissiontype"
+            },
+            "description": {
+              "example": "测试群描述",
+              "type": "string",
+              "description": "群描述，建议不超过 100 字符;;**默认值**：空",
+              "required": false
+            },
+            "chat_tags": {
+              "type": "array",
+              "description": "群标签",
+              "required": false
+            },
+            "bot_id_list": {
+              "required": false,
+              "type": "array",
+              "description": "创建群时邀请的群机器人，不填则不邀请机器人。可参考[如何获取应用的 App ID？](https://open.feishu.cn/document/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-app-id)来获取应用的 App ID; ;**注意：**;- 操作此接口的机器人会自动入群，无需重复填写;- 拉机器人入群请使用 `app_id`;- 最多同时邀请 5 个机器人，且邀请后群组中机器人数量不能超过 15 个"
+            },
+            "chat_mode": {
+              "example": "group",
+              "type": "string",
+              "description": "群模式;;**可选值有**：;- `group`：群组",
+              "required": false
+            },
+            "pin_manage_setting": {
+              "enum": [
+                "only_owner",
+                "all_members"
+              ],
+              "enumName": "pin_manage_setting_type",
+              "type": "string",
+              "description": "谁可以管理置顶",
+              "required": false,
+              "example": "all_members",
+              "options": [
+                {
+                  "description": "仅群主和管理员",
+                  "value": "only_owner"
+                },
+                {
+                  "value": "all_members",
+                  "description": "所有成员"
+                }
+              ]
+            },
+            "avatar": {
+              "required": false,
+              "example": "default-avatar_44ae0ca3-e140-494b-956f-78091e348435",
+              "type": "string",
+              "description": "群头像对应的 Image Key;;- 可通过[上传图片](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/image/create)获取（注意：上传图片的 ==image_type== 需要指定为 ==avatar==）;- 不传值则使用系统默认头像"
+            },
+            "user_id_list": {
+              "type": "array",
+              "description": "创建群时邀请的群成员，不填则不邀请成员。ID 类型在查询参数 ==user_id_type== 中指定；推荐使用 OpenID，获取方式可参考文档[如何获取 Open ID？](https://open.feishu.cn/document/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-openid);;**注意**：;- 最多同时邀请 50 个用户;- 为便于在客户端查看效果，建议调试接口时加入开发者自身 ID;- 如果需要邀请外部用户，则外部用户必须和群主已成为飞书好友;- 如何获取外部用户的 open_id，参考[获取外部用户的 open_id](https://open.feishu.cn/document/uAjLw4CM/ukzMukzMukzM/develop-robots/add-bot-to-external-group#c38b1d97)",
+              "required": false,
+              "annotations": [
+                "open:x_user_id"
+              ]
+            },
+            "toolkit_ids": {
+              "type": "array",
+              "description": "群快捷组件列表",
+              "required": false
+            },
+            "leave_message_visibility": {
+              "type": "string",
+              "description": "成员退群提示消息的可见性;;**可选值有**：;- `only_owner`：仅群主和管理员可见;- `all_members`：所有成员可见;- `not_anyone`：任何人均不可见",
+              "required": false,
+              "example": "all_members"
+            },
+            "restricted_mode_setting": {
+              "properties": {
+                "status": {
+                  "description": "保密模式是否开启;;**可选值有**：;;- true：开启。设置为 ture 时，`screenshot_has_permission_setting`、`download_has_permission_setting`、`message_has_permission_setting` 不能全为 `all_members`。;- false：不开启。设置为 false 时，`screenshot_has_permission_setting`、`download_has_permission_setting`、`message_has_permission_setting` 不能存在 `not_anyone`。;;;**默认值**：false",
+                  "required": false,
+                  "example": "false",
+                  "type": "boolean"
+                },
+                "screenshot_has_permission_setting": {
+                  "enumName": "screenshot_has_permission_setting",
+                  "type": "string",
+                  "description": "允许截屏录屏;;**默认值**：all_members",
+                  "required": false,
+                  "example": "all_members",
+                  "options": [
+                    {
+                      "description": "所有成员允许截屏录屏",
+                      "value": "all_members"
+                    },
+                    {
+                      "value": "not_anyone",
+                      "description": "所有成员禁止截屏录屏"
+                    }
+                  ],
+                  "enum": [
+                    "all_members",
+                    "not_anyone"
+                  ]
+                },
+                "download_has_permission_setting": {
+                  "example": "all_members",
+                  "options": [
+                    {
+                      "description": "所有成员允许下载资源",
+                      "value": "all_members"
+                    },
+                    {
+                      "value": "not_anyone",
+                      "description": "所有成员禁止下载资源"
+                    }
+                  ],
+                  "enum": [
+                    "all_members",
+                    "not_anyone"
+                  ],
+                  "enumName": "download_has_permission_setting",
+                  "type": "string",
+                  "description": "允许下载消息中图片、视频和文件;;**默认值**：all_members",
+                  "required": false
+                },
+                "message_has_permission_setting": {
+                  "type": "string",
+                  "description": "允许复制和转发消息;;**默认值**：all_members",
+                  "required": false,
+                  "example": "all_members",
+                  "options": [
+                    {
+                      "value": "all_members",
+                      "description": "所有成员允许复制和转发消息"
+                    },
+                    {
+                      "description": "所有成员禁止复制和转发消息",
+                      "value": "not_anyone"
+                    }
+                  ],
+                  "enum": [
+                    "all_members",
+                    "not_anyone"
+                  ],
+                  "enumName": "message_has_permission_setting"
+                }
+              },
+              "type": "object",
+              "description": "保密模式设置;;**注意**：保密模式适用于企业旗舰版。适用版本与功能介绍参见[会话保密模式](https://www.feishu.cn/hc/zh-CN/articles/418691056559)。",
+              "required": false,
+              "ref": "restricted_mode_setting"
+            },
+            "i18n_names": {
+              "type": "object",
+              "description": "群国际化名称",
+              "required": false,
+              "ref": "i18n_names",
+              "properties": {
+                "ja_jp": {
+                  "required": false,
+                  "example": "グループチャット",
+                  "type": "string",
+                  "description": "日文名"
+                },
+                "zh_cn": {
+                  "type": "string",
+                  "description": "中文名",
+                  "required": false,
+                  "example": "群聊"
+                },
+                "en_us": {
+                  "type": "string",
+                  "description": "英文名",
+                  "required": false,
+                  "example": "group chat"
+                }
+              }
+            },
+            "external": {
+              "required": false,
+              "example": "false",
+              "type": "boolean",
+              "description": "是否是外部群"
+            },
+            "hide_member_count_setting": {
+              "example": "all_members",
+              "options": [
+                {
+                  "value": "all_members",
+                  "description": "所有群成员可见"
+                },
+                {
+                  "description": "仅群主群管理员可见",
+                  "value": "only_owner"
+                }
+              ],
+              "enum": [
+                "all_members",
+                "only_owner"
+              ],
+              "enumName": "hide_member_count_setting_type",
+              "type": "string",
+              "description": "隐藏群成员人数设置;;**默认值**：all_members",
+              "required": false
+            },
+            "membership_approval": {
+              "example": "no_approval_required",
+              "type": "string",
+              "description": "加群是否需要审批;;**可选值有**：;- `no_approval_required`：无需审批;- `approval_required`：需要审批",
+              "required": false
+            },
+            "join_message_visibility": {
+              "type": "string",
+              "description": "成员入群提示消息的可见性;;**可选值有**：;- `only_owner`：仅群主和管理员可见;- `all_members`：所有成员可见;- `not_anyone`：任何人均不可见",
+              "required": false,
+              "example": "all_members"
+            },
+            "name": {
+              "type": "string",
+              "description": "群名称;; **注意：** ;- 建议群名称不超过 60 字符;- 公开群名称的长度不得少于 2 个字符;- 私有群若未填写群名称，群名称默认设置为 `(无主题)`",
+              "required": false,
+              "example": "测试群名称"
+            },
+            "group_message_type": {
+              "required": false,
+              "example": "chat",
+              "options": [
+                {
+                  "value": "chat",
+                  "description": "对话消息"
+                },
+                {
+                  "value": "thread",
+                  "description": "话题消息"
+                }
+              ],
+              "enum": [
+                "chat",
+                "thread"
+              ],
+              "enumName": "CreateChatGroupMessageType",
+              "type": "string",
+              "description": "群消息形式"
+            },
+            "owner_id": {
+              "type": "string",
+              "description": "创建群时指定的群主，不填时指定建群的机器人为群主。群主 ID 类型在查询参数 ==user_id_type== 中指定；推荐使用 OpenID，获取方式可参考文档[如何获取 Open ID？](https://open.feishu.cn/document/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-openid);;**注意**：开启对外共享能力的机器人在创建外部群时，机器人不能为群主，必须指定某一用户作为群主。此外，添加外部用户进群时，外部用户必须和群主已成为飞书好友。",
+              "required": false,
+              "example": "ou_7d8a6e6df7621556ce0d21922b676706ccs"
+            },
+            "labels": {
+              "type": "array",
+              "description": "群标签",
+              "required": false
+            }
+          },
+          "danger": true
+        },
+        "get": {
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/get",
+          "httpMethod": "GET",
+          "parameterOrder": [
+            "chat_id"
+          ],
+          "id": "chats.get",
+          "path": "chats/{chat_id}",
+          "scopes": [
+            "im:chat:readonly",
+            "im:chat",
+            "im:chat:read"
+          ],
+          "parameters": {
+            "chat_id": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "群 ID。获取方式：;;- [创建群](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/create)，从返回结果中获取该群的 chat_id。;- 调用[获取用户或机器人所在的群列表](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/list)接口，可以查询用户或机器人所在群的 chat_id。;- 调用[搜索对用户或机器人可见的群列表](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/search)，可搜索用户或机器人所在的群、对用户或机器人公开的群的 chat_id。",
+              "example": "oc_a0553eda9014c201e6969b478895c230"
+            },
+            "user_id_type": {
+              "description": "此次调用中使用的用户ID的类型",
+              "default": "",
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "以user_id来识别用户"
+                },
+                {
+                  "description": "以union_id来识别用户",
+                  "value": "union_id"
+                },
+                {
+                  "value": "open_id",
+                  "description": "以open_id来识别用户"
+                }
+              ],
+              "enumName": "GetChatUserIDType",
+              "type": "string",
+              "location": "query",
+              "required": false
+            }
+          },
+          "responseBody": {
+            "group_message_type": {
+              "type": "string",
+              "description": "群消息模式;;**可选值有**：;- `chat`：会话消息;- ` thread`：话题消息;;**注意**：仅普通对话群组返回该字段，话题群和单聊不返回值。",
+              "required": false,
+              "example": "chat"
+            },
+            "urgent_setting": {
+              "enumName": "urgent_setting_type",
+              "type": "string",
+              "description": "谁可以加急",
+              "required": false,
+              "example": "all_members",
+              "options": [
+                {
+                  "value": "only_owner",
+                  "description": "仅群主和管理员"
+                },
+                {
+                  "value": "all_members",
+                  "description": "所有成员"
+                }
+              ],
+              "enum": [
+                "only_owner",
+                "all_members"
+              ]
+            },
+            "avatar": {
+              "required": false,
+              "example": "https://p3-lark-file.byteimg.com/img/lark-avatar-staging/default-avatar_44ae0ca3-e140-494b-956f-78091e348435~100x100.jpg",
+              "type": "string",
+              "description": "群头像 URL"
+            },
+            "user_count": {
+              "required": false,
+              "example": "1",
+              "type": "string",
+              "description": "群内用户的数量"
+            },
+            "i18n_names": {
+              "type": "object",
+              "description": "群国际化名称",
+              "required": false,
+              "ref": "i18n_names",
+              "properties": {
+                "en_us": {
+                  "description": "英文名",
+                  "required": false,
+                  "example": "group chat",
+                  "type": "string"
+                },
+                "ja_jp": {
+                  "required": false,
+                  "example": "グループチャット",
+                  "type": "string",
+                  "description": "日文名"
+                },
+                "zh_cn": {
+                  "type": "string",
+                  "description": "中文名",
+                  "required": false,
+                  "example": "群聊"
+                }
+              }
+            },
+            "tenant_key": {
+              "type": "string",
+              "description": "租户 Key，为租户在飞书上的唯一标识，用来换取对应的tenant_access_token，也可以用作租户在应用中的唯一标识。",
+              "required": false,
+              "example": "736588c9260f175e",
+              "annotations": [
+                "open:tenant_id"
+              ]
+            },
+            "toolkit_ids": {
+              "type": "array",
+              "description": "群快捷组件列表",
+              "required": false
+            },
+            "bot_count": {
+              "example": "3",
+              "type": "string",
+              "description": "群内机器人的数量",
+              "required": false
+            },
+            "video_conference_setting": {
+              "example": "all_members",
+              "options": [
+                {
+                  "value": "only_owner",
+                  "description": "仅群主和管理员"
+                },
+                {
+                  "value": "all_members",
+                  "description": "所有成员"
+                }
+              ],
+              "enum": [
+                "only_owner",
+                "all_members"
+              ],
+              "enumName": "video_conference_setting_type",
+              "type": "string",
+              "description": "谁可以发起视频会议",
+              "required": false
+            },
+            "chat_type": {
+              "example": "private",
+              "type": "string",
+              "description": "群类型;;**可选值有**：;- `private`：私有群;- `public`：公开群;;**注意**：单聊不返回该字段",
+              "required": false
+            },
+            "pin_manage_setting": {
+              "options": [
+                {
+                  "value": "only_owner",
+                  "description": "仅群主和管理员"
+                },
+                {
+                  "value": "all_members",
+                  "description": "所有成员"
+                }
+              ],
+              "enum": [
+                "only_owner",
+                "all_members"
+              ],
+              "enumName": "pin_manage_setting_type",
+              "type": "string",
+              "description": "谁可以管理置顶",
+              "required": false,
+              "example": "all_members"
+            },
+            "labels": {
+              "description": "群标签",
+              "required": false,
+              "type": "array"
+            },
+            "join_message_visibility": {
+              "description": "入群提示消息的可见性;;**可选值有**：;- `only_owner`：仅群主和管理员可见;- `all_members`：所有成员可见;- `not_anyone`：任何人均不可见;;**注意**：单聊不返回该字段",
+              "required": false,
+              "example": "only_owner",
+              "type": "string"
+            },
+            "bot_manager_id_list": {
+              "type": "array",
+              "description": "机器人管理员 ID 列表，ID 类型为应用的 App ID。",
+              "required": false
+            },
+            "hide_member_count_setting": {
+              "description": "隐藏群成员人数设置",
+              "required": false,
+              "example": "all_members",
+              "options": [
+                {
+                  "value": "all_members",
+                  "description": "所有群成员可见"
+                },
+                {
+                  "value": "only_owner",
+                  "description": "仅群主群管理员可见"
+                }
+              ],
+              "enum": [
+                "all_members",
+                "only_owner"
+              ],
+              "enumName": "hide_member_count_setting_type",
+              "type": "string"
+            },
+            "user_manager_id_list": {
+              "type": "array",
+              "description": "用户管理员 ID 列表，ID 类型与查询参数 user_id_type 一致。",
+              "required": false,
+              "annotations": [
+                "open:x_user_id"
+              ]
+            },
+            "moderation_permission": {
+              "example": "all_members",
+              "type": "string",
+              "description": "群发言权限;;**可选值有**：;- `only_owner`：仅群主和管理员;- `all_members`：所有成员;- `moderator_list`：指定群成员",
+              "required": false
+            },
+            "owner_id": {
+              "required": false,
+              "example": "4d7a3c6g",
+              "type": "string",
+              "description": "群主的用户 ID，ID 类型与查询参数中的 user_id_type 对应。;;**注意**：;- 当群主是机器人时不返回该字段;- 单聊不返回该字段"
+            },
+            "chat_tag": {
+              "example": "inner",
+              "type": "string",
+              "description": "群标签。如有多个，则按照下列顺序返回第一个标签。;;**可选值有**：;- `inner`：内部群;- `tenant`：公司群;- `department`：部门群;- `edu`：教育群;- `meeting`：会议群;- `customer_service`：客服群;;**注意**：单聊不返回该字段",
+              "required": false
+            },
+            "edit_permission": {
+              "type": "string",
+              "description": "谁可以编辑群;;**可选值有**：;- `only_owner`：仅群主和管理员;- `all_members`：所有成员",
+              "required": false,
+              "example": "all_members"
+            },
+            "at_all_permission": {
+              "type": "string",
+              "description": "谁可以 at 所有人;;**可选值有**：;- `only_owner`：仅群主和管理员;- `all_members`：所有成员;;**注意**：单聊不返回该字段",
+              "required": false,
+              "example": "all_members"
+            },
+            "external": {
+              "example": "false",
+              "type": "boolean",
+              "description": "是否是外部群",
+              "required": false
+            },
+            "membership_approval": {
+              "example": "no_approval_required",
+              "type": "string",
+              "description": "加群是否需要审批;;**可选值有**：;- `no_approval_required`：无需审批;- `approval_required`：需要审批;;**注意**：单聊不返回该字段",
+              "required": false
+            },
+            "share_card_permission": {
+              "required": false,
+              "example": "allowed",
+              "type": "string",
+              "description": "是否允许分享群;;**可选值有**：;- `allowed`：允许;- `not_allowed`：不允许;;**注意**：单聊不返回该字段"
+            },
+            "description": {
+              "type": "string",
+              "description": "群描述",
+              "required": false,
+              "example": "测试群描述"
+            },
+            "name": {
+              "example": "测试群名称",
+              "type": "string",
+              "description": "群名称。没有设置群名称时，不会返回该参数。",
+              "required": false
+            },
+            "add_member_permission": {
+              "description": "谁可以添加群成员，群成员包括用户或机器人;;**可选值有**：;- `only_owner`：仅群主和管理员;- `all_members`：所有成员;;**注意**：单聊不返回该字段",
+              "required": false,
+              "example": "all_members",
+              "type": "string"
+            },
+            "chat_status": {
+              "enumName": "chat_status_type",
+              "type": "string",
+              "description": "群状态",
+              "required": false,
+              "example": "normal",
+              "options": [
+                {
+                  "value": "normal",
+                  "description": "正常"
+                },
+                {
+                  "description": "解散",
+                  "value": "dissolved"
+                },
+                {
+                  "description": "解散并保留",
+                  "value": "dissolved_save"
+                }
+              ],
+              "enum": [
+                "normal",
+                "dissolved",
+                "dissolved_save"
+              ]
+            },
+            "chat_mode": {
+              "type": "string",
+              "description": "群模式;;**可选值有**：;- `group`：群组;- `topic`: 话题;- `p2p`: 单聊",
+              "required": false,
+              "example": "group"
+            },
+            "restricted_mode_setting": {
+              "properties": {
+                "download_has_permission_setting": {
+                  "required": false,
+                  "example": "all_members",
+                  "options": [
+                    {
+                      "value": "all_members",
+                      "description": "所有成员允许下载资源"
+                    },
+                    {
+                      "value": "not_anyone",
+                      "description": "所有成员禁止下载资源"
+                    }
+                  ],
+                  "enum": [
+                    "all_members",
+                    "not_anyone"
+                  ],
+                  "enumName": "download_has_permission_setting",
+                  "type": "string",
+                  "description": "允许下载消息中图片、视频和文件"
+                },
+                "message_has_permission_setting": {
+                  "enum": [
+                    "all_members",
+                    "not_anyone"
+                  ],
+                  "enumName": "message_has_permission_setting",
+                  "type": "string",
+                  "description": "允许复制和转发消息",
+                  "required": false,
+                  "example": "all_members",
+                  "options": [
+                    {
+                      "value": "all_members",
+                      "description": "所有成员允许复制和转发消息"
+                    },
+                    {
+                      "value": "not_anyone",
+                      "description": "所有成员禁止复制和转发消息"
+                    }
+                  ]
+                },
+                "status": {
+                  "type": "boolean",
+                  "description": "保密模式是否开启",
+                  "required": false,
+                  "example": "false"
+                },
+                "screenshot_has_permission_setting": {
+                  "enumName": "screenshot_has_permission_setting",
+                  "type": "string",
+                  "description": "允许截屏录屏",
+                  "required": false,
+                  "example": "all_members",
+                  "options": [
+                    {
+                      "value": "all_members",
+                      "description": "所有成员允许截屏录屏"
+                    },
+                    {
+                      "value": "not_anyone",
+                      "description": "所有成员禁止截屏录屏"
+                    }
+                  ],
+                  "enum": [
+                    "all_members",
+                    "not_anyone"
+                  ]
+                }
+              },
+              "type": "object",
+              "description": "保密模式设置",
+              "required": false,
+              "ref": "restricted_mode_setting"
+            },
+            "owner_id_type": {
+              "description": "群主的用户 ID 类型，与查询参数中的 user_id_type 相同。取值为 `open_id`、`user_id`、`union_id` 其中之一，不同 ID 的说明参见 [用户相关的 ID 概念](https://open.feishu.cn/document/home/user-identity-introduction/introduction)。;;**注意**：;- 当群主是机器人时不返回该字段;- 单聊不返回该字段",
+              "required": false,
+              "example": "user_id",
+              "type": "string"
+            },
+            "leave_message_visibility": {
+              "example": "only_owner",
+              "type": "string",
+              "description": "出群提示消息的可见性;;**可选值有**：;- `only_owner`：仅群主和管理员可见;- `all_members`：所有成员可见;- `not_anyone`：任何人均不可见;;**注意**：单聊不返回该字段",
+              "required": false
+            }
+          },
+          "description": "获取群信息。Identity: supports `user` and `bot`; the caller must be in the target chat to get full details, and must belong to the same tenant for internal chats.",
+          "accessTokens": [
+            "user",
+            "tenant"
+          ]
+        },
+        "link": {
+          "parameterOrder": [
+            "chat_id"
+          ],
+          "path": "chats/{chat_id}/link",
+          "httpMethod": "POST",
+          "id": "chats.link",
+          "description": "获取群分享链接。Identity: supports `user` and `bot`; the caller must be in the target chat, must be an owner or admin when chat sharing is restricted to owners/admins, and must belong to the same tenant for internal chats.",
+          "requestBody": {
+            "validity_period": {
+              "example": "week",
+              "options": [
+                {
+                  "value": "week",
+                  "description": "有效期 7 天"
+                },
+                {
+                  "value": "year",
+                  "description": "有效期 1 年"
+                },
+                {
+                  "value": "permanently",
+                  "description": "永久有效"
+                }
+              ],
+              "enum": [
+                "week",
+                "year",
+                "permanently"
+              ],
+              "enumName": "validity_period",
+              "type": "string",
+              "description": "群分享链接有效时长",
+              "required": false
+            }
+          },
+          "scopes": [
+            "im:chat:readonly",
+            "im:chat",
+            "im:chat:read"
+          ],
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/link",
+          "parameters": {
+            "chat_id": {
+              "description": "群 ID。获取方式：;;- [创建群](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/create)，从返回结果中获取该群的 chat_id。;- 调用[获取用户或机器人所在的群列表](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/list)接口，可以查询用户或机器人所在群的 chat_id。;- 调用[搜索对用户或机器人可见的群列表](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/search)，可搜索用户或机器人所在的群、对用户或机器人公开的群的 chat_id。;;**注意**：单聊、密聊、团队群不支持分享群链接",
+              "example": "oc_a0553eda9014c201e6969b478895c230",
+              "type": "string",
+              "location": "path",
+              "required": true
+            }
+          },
+          "responseBody": {
+            "share_link": {
+              "required": false,
+              "example": "https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=3nf8789-4rfx-427d-a6bf-ed1d2df348aabd",
+              "type": "string",
+              "description": "群分享链接"
+            },
+            "expire_time": {
+              "required": false,
+              "example": "1609296809",
+              "type": "string",
+              "description": "分享链接的过期时间，秒级时间戳"
+            },
+            "is_permanent": {
+              "required": false,
+              "example": "false",
+              "type": "boolean",
+              "description": "分享链接是否永久有效"
+            }
+          },
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "danger": true
+        },
+        "list": {
+          "parameters": {
+            "user_id_type": {
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "以user_id来识别用户"
+                },
+                {
+                  "description": "以union_id来识别用户",
+                  "value": "union_id"
+                },
+                {
+                  "value": "open_id",
+                  "description": "以open_id来识别用户"
+                }
+              ],
+              "enumName": "ListChatUserIDType",
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "此次调用中使用的用户ID的类型",
+              "default": ""
+            },
+            "sort_type": {
+              "enumName": "ListChatSortType",
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "群组排序方式",
+              "default": "ByCreateTimeAsc",
+              "example": "ByCreateTimeAsc",
+              "options": [
+                {
+                  "value": "ByCreateTimeAsc",
+                  "description": "按群组创建时间升序排列"
+                },
+                {
+                  "value": "ByActiveTimeDesc",
+                  "description": "按群组活跃时间降序排列。因群组活跃时间变动频繁，使用 `ByActiveTimeDesc` 排序方式可能会造成群组遗漏。例如，设置分页大小为 10，发起第一次请求获取到第一页数据后，原本排在第 11 位的群组中有群成员发送了一条消息，那么该群组将被排列到第 1 位，此时发起请求获取第二页数据时，该群组将不能被获取到，需要再从第一页开始获取。"
+                }
+              ]
+            },
+            "page_token": {
+              "example": "dmJCRHhpd3JRbGV1VEVNRFFyTitRWDY5ZFkybmYrMEUwMUFYT0VMMWdENEtuYUhsNUxGMDIwemtvdE5ORjBNQQ==",
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "分页标记，第一次请求不填，表示从头开始遍历；分页查询结果还有更多项时会同时返回新的 page_token，下次遍历可采用该page_token 获取查询结果",
+              "default": ""
+            },
+            "page_size": {
+              "example": "10",
+              "type": "integer",
+              "location": "query",
+              "required": false,
+              "description": "分页大小，用来限制一次请求返回的数据条目数。",
+              "default": "20"
+            }
+          },
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "id": "chats.list",
+          "description": "获取用户或机器人所在的群列表。Identity: supports `user` and `bot`.",
+          "path": "chats",
+          "httpMethod": "GET",
+          "responseBody": {
+            "page_token": {
+              "example": "dmJCRHhpd3JRbGV1VEVNRFFyTitRWDY5ZFkybmYrMEUwMUFYT0VMMWdENEtuYUhsNUxGMDIwemtvdE5ORjBNQQ==",
+              "type": "string",
+              "description": "分页标记，当 has_more 为 true 时，会同时返回新的 page_token，否则不返回 page_token",
+              "required": false
+            },
+            "has_more": {
+              "type": "boolean",
+              "description": "是否还有更多项",
+              "required": false,
+              "example": "false"
+            },
+            "items": {
+              "required": false,
+              "properties": {
+                "external": {
+                  "type": "boolean",
+                  "description": "是否是外部群",
+                  "required": false,
+                  "example": "false"
+                },
+                "tenant_key": {
+                  "example": "736588c9260f175e",
+                  "annotations": [
+                    "open:tenant_id"
+                  ],
+                  "type": "string",
+                  "description": "租户 Key，为租户在飞书上的唯一标识，用来换取对应的tenant_access_token，也可以用作租户在应用中的唯一标识。",
+                  "required": false
+                },
+                "name": {
+                  "type": "string",
+                  "description": "群名称",
+                  "required": false,
+                  "example": "测试群名称"
+                },
+                "description": {
+                  "example": "测试群描述",
+                  "type": "string",
+                  "description": "群描述",
+                  "required": false
+                },
+                "avatar": {
+                  "type": "string",
+                  "description": "群头像 URL",
+                  "required": false,
+                  "example": "https://p3-lark-file.byteimg.com/img/lark-avatar-staging/default-avatar_44ae0ca3-e140-494b-956f-78091e348435~100x100.jpg"
+                },
+                "owner_id": {
+                  "description": "群主的用户 ID，ID 类型与 owner_id_type 相对应。;;**注意**：群主为机器人时无返回值。",
+                  "required": false,
+                  "example": "4d7a3c6g",
+                  "type": "string"
+                },
+                "owner_id_type": {
+                  "required": false,
+                  "example": "user_id",
+                  "type": "string",
+                  "description": "群主的用户 ID 类型，类型分为 user_id、open_id、union_id。各类型 ID 介绍参考[用户身份概述](https://open.feishu.cn/document/home/user-identity-introduction/introduction)。;;**注意**：群主为机器人时无返回值。"
+                },
+                "chat_id": {
+                  "description": "群组 ID，调用[获取群信息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/get)接口，根据群组 ID 可获取群详细信息。",
+                  "required": false,
+                  "example": "oc_a0553eda9014c201e6969b478895c230",
+                  "annotations": [
+                    "open:open_x_id"
+                  ],
+                  "type": "string"
+                },
+                "labels": {
+                  "required": false,
+                  "type": "array",
+                  "description": "群标签"
+                },
+                "chat_status": {
+                  "options": [
+                    {
+                      "value": "normal",
+                      "description": "正常"
+                    },
+                    {
+                      "value": "dissolved",
+                      "description": "解散"
+                    },
+                    {
+                      "value": "dissolved_save",
+                      "description": "解散并保留"
+                    }
+                  ],
+                  "enum": [
+                    "normal",
+                    "dissolved",
+                    "dissolved_save"
+                  ],
+                  "enumName": "chat_status_type",
+                  "type": "string",
+                  "description": "群状态",
+                  "required": false,
+                  "example": "normal"
+                }
+              },
+              "type": "array",
+              "description": "群组列表"
+            }
+          },
+          "scopes": [
+            "im:chat:readonly",
+            "im:chat",
+            "im:chat.group_info:readonly",
+            "im:chat:read"
+          ],
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/list"
+        },
+        "update": {
+          "parameterOrder": [
+            "chat_id"
+          ],
+          "requestBody": {
+            "at_all_permission": {
+              "type": "string",
+              "description": "谁可以 at 所有人;;**可选值有**：;- `only_owner`：仅群主和管理员;- `all_members`：所有成员",
+              "required": false,
+              "example": "all_members"
+            },
+            "video_conference_setting": {
+              "options": [
+                {
+                  "value": "only_owner",
+                  "description": "仅群主和管理员"
+                },
+                {
+                  "description": "所有成员",
+                  "value": "all_members"
+                }
+              ],
+              "enum": [
+                "only_owner",
+                "all_members"
+              ],
+              "enumName": "video_conference_setting_type",
+              "type": "string",
+              "description": "谁可以发起视频会议",
+              "required": false,
+              "example": "all_members"
+            },
+            "group_message_type": {
+              "description": "群消息形式",
+              "required": false,
+              "example": "chat",
+              "options": [
+                {
+                  "value": "chat",
+                  "description": "对话消息"
+                },
+                {
+                  "description": "话题消息",
+                  "value": "thread"
+                }
+              ],
+              "enum": [
+                "chat",
+                "thread"
+              ],
+              "enumName": "UpdateChatGroupMessageType",
+              "type": "string"
+            },
+            "urgent_setting": {
+              "enum": [
+                "only_owner",
+                "all_members"
+              ],
+              "enumName": "urgent_setting_type",
+              "type": "string",
+              "description": "谁可以加急",
+              "required": false,
+              "example": "all_members",
+              "options": [
+                {
+                  "description": "仅群主和管理员",
+                  "value": "only_owner"
+                },
+                {
+                  "value": "all_members",
+                  "description": "所有成员"
+                }
+              ]
+            },
+            "join_message_visibility": {
+              "required": false,
+              "example": "only_owner",
+              "type": "string",
+              "description": "成员入群提示消息的可见性;;**可选值有**：;- `only_owner`：仅群主和管理员可见;- `all_members`：所有成员可见;- `not_anyone`：任何人均不可见"
+            },
+            "leave_message_visibility": {
+              "type": "string",
+              "description": "成员退群提示消息的可见性;;**可选值有**：;- `only_owner`：仅群主和管理员可见;- `all_members`：所有成员可见;- `not_anyone`：任何人均不可见",
+              "required": false,
+              "example": "only_owner"
+            },
+            "labels": {
+              "type": "array",
+              "description": "群标签",
+              "required": false
+            },
+            "name": {
+              "description": "群名称;;**注意：** ;- 建议群名称不超过 60 字符;- 公开群名称的长度不得少于 2 个字符",
+              "required": false,
+              "example": "群聊",
+              "type": "string"
+            },
+            "restricted_mode_setting": {
+              "properties": {
+                "status": {
+                  "required": false,
+                  "example": "false",
+                  "type": "boolean",
+                  "description": "保密模式是否开启;;**可选值有**：;;- true：开启。设置为 ture 时，`screenshot_has_permission_setting`、`download_has_permission_setting`、`message_has_permission_setting` 不能全为 `all_members`。;- false：不开启。设置为 false 时，`screenshot_has_permission_setting`、`download_has_permission_setting`、`message_has_permission_setting` 不能存在 `not_anyone`。"
+                },
+                "screenshot_has_permission_setting": {
+                  "required": false,
+                  "example": "all_members",
+                  "options": [
+                    {
+                      "value": "all_members",
+                      "description": "所有成员允许截屏录屏"
+                    },
+                    {
+                      "value": "not_anyone",
+                      "description": "所有成员禁止截屏录屏"
+                    }
+                  ],
+                  "enum": [
+                    "all_members",
+                    "not_anyone"
+                  ],
+                  "enumName": "screenshot_has_permission_setting",
+                  "type": "string",
+                  "description": "允许截屏录屏"
+                },
+                "download_has_permission_setting": {
+                  "enumName": "download_has_permission_setting",
+                  "type": "string",
+                  "description": "允许下载消息中图片、视频和文件",
+                  "required": false,
+                  "example": "all_members",
+                  "options": [
+                    {
+                      "value": "all_members",
+                      "description": "所有成员允许下载资源"
+                    },
+                    {
+                      "value": "not_anyone",
+                      "description": "所有成员禁止下载资源"
+                    }
+                  ],
+                  "enum": [
+                    "all_members",
+                    "not_anyone"
+                  ]
+                },
+                "message_has_permission_setting": {
+                  "enum": [
+                    "all_members",
+                    "not_anyone"
+                  ],
+                  "enumName": "message_has_permission_setting",
+                  "type": "string",
+                  "description": "允许复制和转发消息",
+                  "required": false,
+                  "example": "all_members",
+                  "options": [
+                    {
+                      "value": "all_members",
+                      "description": "所有成员允许复制和转发消息"
+                    },
+                    {
+                      "description": "所有成员禁止复制和转发消息",
+                      "value": "not_anyone"
+                    }
+                  ]
+                }
+              },
+              "type": "object",
+              "description": "保密模式设置;;**注意**：保密模式适用于企业旗舰版。适用版本与功能介绍参见[会话保密模式](https://www.feishu.cn/hc/zh-CN/articles/418691056559)。",
+              "required": false,
+              "ref": "restricted_mode_setting"
+            },
+            "avatar": {
+              "description": "群头像对应的 Image Key，可通过[上传图片](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/image/create)获取（注意：上传图片的 ==image_type== 需要指定为 ==avatar==）",
+              "required": false,
+              "example": "default-avatar_44ae0ca3-e140-494b-956f-78091e348435",
+              "type": "string"
+            },
+            "add_member_permission": {
+              "type": "string",
+              "description": "谁可以添加群成员，群成员包括用户或机器人;;**可选值有**：;- `only_owner`：仅群主和管理员;- `all_members`：所有成员;;**注意**：`add_member_permission` 和 `share_card_permission` 两个参数必须同步配置。;;- 如果 `add_member_permission` 值为 `only_owner`，则 `share_card_permission` 只能设置为 `not_allowed`。;- 如果 `add_member_permission` 值为`all_members`，则 `share_card_permission` 只能设置为 `allowed`。;;",
+              "required": false,
+              "example": "all_members"
+            },
+            "chat_type": {
+              "type": "string",
+              "description": "群类型;;**可选值有**：;- `private`：私有群;- `public`：公开群",
+              "required": false,
+              "example": "private"
+            },
+            "owner_id": {
+              "description": "新群主的用户 ID，不转让群主时无需填写。ID 类型与查询参数 user_id_type 取值一致，ID 类型推荐使用 OpenID，获取方式可参考文档[如何获取 Open ID？](https://open.feishu.cn/document/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-obtain-openid)。",
+              "required": false,
+              "example": "4d7a3c6g",
+              "type": "string"
+            },
+            "membership_approval": {
+              "type": "string",
+              "description": "加群是否需要审批;;**可选值有**：;- `no_approval_required`：无需审批;- `approval_required`：需要审批",
+              "required": false,
+              "example": "no_approval_required"
+            },
+            "hide_member_count_setting": {
+              "enumName": "hide_member_count_setting_type",
+              "type": "string",
+              "description": "隐藏群成员人数设置",
+              "required": false,
+              "example": "all_members",
+              "options": [
+                {
+                  "value": "all_members",
+                  "description": "所有群成员可见"
+                },
+                {
+                  "description": "仅群主群管理员可见",
+                  "value": "only_owner"
+                }
+              ],
+              "enum": [
+                "all_members",
+                "only_owner"
+              ]
+            },
+            "description": {
+              "type": "string",
+              "description": "群描述，建议不超过 100 字符",
+              "required": false,
+              "example": "测试群描述"
+            },
+            "i18n_names": {
+              "type": "object",
+              "description": "群国际化名称",
+              "required": false,
+              "ref": "i18n_names",
+              "properties": {
+                "zh_cn": {
+                  "type": "string",
+                  "description": "中文名",
+                  "required": false,
+                  "example": "群聊"
+                },
+                "en_us": {
+                  "example": "group chat",
+                  "type": "string",
+                  "description": "英文名",
+                  "required": false
+                },
+                "ja_jp": {
+                  "type": "string",
+                  "description": "日文名",
+                  "required": false,
+                  "example": "グループチャット"
+                }
+              }
+            },
+            "share_card_permission": {
+              "type": "string",
+              "description": "是否允许分享群;;**可选值有**：;- `allowed`：允许;- `not_allowed`：不允许;;**注意**：`add_member_permission` 和 `share_card_permission` 两个参数必须同步配置。;;- 如果 `add_member_permission` 值为 `only_owner`，则 `share_card_permission` 只能设置为 `not_allowed`。;- 如果 `add_member_permission` 值为`all_members`，则 `share_card_permission` 只能设置为 `allowed`。",
+              "required": false,
+              "example": "allowed"
+            },
+            "edit_permission": {
+              "example": "all_members",
+              "type": "string",
+              "description": "谁可以编辑群信息;;**可选值有**：;- `only_owner`：仅群主和管理员;- `all_members`：所有成员",
+              "required": false
+            },
+            "pin_manage_setting": {
+              "options": [
+                {
+                  "value": "only_owner",
+                  "description": "仅群主和管理员"
+                },
+                {
+                  "value": "all_members",
+                  "description": "所有成员"
+                }
+              ],
+              "enum": [
+                "only_owner",
+                "all_members"
+              ],
+              "enumName": "pin_manage_setting_type",
+              "type": "string",
+              "description": "谁可以管理置顶",
+              "required": false,
+              "example": "all_members"
+            },
+            "toolkit_ids": {
+              "type": "array",
+              "description": "群快捷组件列表",
+              "required": false
+            }
+          },
+          "httpMethod": "PUT",
+          "description": "更新群信息。Identity: supports `user` and `bot`.",
+          "parameters": {
+            "user_id_type": {
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "以user_id来识别用户"
+                },
+                {
+                  "value": "union_id",
+                  "description": "以union_id来识别用户"
+                },
+                {
+                  "value": "open_id",
+                  "description": "以open_id来识别用户"
+                }
+              ],
+              "enumName": "UpdateChatUserIDType",
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "此次调用中使用的用户ID的类型",
+              "default": ""
+            },
+            "chat_id": {
+              "description": "群 ID。获取方式：;;- [创建群](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/create)，从返回结果中获取该群的 chat_id。;- 调用[获取用户或机器人所在的群列表](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/list)接口，可以查询用户或机器人所在群的 chat_id。;- 调用[搜索对用户或机器人可见的群列表](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/search)，可搜索用户或机器人所在的群、对用户或机器人公开的群的 chat_id。;;**注意**：仅支持群模式为 `group` 的群组 ID。你可以调用[获取群信息](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/get)接口，在返回结果中查看 `chat_mode` 参数取值是否为 `group`。",
+              "example": "oc_a0553eda9014c201e6969b478895c230",
+              "type": "string",
+              "location": "path",
+              "required": true
+            }
+          },
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "path": "chats/{chat_id}",
+          "danger": true,
+          "id": "chats.update",
+          "scopes": [
+            "im:chat",
+            "im:chat:update"
+          ],
+          "docUrl": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/update"
+        }
+      }
+    }
+  },
+  "name": "im",
+  "version": "v1",
+  "title": "即时通讯 API",
+  "description": "消息发送、群聊管理",
+  "servicePath": "/open-apis/im/v1"
+}

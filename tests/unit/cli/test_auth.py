@@ -1,10 +1,17 @@
 import argparse
-import io
 import json
 from pathlib import Path
 from typing import Any
-from feishu_bot_sdk import cli
-from feishu_bot_sdk.bot import BotService
+
+import feishu_bot_sdk.cli as cli
+from feishu_bot_sdk.cli.runtime.auth import _build_config, _UserTokenStoreContext
+from feishu_bot_sdk.cli.runtime.output import (
+    _extract_required_tenant_scopes,
+    _extract_required_user_scopes,
+    _format_configuration_error_message,
+    _format_feishu_error_message,
+    _format_http_error,
+)
 from feishu_bot_sdk.config import FeishuConfig
 from feishu_bot_sdk.exceptions import FeishuError, HTTPRequestError
 from feishu_bot_sdk.feishu import OAuthUserToken
@@ -31,7 +38,7 @@ def test_build_config_prefers_env_credentials(monkeypatch: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "env_app_id")
     monkeypatch.setenv("FEISHU_APP_SECRET", "env_app_secret")
 
-    config = cli._build_config(
+    config = _build_config(
         _base_args(app_id="arg_app_id", app_secret="arg_app_secret")
     )
 
@@ -41,7 +48,7 @@ def test_build_config_prefers_env_credentials(monkeypatch: Any) -> None:
 
 
 def test_build_config_accepts_auto_mode_with_user_token() -> None:
-    config = cli._build_config(
+    config = _build_config(
         _base_args(
             auth_mode="auto",
             app_id="cli_app",
@@ -59,7 +66,7 @@ def test_build_config_uses_user_token_from_store_when_env_and_args_missing() -> 
         access_token="store_access_token",
         expires_at=123456.0,
     )
-    context = cli._UserTokenStoreContext(
+    context = _UserTokenStoreContext(
         enabled=True,
         profile="default",
         store_path=Path("tokens.json"),
@@ -67,7 +74,7 @@ def test_build_config_uses_user_token_from_store_when_env_and_args_missing() -> 
         from_env_or_arg=False,
         loaded_token=store_token,
     )
-    config = cli._build_config(
+    config = _build_config(
         _base_args(auth_mode="user"), force_user_auth=True, token_context=context
     )
     assert config.access_token is None
@@ -83,7 +90,7 @@ def test_build_config_prefers_env_user_token_over_store(monkeypatch: Any) -> Non
         access_token="store_access_token",
         expires_at=123456.0,
     )
-    context = cli._UserTokenStoreContext(
+    context = _UserTokenStoreContext(
         enabled=True,
         profile="default",
         store_path=Path("tokens.json"),
@@ -91,12 +98,39 @@ def test_build_config_prefers_env_user_token_over_store(monkeypatch: Any) -> Non
         from_env_or_arg=True,
         loaded_token=store_token,
     )
-    config = cli._build_config(
+    config = _build_config(
         _base_args(auth_mode="user"), force_user_auth=True, token_context=context
     )
     assert config.access_token is None
     assert config.user_access_token == "env_user_access_token"
     assert config.user_access_token_expires_at is None
+
+
+def test_build_config_does_not_mix_store_refresh_token_with_explicit_user_access_token() -> None:
+    store_token = StoredUserToken(
+        access_token="store_access_token",
+        refresh_token="store_refresh_token",
+        expires_at=123456.0,
+        refresh_expires_at=654321.0,
+    )
+    context = _UserTokenStoreContext(
+        enabled=True,
+        profile="default",
+        store_path=Path("tokens.json"),
+        store=None,
+        from_env_or_arg=True,
+        loaded_token=store_token,
+    )
+    config = _build_config(
+        _base_args(auth_mode="user", user_access_token="explicit_user_access_token"),
+        force_user_auth=True,
+        token_context=context,
+    )
+    assert config.access_token is None
+    assert config.user_access_token == "explicit_user_access_token"
+    assert config.user_refresh_token is None
+    assert config.user_access_token_expires_at is None
+    assert config.user_refresh_token_expires_at is None
 
 
 def test_auth_token_json_output(monkeypatch: Any, capsys: Any) -> None:
@@ -115,10 +149,9 @@ def test_auth_token_json_output(monkeypatch: Any, capsys: Any) -> None:
     assert payload["access_token"] == "t-env"
 
 
-def test_auth_request_payload_from_stdin(monkeypatch: Any, capsys: Any) -> None:
+def test_api_request_with_data(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
-    monkeypatch.setattr("sys.stdin", io.StringIO('{"x": 1}'))
 
     captured: dict[str, Any] = {}
 
@@ -141,7 +174,7 @@ def test_auth_request_payload_from_stdin(monkeypatch: Any, capsys: Any) -> None:
     )
 
     code = cli.main(
-        ["auth", "request", "POST", "/x/y", "--payload-stdin", "--format", "json"]
+        ["api", "POST", "/x/y", "--data", '{"x": 1}', "--format", "json"]
     )
     assert code == 0
     assert captured["method"] == "POST"
@@ -157,7 +190,7 @@ def test_extract_required_user_scopes() -> None:
         "[contact:user:search, contact:contact.base:readonly, contact:user:search]"
     )
     assert (
-        cli._extract_required_user_scopes(text)
+        _extract_required_user_scopes(text)
         == "contact:user:search contact:contact.base:readonly"
     )
 
@@ -168,7 +201,7 @@ def test_extract_required_tenant_scopes() -> None:
         "[drive:drive, drive:drive:readonly, space:document:retrieve, drive:drive]"
     )
     assert (
-        cli._extract_required_tenant_scopes(text)
+        _extract_required_tenant_scopes(text)
         == "drive:drive drive:drive:readonly space:document:retrieve"
     )
 
@@ -182,7 +215,7 @@ def test_format_http_error_permission_hint_includes_scope_suggestion() -> None:
             '[contact:user:search, contact:contact.base:readonly]"}'
         ),
     )
-    message = cli._format_http_error(exc)
+    message = _format_http_error(exc)
     assert "missing user scopes" in message
     assert "contact:user:search contact:contact.base:readonly" in message
 
@@ -196,7 +229,7 @@ def test_format_http_error_missing_tenant_scope_hint() -> None:
             '[drive:drive, drive:drive:readonly, space:document:retrieve]"}'
         ),
     )
-    message = cli._format_http_error(exc)
+    message = _format_http_error(exc)
     assert "missing tenant app scopes" in message
     assert "drive:drive drive:drive:readonly space:document:retrieve" in message
     assert "not fixed by switching to user auth" in message
@@ -208,7 +241,7 @@ def test_format_http_error_redirect_uri_hint() -> None:
         status_code=400,
         response_text='{"code":20029,"msg":"redirect_uri request is illegal"}',
     )
-    message = cli._format_http_error(exc)
+    message = _format_http_error(exc)
     assert "oauth redirect_uri is invalid" in message
 
 
@@ -218,7 +251,7 @@ def test_format_http_error_invalid_token_hint() -> None:
         status_code=400,
         response_text='{"code":99991668,"msg":"Invalid access token for authorization"}',
     )
-    message = cli._format_http_error(exc)
+    message = _format_http_error(exc)
     assert "invalid access token" in message
     assert "feishu auth login --scope" in message
 
@@ -229,9 +262,9 @@ def test_format_http_error_user_access_token_not_supported_hint() -> None:
         status_code=400,
         response_text='{"code":99991668,"msg":"user access token not support"}',
     )
-    message = cli._format_http_error(exc)
+    message = _format_http_error(exc)
     assert "does not support user access token" in message
-    assert "--auth-mode tenant" in message
+    assert "--as bot" in message
 
 
 def test_format_http_error_invalid_request_param_hint_for_media_resource() -> None:
@@ -240,7 +273,7 @@ def test_format_http_error_invalid_request_param_hint_for_media_resource() -> No
         status_code=400,
         response_text='{"code":234001,"msg":"Invalid request param."}',
     )
-    message = cli._format_http_error(exc)
+    message = _format_http_error(exc)
     assert "invalid request parameters" in message
     assert "--message-id" in message
 
@@ -251,18 +284,18 @@ def test_format_http_error_resource_sender_hint() -> None:
         status_code=400,
         response_text='{"code":234008,"msg":"The app is not the resource sender."}',
     )
-    message = cli._format_http_error(exc)
+    message = _format_http_error(exc)
     assert "message resource download" in message
     assert "--message-id" in message
 
 
 def test_format_feishu_error_message_token_hints() -> None:
-    invalid_access = cli._format_feishu_error_message(
+    invalid_access = _format_feishu_error_message(
         "feishu api failed: {'code': 20005, 'msg': 'invalid access token'}"
     )
     assert "re-login" in invalid_access
 
-    invalid_refresh = cli._format_feishu_error_message(
+    invalid_refresh = _format_feishu_error_message(
         "feishu api failed: {'code': 20026, 'msg': 'refresh token is invalid'}"
     )
     assert "refresh token is invalid" in invalid_refresh
@@ -270,7 +303,7 @@ def test_format_feishu_error_message_token_hints() -> None:
 
 
 def test_format_configuration_error_message_user_mode_hint() -> None:
-    message = cli._format_configuration_error_message(
+    message = _format_configuration_error_message(
         "user mode requires user_access_token/access_token or user_refresh_token"
     )
     assert "vclawctl auth current --provider feishu" in message
@@ -281,17 +314,21 @@ def test_cli_main_feishu_error_uses_hint(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
 
-    def _fake_get_info(_self: BotService) -> Any:
+    def _fake_get_access_token(_self: Any) -> str:
         raise FeishuError(
             "feishu api failed: {'code': 20026, 'msg': 'refresh token is invalid'}"
         )
 
-    monkeypatch.setattr("feishu_bot_sdk.bot.BotService.get_info", _fake_get_info)
+    monkeypatch.setattr("feishu_bot_sdk.feishu.FeishuClient.get_access_token", _fake_get_access_token)
 
-    code = cli.main(["bot", "info", "--format", "json"])
+    code = cli.main(["auth", "token", "--format", "json"])
     assert code == 3
     payload = json.loads(capsys.readouterr().out)
-    assert "refresh token is invalid" in payload["error"]
+    assert payload["error"]["type"] == "feishu_error"
+    assert payload["error"]["code"] == 20026
+    assert "refresh token is invalid" in payload["error"]["message"]
+    assert "run `feishu auth login` again" in payload["error"]["hint"]
+    assert payload["error"]["retryable"] is False
 
 
 def test_cli_main_configuration_error_uses_hint(monkeypatch: Any, capsys: Any) -> None:
@@ -305,20 +342,22 @@ def test_cli_main_configuration_error_uses_hint(monkeypatch: Any, capsys: Any) -
 
     code = cli.main(
         [
-            "search",
-            "doc-wiki",
-            "--query",
-            "weekly",
-            "--doc-filter-json",
-            '{"only_title":true}',
+            "auth",
+            "token",
+            "--as",
+            "user",
+            "--no-store",
             "--format",
             "json",
         ]
     )
     assert code == 2
     payload = json.loads(capsys.readouterr().out)
-    assert "vclawctl auth current --provider feishu" in payload["error"]
-    assert "re-authorize requester access from v-claw settings" in payload["error"]
+    assert payload["error"]["type"] == "configuration_error"
+    assert payload["error"]["code"] == "configuration_error"
+    assert "vclawctl auth current --provider feishu" in payload["error"]["hint"]
+    assert "re-authorize requester access from v-claw settings" in payload["error"]["hint"]
+    assert payload["error"]["retryable"] is False
 
 
 def test_auth_login_stores_user_token(
@@ -358,7 +397,7 @@ def test_auth_login_stores_user_token(
         )
 
     monkeypatch.setattr(
-        "feishu_bot_sdk.cli._wait_for_oauth_callback", _fake_wait_for_oauth_callback
+        cli, "_wait_for_oauth_callback", _fake_wait_for_oauth_callback, raising=False
     )
     monkeypatch.setattr(
         "feishu_bot_sdk.feishu.FeishuClient.exchange_authorization_code", _fake_exchange
@@ -430,64 +469,3 @@ def test_auth_logout_clears_profile(
     assert data["profiles"] == {}
 
 
-def test_oauth_authorize_url(monkeypatch: Any, capsys: Any) -> None:
-    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
-
-    code = cli.main(
-        [
-            "oauth",
-            "authorize-url",
-            "--redirect-uri",
-            "https://example.com/callback",
-            "--state",
-            "state-1",
-            "--format",
-            "json",
-        ]
-    )
-    assert code == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert "authen/v1/authorize" in payload["authorize_url"]
-    assert "app_id=cli_test_app" in payload["authorize_url"]
-
-
-def test_oauth_exchange_code(monkeypatch: Any, capsys: Any) -> None:
-    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
-    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
-
-    def _fake_exchange(
-        _self: Any,
-        code: str,
-        *,
-        grant_type: str = "authorization_code",
-        redirect_uri: str | None = None,
-        code_verifier: str | None = None,
-    ) -> OAuthUserToken:
-        assert code == "code_123"
-        assert grant_type == "authorization_code"
-        assert redirect_uri is None
-        assert code_verifier is None
-        return OAuthUserToken(
-            access_token="u_token_1",
-            token_type="Bearer",
-            expires_in=7200,
-            refresh_token="u_refresh_1",
-        )
-
-    monkeypatch.setattr(
-        "feishu_bot_sdk.feishu.FeishuClient.exchange_authorization_code", _fake_exchange
-    )
-
-    code = cli.main(
-        [
-            "oauth",
-            "exchange-code",
-            "--code",
-            "code_123",
-            "--format",
-            "json",
-        ]
-    )
-    assert code == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["access_token"] == "u_token_1"

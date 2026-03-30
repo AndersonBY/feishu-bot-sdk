@@ -85,7 +85,7 @@ def test_ws_endpoint(monkeypatch: Any, capsys: Any) -> None:
             ),
         )
 
-    monkeypatch.setattr("feishu_bot_sdk.cli.fetch_ws_endpoint", _fake_fetch_ws_endpoint)
+    monkeypatch.setattr(cli, "fetch_ws_endpoint", _fake_fetch_ws_endpoint, raising=False)
 
     code = cli.main(["ws", "endpoint", "--format", "json"])
     assert code == 0
@@ -123,7 +123,7 @@ def test_server_run_registers_event_handler(monkeypatch: Any, capsys: Any) -> No
             calls["run"] += 1
             calls["handle_signals"] = handle_signals
 
-    monkeypatch.setattr("feishu_bot_sdk.cli.FeishuBotServer", _FakeServer)
+    monkeypatch.setattr(cli, "FeishuBotServer", _FakeServer, raising=False)
 
     code = cli.main(
         [
@@ -198,7 +198,7 @@ def test_ws_run_writes_output_file(
         async def stop(self) -> None:
             self._stopped = True
 
-    monkeypatch.setattr("feishu_bot_sdk.cli.AsyncLongConnectionClient", _FakeWSClient)
+    monkeypatch.setattr(cli, "AsyncLongConnectionClient", _FakeWSClient, raising=False)
 
     output_file = tmp_path / "events.jsonl"
     code = cli.main(
@@ -247,7 +247,7 @@ def test_webhook_serve_invokes_server_runner(monkeypatch: Any, capsys: Any) -> N
         captured["max_requests"] = max_requests
 
     monkeypatch.setattr(
-        "feishu_bot_sdk.cli._serve_webhook_http", _fake_serve_webhook_http
+        cli, "_serve_webhook_http", _fake_serve_webhook_http, raising=False
     )
 
     code = cli.main(
@@ -294,8 +294,8 @@ def test_server_start_status_stop(
         captured["log_file"] = log_file
         return _Proc()
 
-    monkeypatch.setattr("feishu_bot_sdk.cli._spawn_background_process", _fake_spawn)
-    monkeypatch.setattr("feishu_bot_sdk.cli._is_process_alive", lambda _pid: False)
+    monkeypatch.setattr(cli, "_spawn_background_process", _fake_spawn, raising=False)
+    monkeypatch.setattr(cli, "_is_process_alive", lambda _pid: False, raising=False)
 
     start_code = cli.main(
         [
@@ -318,7 +318,7 @@ def test_server_start_status_stop(
     assert pid_file.read_text(encoding="utf-8").strip() == "43210"
     assert "server" in " ".join(captured["cmd"])
 
-    monkeypatch.setattr("feishu_bot_sdk.cli._is_process_alive", lambda _pid: True)
+    monkeypatch.setattr(cli, "_is_process_alive", lambda _pid: True, raising=False)
     status_code = cli.main(
         ["server", "status", "--pid-file", str(pid_file), "--format", "json"]
     )
@@ -332,7 +332,7 @@ def test_server_start_status_stop(
     def _fake_terminate(pid: int) -> None:
         stopped["pid"] = pid
 
-    monkeypatch.setattr("feishu_bot_sdk.cli._terminate_process", _fake_terminate)
+    monkeypatch.setattr(cli, "_terminate_process", _fake_terminate, raising=False)
     stop_code = cli.main(
         ["server", "stop", "--pid-file", str(pid_file), "--format", "json"]
     )

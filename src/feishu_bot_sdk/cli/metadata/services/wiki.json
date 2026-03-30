@@ -1,0 +1,276 @@
+{
+  "servicePath": "/open-apis/wiki/v2",
+  "resources": {
+    "spaces": {
+      "methods": {
+        "get_node": {
+          "responseBody": {
+            "node": {
+              "type": "object",
+              "description": "节点信息",
+              "required": false,
+              "ref": "node",
+              "properties": {
+                "owner": {
+                  "required": false,
+                  "example": "ou_xxxxx",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "文档所有者"
+                },
+                "node_creator": {
+                  "required": false,
+                  "example": "ou_xxxxx",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "节点创建者"
+                },
+                "obj_type": {
+                  "required": true,
+                  "example": "doc",
+                  "options": [
+                    {
+                      "value": "doc",
+                      "description": "旧版文档"
+                    },
+                    {
+                      "description": "表格",
+                      "value": "sheet"
+                    },
+                    {
+                      "value": "mindnote",
+                      "description": "思维导图"
+                    },
+                    {
+                      "value": "bitable",
+                      "description": "多维表格"
+                    },
+                    {
+                      "description": "文件",
+                      "value": "file"
+                    },
+                    {
+                      "value": "docx",
+                      "description": "新版文档"
+                    },
+                    {
+                      "description": "幻灯片",
+                      "value": "slides"
+                    }
+                  ],
+                  "enum": [
+                    "doc",
+                    "sheet",
+                    "mindnote",
+                    "bitable",
+                    "file",
+                    "docx",
+                    "slides"
+                  ],
+                  "enumName": "ObjType",
+                  "type": "string",
+                  "description": "文档类型，对于快捷方式，该字段是对应的实体的obj_type。"
+                },
+                "node_type": {
+                  "type": "string",
+                  "description": "节点类型",
+                  "required": true,
+                  "example": "origin",
+                  "options": [
+                    {
+                      "value": "origin",
+                      "description": "实体"
+                    },
+                    {
+                      "value": "shortcut",
+                      "description": "快捷方式"
+                    }
+                  ],
+                  "enum": [
+                    "origin",
+                    "shortcut"
+                  ],
+                  "enumName": "NodeType"
+                },
+                "node_token": {
+                  "type": "string",
+                  "description": "知识库节点 token，如果 URL 链接中 token 前为 wiki，该 token 为知识库的节点 token。",
+                  "required": false,
+                  "example": "wikcnKQ1k3p******8Vabcef",
+                  "annotations": [
+                    "readOnly"
+                  ]
+                },
+                "origin_node_token": {
+                  "type": "string",
+                  "description": "快捷方式对应的实体node_token，当节点为快捷方式时，该值不为空。",
+                  "required": false,
+                  "example": "wikcnKQ1k3p******8Vabcef"
+                },
+                "creator": {
+                  "example": "ou_xxxxx",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "文档创建者",
+                  "required": false
+                },
+                "space_id": {
+                  "type": "string",
+                  "description": "知识空间 ID。获取方式参考[知识库概述](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/wiki-overview)。",
+                  "required": false,
+                  "example": "6946843325487912356",
+                  "annotations": [
+                    "readOnly"
+                  ]
+                },
+                "has_child": {
+                  "required": false,
+                  "example": "false",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "boolean",
+                  "description": "是否有子节点"
+                },
+                "title": {
+                  "example": "标题",
+                  "type": "string",
+                  "description": "文档标题",
+                  "required": false
+                },
+                "parent_node_token": {
+                  "type": "string",
+                  "description": "父节点 token。若当前节点为一级节点，父节点 token 为空。",
+                  "required": false,
+                  "example": "wikcnKQ1k3p******8Vabcef"
+                },
+                "obj_token": {
+                  "required": false,
+                  "example": "doccnzAaOD******Wabcdef",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "节点的实际云文档的 token，如果 URL 链接中 token 前为 docx、base、sheets 等非 wiki 类型，则说明该 token 是当前云文档的实际 token。如果要获取或编辑节点内容，需要使用此 token 调用对应的接口。可根据 obj_type 判断属于哪种文档类型。"
+                },
+                "origin_space_id": {
+                  "description": "快捷方式对应的实体所在的space id",
+                  "required": false,
+                  "example": "6946843325487912356",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string"
+                },
+                "obj_create_time": {
+                  "type": "string",
+                  "description": "文档创建时间",
+                  "required": false,
+                  "example": "1642402428",
+                  "annotations": [
+                    "readOnly"
+                  ]
+                },
+                "obj_edit_time": {
+                  "description": "文档最近编辑时间",
+                  "required": false,
+                  "example": "1642402428",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string"
+                },
+                "node_create_time": {
+                  "type": "string",
+                  "description": "节点创建时间",
+                  "required": false,
+                  "example": "1642402428",
+                  "annotations": [
+                    "readOnly"
+                  ]
+                }
+              }
+            }
+          },
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "httpMethod": "GET",
+          "path": "spaces/get_node",
+          "parameters": {
+            "token": {
+              "default": "",
+              "example": "wikcnKQ1k3p******8Vabcef",
+              "type": "string",
+              "location": "query",
+              "required": true,
+              "description": "知识库节点或对应云文档的实际 token。;- 知识库节点 token：如果 URL 链接中 token 前为 wiki，该 token 为知识库的节点 token。;- 云文档实际 token：如果 URL 链接中 token 前为 docx、base、sheets 等非 wiki 类型，则说明该 token 是当前云文档的实际 token。;;了解更多，请参考[文档常见问题-如何获取云文档资源相关 token（id）](https://open.feishu.cn/document/ukTMukTMukTM/uczNzUjL3czM14yN3MTN)。;;**注意**：;;使用云文档 token 查询时，需要对 obj_type 参数传入文档对应的类型。"
+            },
+            "obj_type": {
+              "enumName": "ObjTypeForQuery",
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "文档类型。不传时默认以 wiki 类型查询。",
+              "default": "wiki",
+              "example": "docx",
+              "options": [
+                {
+                  "value": "doc",
+                  "description": "旧版文档"
+                },
+                {
+                  "value": "docx",
+                  "description": "新版文档"
+                },
+                {
+                  "value": "sheet",
+                  "description": "表格"
+                },
+                {
+                  "value": "mindnote",
+                  "description": "思维导图"
+                },
+                {
+                  "value": "bitable",
+                  "description": "多维表格"
+                },
+                {
+                  "description": "文件",
+                  "value": "file"
+                },
+                {
+                  "value": "slides",
+                  "description": "幻灯片"
+                },
+                {
+                  "value": "wiki",
+                  "description": "知识库节点"
+                }
+              ]
+            }
+          },
+          "scopes": [
+            "wiki:wiki",
+            "wiki:wiki:readonly",
+            "wiki:node:read"
+          ],
+          "id": "spaces.get_node",
+          "docUrl": "https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/wiki-v2/space/get_node",
+          "description": "获取知识空间节点信息"
+        }
+      }
+    }
+  },
+  "name": "wiki",
+  "version": "v2",
+  "title": "知识库 API",
+  "description": "知识空间、节点管理"
+}

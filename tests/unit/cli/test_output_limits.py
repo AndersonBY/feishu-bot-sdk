@@ -5,7 +5,7 @@ from typing import Any
 from feishu_bot_sdk import cli
 
 
-def _large_search_payload() -> dict[str, Any]:
+def _large_payload() -> dict[str, Any]:
     return {
         "items": [
             {
@@ -20,26 +20,22 @@ def _large_search_payload() -> dict[str, Any]:
     }
 
 
-def test_large_search_output_is_truncated_with_paging_hints(
+def test_large_output_is_truncated_with_paging_hints(
     monkeypatch: Any, capsys: Any
 ) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
-    monkeypatch.setenv("FEISHU_USER_ACCESS_TOKEN", "u_cli_dummy")
 
     monkeypatch.setattr(
-        "feishu_bot_sdk.search.SearchService.search_apps",
-        lambda _self, query, user_id_type=None, page_size=None, page_token=None: _large_search_payload(),
+        "feishu_bot_sdk.feishu.FeishuClient.request_json",
+        lambda _self, method, path, params=None, payload=None: _large_payload(),
     )
 
     code = cli.main(
         [
-            "search",
-            "app",
-            "--query",
-            "calendar",
-            "--page-size",
-            "30",
+            "api",
+            "GET",
+            "/test/large",
             "--max-output-chars",
             "4000",
             "--format",
@@ -52,8 +48,6 @@ def test_large_search_output_is_truncated_with_paging_hints(
     payload = json.loads(out)
     assert payload["_cli_output"]["truncated"] is True
     assert payload["_cli_output"]["mode"] == "preview"
-    assert payload["_cli_output"]["paging"]["next_page_token"] == "next_1"
-    assert any("page-token next_1" in hint for hint in payload["_cli_output"]["hints"])
     assert any("output-offset" in hint for hint in payload["_cli_output"]["hints"])
     assert len(payload["items"]) < 30
 
@@ -61,19 +55,17 @@ def test_large_search_output_is_truncated_with_paging_hints(
 def test_output_offset_returns_json_slice(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
-    monkeypatch.setenv("FEISHU_USER_ACCESS_TOKEN", "u_cli_dummy")
 
     monkeypatch.setattr(
-        "feishu_bot_sdk.search.SearchService.search_apps",
-        lambda _self, query, user_id_type=None, page_size=None, page_token=None: _large_search_payload(),
+        "feishu_bot_sdk.feishu.FeishuClient.request_json",
+        lambda _self, method, path, params=None, payload=None: _large_payload(),
     )
 
     code = cli.main(
         [
-            "search",
-            "app",
-            "--query",
-            "calendar",
+            "api",
+            "GET",
+            "/test/large",
             "--output-offset",
             "1200",
             "--max-output-chars",
@@ -97,20 +89,18 @@ def test_save_output_writes_full_json_before_truncation(
 ) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
-    monkeypatch.setenv("FEISHU_USER_ACCESS_TOKEN", "u_cli_dummy")
 
     monkeypatch.setattr(
-        "feishu_bot_sdk.search.SearchService.search_apps",
-        lambda _self, query, user_id_type=None, page_size=None, page_token=None: _large_search_payload(),
+        "feishu_bot_sdk.feishu.FeishuClient.request_json",
+        lambda _self, method, path, params=None, payload=None: _large_payload(),
     )
 
-    output_path = tmp_path / "search-full.json"
+    output_path = tmp_path / "full.json"
     code = cli.main(
         [
-            "search",
-            "app",
-            "--query",
-            "calendar",
+            "api",
+            "GET",
+            "/test/large",
             "--save-output",
             str(output_path),
             "--max-output-chars",
@@ -132,19 +122,17 @@ def test_save_output_writes_full_json_before_truncation(
 def test_full_output_disables_truncation(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
-    monkeypatch.setenv("FEISHU_USER_ACCESS_TOKEN", "u_cli_dummy")
 
     monkeypatch.setattr(
-        "feishu_bot_sdk.search.SearchService.search_apps",
-        lambda _self, query, user_id_type=None, page_size=None, page_token=None: _large_search_payload(),
+        "feishu_bot_sdk.feishu.FeishuClient.request_json",
+        lambda _self, method, path, params=None, payload=None: _large_payload(),
     )
 
     code = cli.main(
         [
-            "search",
-            "app",
-            "--query",
-            "calendar",
+            "api",
+            "GET",
+            "/test/large",
             "--full-output",
             "--max-output-chars",
             "3000",

@@ -62,7 +62,7 @@ feishu search doc-wiki --query "项目周报" --doc-filter-json '{"only_title": 
 
 ## 注意事项
 
-- `search` 命令组默认使用 `auth_mode=user`（可显式 `--auth-mode tenant` 覆盖）。
+- `search` 命令组默认使用 user identity；只有当接口明确支持 bot identity 时，才需要显式改成 `--as bot`。
 - `--all` 会自动翻页并聚合返回结果（`items` 或 `res_units`）。
 - 官方搜索接口通常要求 `user_access_token`，并依赖 `search:app` / `search:message` / `search:docs:read` 等权限。
 - `search doc-wiki` 官方说明中，建议 `query` 搭配至少一种 `doc_filter` 或 `wiki_filter` 使用。

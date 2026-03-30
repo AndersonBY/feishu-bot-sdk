@@ -4,6 +4,26 @@
 
 `feishu-bot-sdk` ships a `feishu` command for scripts, CI, and LLM Agent workflows.
 
+## CLI Architecture
+
+The CLI is built on Click with a three-layer command model:
+
+- top-level commands: `api`, `schema`, `doctor`, `completion`, `webhook`, `ws`, `server`, `media`
+- high-value workflow commands: `+shortcut` (e.g., `bitable +create-from-csv`, `docx +insert-content`)
+- service commands: metadata-driven API calls, `feishu <service> <resource> <method> --params ... --data ...`
+
+Recommended order:
+
+1. use `+shortcut` when it exists
+2. inspect `feishu schema ...`
+3. call the generated service command
+4. use `feishu api` for direct API calls
+
+See also:
+
+- [CLI Framework Decision](../cli-framework-decision.md)
+- [CLI Command Mapping](../cli-command-mapping.md)
+
 ## Install
 
 ```bash
@@ -11,23 +31,16 @@ uv tool install feishu-bot-sdk
 feishu --help
 ```
 
-## Global Flags
+## Public Runtime Flags
 
-- `--format human|json`: default is `human`; use `json` for machine workflows
-- `--app-id` / `--app-secret`: app credentials; `--app-secret` is only recommended for temporary debugging, prefer `feishu config init --app-secret-stdin`
-- `--auth-mode tenant|user`: auth mode, default is `tenant`
-- `--access-token`: optional static access token for current auth mode
-- `--app-access-token`: optional app token for OAuth code/refresh exchange
-- `--user-access-token` / `--user-refresh-token`: user tokens (common with `auth_mode=user`)
-- `--profile`: CLI profile (default from `FEISHU_PROFILE` or the configured default profile)
-- `--token-store`: local token store path
-- `--no-store`: disable local token store read/write
-- `--base-url`: default `https://open.feishu.cn/open-apis`
-- `--timeout`: request timeout seconds
-- `--max-output-chars`: maximum stdout characters for regular command results, default `25000`
-- `--output-offset`: when output is large, inspect a later slice of the full JSON serialization
-- `--save-output`: write the full normalized JSON to a file before stdout truncation
-- `--full-output`: disable regular-command stdout truncation
+All Click commands expose these runtime flags:
+
+- `--format json|pretty|table|csv|ndjson`
+- `--as user|bot|auto`
+- `--profile`
+- `--app-id` / `--app-secret`
+- `--max-output-chars` / `--output-offset` / `--save-output` / `--full-output`
+- service/raw API commands also support `--params` / `--data` / `--page-all` / `--page-size` / `--page-limit` / `--page-delay` / `--output` / `--dry-run`
 
 Auth precedence: environment variables > CLI flags > CLI profile > local token store profile.
 
@@ -42,13 +55,13 @@ Auth precedence: environment variables > CLI flags > CLI profile > local token s
 Recommended first step: configure a CLI profile, then use the rest of the `auth` and domain commands against that profile.
 
 ```bash
-printf 'app_secret' | feishu config init --profile default --app-id cli_xxx --app-secret-stdin --set-default --auth-mode auto --format json
+printf 'app_secret' | feishu config init --profile default --app-id cli_xxx --app-secret-stdin --default-as auto --set-default --format json
 feishu config show --format json
 feishu config list-profiles --format json
-feishu config migrate-token-store --from ~/.config/feishu-bot-sdk/tokens.json --app-id cli_xxx --format json
+feishu config migrate-token-store --source-path ~/.config/feishu-bot-sdk/tokens.json --app-id cli_xxx --format json
 ```
 
-If you already have a legacy `tokens.json`, use `config migrate-token-store` to import the old profile names and token store path into the new CLI config. The legacy token file itself is left in place.
+If you already have an old `tokens.json`, use `config migrate-token-store` to import the old profile names and token store path into the CLI config. The old token file itself is left in place.
 
 ## Large Output Control
 
@@ -61,6 +74,26 @@ If you already have a legacy `tokens.json`, use `config migrate-token-store` to 
 - Keep the full result on disk: `feishu ... --save-output ./full.json --format json`
 - Prefer `--page-size` / `--page-token` over `--all` when the command supports paging
 
+## JSON Error Envelope
+
+When `--format json` is used, command failures return a structured envelope:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "type": "http_error",
+    "code": 99991679,
+    "message": "http request failed",
+    "hint": "missing user scopes; re-authorize with ...",
+    "retryable": false
+  },
+  "exit_code": 4
+}
+```
+
+The `error` object may also include transport-specific fields such as `status_code` and `response_excerpt`.
+
 ## Common Commands
 
 ```bash
@@ -68,117 +101,50 @@ If you already have a legacy `tokens.json`, use `config migrate-token-store` to 
 feishu config init --profile default --app-id cli_xxx --app-secret-file ./.secrets/feishu_app_secret --set-default --format json
 feishu config show --profile default --format json
 feishu config set-default-profile default --format json
-feishu config migrate-token-store --from ./tokens.json --default-profile default --format json
+feishu config migrate-token-store --source-path ./tokens.json --default-profile default --format json
 feishu config remove-profile default --format json
 
-# auth (recommended: localhost callback, no public URL)
+# auth
 feishu auth token --format json
 feishu auth login --scope "offline_access contact:user.base:readonly" --no-browser --format json
 feishu auth whoami --format json
 feishu auth refresh --format json
 feishu auth logout --format json
+feishu auth status --format json
+feishu auth check --scope "contact:user:search" --format json
 
-# low-level OAuth debug commands
-feishu oauth authorize-url --redirect-uri https://example.com/callback --format json
-feishu oauth exchange-code --code CODE --format json
+# generic API call
+feishu api GET /open-apis/contact/v3/users/ou_xxx --format json
+feishu api POST /open-apis/im/v1/messages --data '{"receive_id":"ou_xxx","content":"{\"text\":\"hello\"}","msg_type":"text"}' --params '{"receive_id_type":"open_id"}' --format json
 
-# messaging
-feishu im send-text --receive-id ou_xxx --text "hello"
-feishu im send-markdown --receive-id ou_xxx --markdown-file ./msg.md --format json
-feishu im push-follow-up om_xxx --follow-ups-json '[{"content":"continue"}]' --format json
-feishu im forward-thread omt_xxx --receive-id-type chat_id --receive-id oc_xxx --format json
-feishu im update-url-previews --preview-token token_1 --preview-token token_2 --open-id ou_xxx --format json
-
-# chats and announcements
-feishu chat list --all --format json
-feishu chat create --chat-json '{"name":"Ops War Room","owner_id":"ou_xxx","user_id_list":["ou_xxx"],"chat_mode":"group","chat_type":"private"}' --user-id-type open_id --format json
-feishu group member add --chat-id oc_xxx --member-id ou_xxx --member-id-type open_id --format json
-feishu chat announcement get --chat-id oc_xxx --format json
-feishu chat announcement list-blocks --chat-id oc_xxx --revision-id -1 --all --format json
-feishu chat announcement batch-update --chat-id oc_xxx --requests-json '[{"update_text_elements":{"block_id":"doxxx","elements":[]}}]' --revision-id -1 --client-token token_1 --format json
-
-# file and docs
+# files and docs
 feishu media upload-file ./final.csv --format json
 feishu media download-file file_xxx ./downloads/file.bin --format json
-feishu media download-file img_v3_xxx ./downloads/image.jpg --format json
-# user-sent message resources require message_id
 feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx --resource-type image --format json
-feishu bitable create-from-csv ./final.csv --app-name "Task Result" --table-name "Result"
-feishu bitable list-tables --app-token app_xxx --format json
-feishu bitable list-records --app-token app_xxx --table-id tbl_xxx --all --format json
-feishu bitable list-views --app-token app_xxx --format json
-feishu docx create --title "Daily Report" --folder-token fld_xxx --format json
-feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
-# Returns a compact summary by default; add --full-response for converted/inserted_batches details
-feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --output ./report.md --format json
-feishu docx list-blocks --document-id doccn_xxx --all --format json
-feishu drive root-folder-meta --auth-mode user --format json
-feishu drive create-folder --auth-mode user --folder-token <root_token> --name "Uploads" --format json
-feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx --auth-mode user --check-requester-owner --format json
-feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
-feishu drive meta --request-docs-json '[{"doc_token":"file_xxx","doc_type":"file"}]' --auth-mode user --check-requester-owner --format json
-feishu drive version-list doccn_xxx --obj-type docx --page-size 50 --all --format json
-feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
-feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id me --member-id-type open_id --permission edit --auth-mode user --format json
+feishu bitable +create-from-csv ./final.csv --app-name "Task Result" --table-name "Result"
+feishu docx +insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
+feishu drive +requester-upload ./final.csv --folder-name "Uploads" --format json
 
-# wiki
-feishu wiki search-nodes --query "weekly report" --all --format json
-feishu wiki list-spaces --all --format json
-
-# search
-feishu search app --query "approval" --auth-mode user --format json
-feishu search message --query "incident" --chat-type group_chat --auth-mode user --format json
-feishu search doc-wiki --query "weekly report" --doc-filter-json '{"only_title": true}' --auth-mode user --format json
-
-# contact
-feishu contact user get --user-id ou_xxx --user-id-type open_id --format json
-feishu contact user by-department --department-id od_xxx --page-size 20 --format json
-feishu contact department search --query "engineering" --format json
-feishu contact scope get --page-size 100 --format json
-
-# calendar
-feishu calendar list-calendars --page-size 50 --format json
-feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json
-feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
+# calendar attachments
+feishu calendar +attach-material ./agenda.md --calendar-id cal_xxx --event-id evt_xxx --format json
 
 # mail
-feishu mail address query-status --email ops@example.com --email alerts@example.com --format json
-feishu mail message list --user-mailbox-id me --folder-id INBOX --all --format json
-feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "Daily Report" --markdown-file ./report.md --format json
-feishu mail mailbox alias create --user-mailbox-id me --email-alias alias@example.com --format json
-feishu mail group create --mailgroup-json '{"email":"ops@example.com","name":"Ops Group"}' --format json
-feishu mail public-mailbox member batch-create --public-mailbox-id support@example.com --items-file ./members.json --format json
+feishu mail +send-markdown --user-mailbox-id me --to-email user@example.com --subject "Daily Report" --markdown-file ./report.md --format json
 ```
-
-`mail message send-markdown` automatically turns local Markdown image paths and reachable remote image URLs into inline CID images, so Agents do not need to pre-download them.
 
 ## User Auth (CLI Best Practice)
 
-`feishu auth login` uses a local callback by default (`http://127.0.0.1:18080/callback`) and enables PKCE.
+`feishu auth login` prefers device flow by default. It switches to localhost callback when you explicitly pass `--localhost`, or when you use localhost-oriented flags such as `--redirect-uri`, `--state`, `--no-browser`, or `--no-pkce`.
 
-- Step 1: add the localhost redirect URL in Feishu app security settings
-- Step 2: run `feishu auth login`
-- Step 3: use `feishu auth whoami` and other `auth_mode=user` commands directly
+- Step 1: for browserless or agent flows, run `feishu auth login --device-code`
+- Step 2: for browser callback flows, add the localhost redirect URL in Feishu app security settings and run `feishu auth login --localhost`
+- Step 3: use `feishu auth whoami` and other commands that require user identity directly
 
 Automatic behavior:
 
 - pre-refresh near-expiry access tokens (default 300 seconds before expiry)
 - on token-invalid API responses, auto-refresh and retry once
 - persist refreshed token pairs to local token store (including rotated refresh token)
-
-## Content Commands (Agent Tips)
-
-- For announcements, start with `chat announcement get` to inspect `announcement_type` and `revision_id`, then continue with `list-blocks`, `get-block`, or `list-children`
-- For announcement edits, prefer `chat announcement batch-update`; use `create-children` to append blocks and `delete-children` to remove ranges
-- For member management, `feishu group member ...` is an alias of `feishu chat member ...`, which is often easier for agents to infer from plain-language prompts
-- Prefer `--all` for paged queries: `bitable list-records`, `wiki list-spaces`, `wiki search-nodes`, `wiki list-nodes`
-- `bitable list-tables` also supports `--all`
-- `docx list-blocks`, `docx list-children`, `drive view-records`, and `drive version-list` also support `--all`
-- `bitable list-records` now supports `--view-id`, `--filter`, `--sort`, `--field-names`, and `--text-field-as-array`
-- `bitable list-records`, `list-views`, `create-record`, `get-view`, `create-view`, `update-view`, `delete-view`, and `get-field` can omit `--table-id` when the app has a default table or exactly one table
-- `bitable get-app` and `copy-app` try to backfill `data.table_id` when `default_table_id` is empty; if the app has multiple tables, run `bitable list-tables` first
-- Permission-related flags now use strict choices: `--member-id-type`, `--resource-type`, `--permission`
-- For doc writes, prefer `docx insert-content` instead of building markdown blocks manually
 
 ## Calendar Attachments (Strongly Recommended for Agents)
 
@@ -187,7 +153,7 @@ To avoid `193107 no permission to access attachment file token`, do not upload w
 Use:
 
 ```bash
-feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
+feishu calendar +attach-material ./agenda.md --calendar-id cal_xxx --event-id evt_xxx --format json
 ```
 
 This command automatically:
@@ -195,20 +161,6 @@ This command automatically:
 - uploads with `parent_type=calendar`
 - uploads with `parent_node=<calendar_id>`
 - updates event `attachments` (default append mode; use `--mode replace` to overwrite)
-
-## Stdin (Agent-friendly)
-
-Many commands can read input from stdin for pipeline workflows:
-
-```bash
-# Markdown from stdin
-cat report.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --format json
-cat report.md | feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "Daily Report" --markdown-stdin --format json
-
-# JSON from stdin
-echo '{"text":"hello"}' | feishu im send --receive-id ou_xxx --msg-type text --content-stdin --format json
-echo '{"x":1}' | feishu auth request POST /some/path --payload-stdin --format json
-```
 
 ## Events and Long Connection
 

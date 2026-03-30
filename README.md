@@ -49,17 +49,17 @@ feishu --help
   - 用户态变量：`FEISHU_USER_ACCESS_TOKEN`、`FEISHU_USER_REFRESH_TOKEN`
   - OAuth 交换变量：`FEISHU_APP_ACCESS_TOKEN`
   - CLI 配置 / Store：`FEISHU_PROFILE`、`FEISHU_CLI_CONFIG_PATH`、`FEISHU_SECRET_STORE_PATH`、`FEISHU_SECRET_STORE_KEY_PATH`、`FEISHU_TOKEN_STORE_PATH`、`FEISHU_NO_STORE`
-  - 全局参数：`--app-id`、`--app-secret`、`--auth-mode`、`--access-token`、`--profile`、`--token-store`、`--no-store`
+  - 全局参数：`--app-id`、`--app-secret`、`--as`、`--access-token`、`--profile`、`--token-store`、`--no-store`
 - `--app-secret` 仍兼容，但只建议临时调试使用；日常推荐 `feishu config init --app-secret-stdin`
 
 示例：
 
 ```bash
 # 0) 初始化 CLI profile（推荐）
-printf 'app_secret' | feishu config init --profile default --app-id cli_xxx --app-secret-stdin --set-default --auth-mode auto --format json
+printf 'app_secret' | feishu config init --profile default --app-id cli_xxx --app-secret-stdin --set-default --as auto --format json
 feishu config show --format json
 feishu config list-profiles --format json
-feishu config migrate-token-store --from ~/.config/feishu-bot-sdk/tokens.json --app-id cli_xxx --format json
+feishu config migrate-token-store --source-path ~/.config/feishu-bot-sdk/tokens.json --app-id cli_xxx --format json
 
 # 1) 获取当前认证模式 token（JSON 输出）
 feishu auth token --format json
@@ -115,22 +115,25 @@ feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --
 feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --format json
 
 # 8) 上传云空间文件
-feishu drive root-folder-meta --auth-mode user --format json
-feishu drive create-folder --auth-mode user --folder-token <root_token> --name "Uploads" --format json
+feishu drive root-folder-meta --as user --format json
+feishu drive create-folder --as user --folder-token <root_token> --name "Uploads" --format json
+feishu drive requester-upload-file ./final.csv --folder-name "Requester Uploads" --format json
 feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx
-feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx --auth-mode user --check-requester-owner --format json
+feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx --as user --check-requester-owner --format json
 feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
-feishu drive meta --request-docs-json '[{"doc_token":"file_xxx","doc_type":"file"}]' --auth-mode user --check-requester-owner --format json
+feishu drive meta --request-docs-json '[{"doc_token":"file_xxx","doc_type":"file"}]' --as user --check-requester-owner --format json
 feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
-feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id me --permission edit --auth-mode user --format json
+feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id me --permission edit --as user --format json
+
+对“文件必须归当前用户本人所有”的上传，不要直接把 `root-folder-meta` 返回的 token 当上传目标。优先使用 `requester-upload-file`，它会强制走 user auth、在 requester root 下新建子文件夹、上传文件并做 owner 校验；如果 owner 仍不匹配，命令会直接失败。
 
 # 9) 搜索 Wiki 节点
 feishu wiki search-nodes --query "项目周报" --all --format json
 
 # 9.1) 搜索能力（应用 / 消息 / 文档/Wiki）
-feishu search app --query "审批" --auth-mode user --format json
-feishu search message --query "故障" --chat-type group_chat --auth-mode user --format json
-feishu search doc-wiki --query "项目周报" --doc-filter-json '{"only_title": true}' --auth-mode user --format json
+feishu search app --query "审批" --as user --format json
+feishu search message --query "故障" --chat-type group_chat --as user --format json
+feishu search doc-wiki --query "项目周报" --doc-filter-json '{"only_title": true}' --as user --format json
 
 # 10) 通讯录查询
 feishu contact user get --user-id ou_xxx --user-id-type open_id --format json

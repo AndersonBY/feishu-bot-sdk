@@ -1,0 +1,614 @@
+{
+  "title": "电子表格 API",
+  "description": "电子表格操作",
+  "servicePath": "/open-apis/sheets/v3",
+  "resources": {
+    "spreadsheets": {
+      "methods": {
+        "get": {
+          "docUrl": "https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet/get",
+          "path": "spreadsheets/{spreadsheet_token}",
+          "parameterOrder": [
+            "spreadsheet_token"
+          ],
+          "id": "spreadsheet.get",
+          "scopes": [
+            "sheets:spreadsheet",
+            "sheets:spreadsheet:readonly",
+            "drive:drive",
+            "drive:drive:readonly",
+            "sheets:spreadsheet.meta:read"
+          ],
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "description": "获取电子表格信息",
+          "parameters": {
+            "spreadsheet_token": {
+              "description": "电子表格的 token。可通过以下两种方式获取。了解更多，参考[电子表格概述](https://open.feishu.cn/document/ukTMukTMukTM/uATMzUjLwEzM14CMxMTN/overview)。;-  电子表格的 URL：https://sample.feishu.cn/sheets/==Iow7sNNEphp3WbtnbCscPqabcef==;- 调用[获取文件夹中的文件清单](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file/list)",
+              "example": "Iow7sNNEphp3WbtnbCscPqabcef",
+              "type": "string",
+              "location": "path",
+              "required": true
+            },
+            "user_id_type": {
+              "options": [
+                {
+                  "value": "user_id",
+                  "description": "以user_id来识别用户"
+                },
+                {
+                  "description": "以union_id来识别用户",
+                  "value": "union_id"
+                },
+                {
+                  "value": "open_id",
+                  "description": "以open_id来识别用户"
+                }
+              ],
+              "enumName": "GetSpreadsheetUserIDType",
+              "type": "string",
+              "location": "query",
+              "required": false,
+              "description": "此次调用中使用的用户ID的类型",
+              "default": ""
+            }
+          },
+          "responseBody": {
+            "spreadsheet": {
+              "ref": "get_spreadsheet",
+              "properties": {
+                "token": {
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "电子表格 token",
+                  "required": false,
+                  "example": "Iow7sNNEphp3WbtnbCscPqabcef"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "电子表格的 URL 链接",
+                  "required": false,
+                  "example": "https://example.feishu.cn/sheets/Iow7sNNEphp3WbtnbCscPqabcef",
+                  "annotations": [
+                    "readOnly"
+                  ]
+                },
+                "title": {
+                  "type": "string",
+                  "description": "电子表格标题",
+                  "required": false,
+                  "example": "title"
+                },
+                "owner_id": {
+                  "required": false,
+                  "example": "ou_48d0958ee4b2ab3eaf0b5f6c968abcef",
+                  "annotations": [
+                    "readOnly",
+                    "open:x_user_id"
+                  ],
+                  "type": "string",
+                  "description": "电子表格的所有者 ID。ID 类型由查询参数 user_id_type 决定。"
+                }
+              },
+              "type": "object",
+              "description": "电子表格的基础信息",
+              "required": false
+            }
+          },
+          "httpMethod": "GET"
+        },
+        "patch": {
+          "danger": true,
+          "docUrl": "https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet/patch",
+          "parameterOrder": [
+            "spreadsheet_token"
+          ],
+          "scopes": [
+            "sheets:spreadsheet",
+            "drive:drive",
+            "sheets:spreadsheet.meta:write_only"
+          ],
+          "path": "spreadsheets/{spreadsheet_token}",
+          "httpMethod": "PATCH",
+          "parameters": {
+            "spreadsheet_token": {
+              "example": "Iow7sNNEphp3WbtnbCscPqabcef",
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "电子表格的 token。可通过以下两种方式获取。了解更多，参考[电子表格概述](https://open.feishu.cn/document/ukTMukTMukTM/uATMzUjLwEzM14CMxMTN/overview)。;-  电子表格的 URL：https://sample.feishu.cn/sheets/==Iow7sNNEphp3WbtnbCscPqabcef==;- 调用[获取文件夹中的文件清单](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file/list)"
+            }
+          },
+          "requestBody": {
+            "title": {
+              "required": false,
+              "example": "Sales sheet",
+              "type": "string",
+              "description": "新的电子表格标题。参数为空时，表格标题将显示为“未命名表格”或本地语言环境对应内容。"
+            }
+          },
+          "id": "spreadsheet.patch",
+          "description": "修改电子表格属性",
+          "accessTokens": [
+            "tenant",
+            "user"
+          ]
+        },
+        "create": {
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "requestBody": {
+            "title": {
+              "example": "Sales sheet",
+              "type": "string",
+              "description": "表格标题",
+              "required": false
+            },
+            "folder_token": {
+              "type": "string",
+              "description": "文件夹 token。你可通过以下两种方式获取文件夹的 token：;- 文件夹的 URL：https://sample.feishu.cn/drive/folder/==fldbcO1UuPz8VwnpPx5a92abcef==;- 调用开放平台接口获取：;    - 调用[获取我的空间（root folder）元数据](https://open.feishu.cn/document/ukTMukTMukTM/ugTNzUjL4UzM14CO1MTN/get-root-folder-meta)接口获取根目录（即根文件夹）的 token。;    - 继续调用[获取文件夹中的文件清单](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file/list)接口，获取根目录下文件夹的 token。;;;**提示**：要在知识库中创建电子表格，你需调用[创建知识空间节点](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/wiki-v2/space-node/create)接口，并选择表格（sheet）类型。",
+              "required": false,
+              "example": "fldbcO1UuPz8VwnpPx5a92abcef"
+            },
+            "without_mount": {
+              "type": "boolean",
+              "description": "是否挂载到云空间",
+              "required": false,
+              "example": "false",
+              "annotations": [
+                "writeOnly"
+              ]
+            }
+          },
+          "responseBody": {
+            "spreadsheet": {
+              "properties": {
+                "without_mount": {
+                  "required": false,
+                  "example": "false",
+                  "annotations": [
+                    "writeOnly"
+                  ],
+                  "type": "boolean",
+                  "description": "是否挂载到云空间"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "电子表格标题",
+                  "required": false,
+                  "example": "Sales sheet"
+                },
+                "folder_token": {
+                  "description": "文件夹 token",
+                  "required": false,
+                  "example": "fldbcO1UuPz8VwnpPx5a92abcef",
+                  "type": "string"
+                },
+                "url": {
+                  "required": false,
+                  "example": "https://example.feishu.cn/sheets/Iow7sNNEphp3WbtnbCscPqabcef",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string",
+                  "description": "电子表格的 URL 链接"
+                },
+                "spreadsheet_token": {
+                  "description": "电子表格 token",
+                  "required": false,
+                  "example": "Iow7sNNEphp3WbtnbCscPqabcef",
+                  "annotations": [
+                    "readOnly"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "description": "电子表格的基础信息",
+              "required": false,
+              "ref": "spreadsheet"
+            }
+          },
+          "id": "spreadsheet.create",
+          "path": "spreadsheets",
+          "scopes": [
+            "drive:drive",
+            "sheets:spreadsheet",
+            "sheets:spreadsheet:create"
+          ],
+          "danger": true,
+          "httpMethod": "POST",
+          "description": "创建电子表格",
+          "docUrl": "https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet/create"
+        }
+      }
+    },
+    "spreadsheet.sheet.filters": {
+      "methods": {
+        "update": {
+          "parameters": {
+            "spreadsheet_token": {
+              "example": "Iow7sNNEphp3WbtnbCscPqabcef",
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "电子表格的 token。可通过以下两种方式获取。了解更多，参考[电子表格概述](https://open.feishu.cn/document/ukTMukTMukTM/uATMzUjLwEzM14CMxMTN/overview)。;- 电子表格的 URL：https://sample.feishu.cn/sheets/==Iow7sNNEphp3WbtnbCscPqabcef==;- 调用[获取文件夹中的文件清单](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file/list)"
+            },
+            "sheet_id": {
+              "example": "8fe9d6",
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "工作表 ID，通过[获取工作表](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet/query) 获取。"
+            }
+          },
+          "httpMethod": "PUT",
+          "danger": true,
+          "id": "spreadsheet.sheet.filter.update",
+          "requestBody": {
+            "col": {
+              "example": "G",
+              "type": "string",
+              "description": "指定要更新筛选条件的列。",
+              "required": true
+            },
+            "condition": {
+              "ref": "condition",
+              "properties": {
+                "compare_type": {
+                  "description": "比较类型。不同筛选类型的比较类型的枚举值不同，详情参考[筛选指南](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet-filter/filter-user-guide)。",
+                  "required": false,
+                  "example": "beginsWith",
+                  "type": "string"
+                },
+                "expected": {
+                  "type": "array",
+                  "description": "筛选参数。不同筛选类型的筛选参数限制不同，详情参考[筛选指南](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet-filter/filter-user-guide)。",
+                  "required": true
+                },
+                "filter_type": {
+                  "type": "string",
+                  "description": "筛选类型，枚举值如下所示。了解更多，参考[筛选指南](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet-filter/filter-user-guide)。;- multiValue ：多值筛选;- number ：数字筛选;- text ：文本筛选;- color ：颜色筛选;- clear ：清除某列的筛选条件",
+                  "required": true,
+                  "example": "text"
+                }
+              },
+              "type": "object",
+              "description": "设置筛选条件。",
+              "required": true
+            }
+          },
+          "parameterOrder": [
+            "spreadsheet_token",
+            "sheet_id"
+          ],
+          "docUrl": "https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet-filter/update",
+          "path": "spreadsheets/{spreadsheet_token}/sheets/{sheet_id}/filter",
+          "description": "更新筛选",
+          "scopes": [
+            "sheets:spreadsheet",
+            "drive:drive",
+            "sheets:spreadsheet:write_only"
+          ],
+          "accessTokens": [
+            "tenant",
+            "user"
+          ]
+        },
+        "create": {
+          "docUrl": "https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet-filter/create",
+          "id": "spreadsheet.sheet.filter.create",
+          "path": "spreadsheets/{spreadsheet_token}/sheets/{sheet_id}/filter",
+          "httpMethod": "POST",
+          "scopes": [
+            "sheets:spreadsheet",
+            "drive:drive",
+            "sheets:spreadsheet:write_only"
+          ],
+          "description": "创建筛选",
+          "parameterOrder": [
+            "spreadsheet_token",
+            "sheet_id"
+          ],
+          "danger": true,
+          "parameters": {
+            "spreadsheet_token": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "电子表格的 token。可通过以下两种方式获取。了解更多，参考[电子表格概述](https://open.feishu.cn/document/ukTMukTMukTM/uATMzUjLwEzM14CMxMTN/overview)。;- 电子表格的 URL：https://sample.feishu.cn/sheets/==Iow7sNNEphp3WbtnbCscPqabcef==;- 调用[获取文件夹中的文件清单](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file/list)",
+              "example": "Iow7sNNEphp3WbtnbCscPqabcef"
+            },
+            "sheet_id": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "工作表 ID，通过[获取工作表](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet/query) 获取。",
+              "example": "8fe9d6"
+            }
+          },
+          "requestBody": {
+            "col": {
+              "example": "E",
+              "type": "string",
+              "description": "设置应用筛选条件的列。",
+              "required": true
+            },
+            "condition": {
+              "required": true,
+              "ref": "condition",
+              "properties": {
+                "filter_type": {
+                  "type": "string",
+                  "description": "筛选类型，枚举值如下所示。了解更多，参考[筛选指南](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet-filter/filter-user-guide)。;- multiValue ：多值筛选;- number ：数字筛选;- text ：文本筛选;- color ：颜色筛选",
+                  "required": true,
+                  "example": "number"
+                },
+                "compare_type": {
+                  "type": "string",
+                  "description": "比较类型",
+                  "required": false,
+                  "example": "less"
+                },
+                "expected": {
+                  "description": "筛选参数",
+                  "required": true,
+                  "type": "array"
+                }
+              },
+              "type": "object",
+              "description": "设置筛选条件。"
+            },
+            "range": {
+              "type": "string",
+              "description": "设置筛选的应用范围。支持以下五种写法，了解更多，参考[筛选指南](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet-filter/filter-user-guide)。;;- `sheetId`：填写实际的工作表 ID，表示将筛选应用于整表;- `sheetId!{开始行索引}:{结束行索引}` ：填写工作表 ID 和行数区间，表示将筛选应用于整行;- `sheetId!{开始列索引}:{结束列索引}`：填写工作表 ID 和列的区间，表示将筛选应用于整列;- `sheetId!{开始单元格}:{结束单元格}`：填写工作表 ID 和单元格区间，表示将筛选应用于单元格选定的区域中;- `sheetId!{开始单元格}:{结束列索引}`：填写工作表 ID、起始单元格和结束列，表示省略结束行，使用表格的最后行作为结束行",
+              "required": true,
+              "example": "8fe9d6!A1:H14"
+            }
+          },
+          "accessTokens": [
+            "tenant",
+            "user"
+          ]
+        },
+        "delete": {
+          "httpMethod": "DELETE",
+          "parameters": {
+            "spreadsheet_token": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "电子表格的 token。可通过以下两种方式获取。了解更多，参考[电子表格概述](https://open.feishu.cn/document/ukTMukTMukTM/uATMzUjLwEzM14CMxMTN/overview)。;- 电子表格的 URL：https://sample.feishu.cn/sheets/==Iow7sNNEphp3WbtnbCscPqabcef==;- 调用[获取文件夹中的文件清单](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file/list)",
+              "example": "Iow7sNNEphp3WbtnbCscPqabcef"
+            },
+            "sheet_id": {
+              "description": "工作表 ID，通过[获取工作表](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet/query) 获取。",
+              "example": "8fe9d6",
+              "type": "string",
+              "location": "path",
+              "required": true
+            }
+          },
+          "parameterOrder": [
+            "spreadsheet_token",
+            "sheet_id"
+          ],
+          "path": "spreadsheets/{spreadsheet_token}/sheets/{sheet_id}/filter",
+          "docUrl": "https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet-filter/delete",
+          "id": "spreadsheet.sheet.filter.delete",
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "danger": true,
+          "scopes": [
+            "sheets:spreadsheet",
+            "drive:drive",
+            "sheets:spreadsheet:write_only"
+          ],
+          "description": "删除筛选"
+        },
+        "get": {
+          "scopes": [
+            "drive:drive",
+            "drive:drive:readonly",
+            "sheets:spreadsheet",
+            "sheets:spreadsheet:readonly",
+            "sheets:spreadsheet:read"
+          ],
+          "httpMethod": "GET",
+          "description": "获取筛选",
+          "responseBody": {
+            "sheet_filter_info": {
+              "description": "筛选信息",
+              "required": false,
+              "ref": "sheet_filter_info",
+              "properties": {
+                "range": {
+                  "type": "string",
+                  "description": "筛选的应用范围",
+                  "required": true,
+                  "example": "8fe9d6!A1:H14"
+                },
+                "filtered_out_rows": {
+                  "type": "array",
+                  "description": "被筛选条件过滤掉的行。从 1 开始索引。",
+                  "required": true
+                },
+                "filter_infos": {
+                  "type": "array",
+                  "description": "工作表的筛选条件",
+                  "required": true,
+                  "properties": {
+                    "col": {
+                      "type": "string",
+                      "description": "设置了筛选条件的列",
+                      "required": true,
+                      "example": "E"
+                    },
+                    "conditions": {
+                      "type": "array",
+                      "description": "筛选条件",
+                      "required": true
+                    }
+                  }
+                }
+              },
+              "type": "object"
+            }
+          },
+          "accessTokens": [
+            "tenant",
+            "user"
+          ],
+          "parameters": {
+            "spreadsheet_token": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "电子表格的 token。可通过以下两种方式获取。了解更多，参考[电子表格概述](https://open.feishu.cn/document/ukTMukTMukTM/uATMzUjLwEzM14CMxMTN/overview)。;- 电子表格的 URL：https://sample.feishu.cn/sheets/==Iow7sNNEphp3WbtnbCscPqabcef==;- 调用[获取文件夹中的文件清单](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file/list)",
+              "example": "Iow7sNNEphp3WbtnbCscPqabcef"
+            },
+            "sheet_id": {
+              "location": "path",
+              "required": true,
+              "description": "工作表 ID，通过[获取工作表](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet/query) 获取。",
+              "example": "8fe9d6",
+              "type": "string"
+            }
+          },
+          "parameterOrder": [
+            "spreadsheet_token",
+            "sheet_id"
+          ],
+          "path": "spreadsheets/{spreadsheet_token}/sheets/{sheet_id}/filter",
+          "docUrl": "https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet-filter/get",
+          "id": "spreadsheet.sheet.filter.get"
+        }
+      }
+    },
+    "spreadsheet.sheets": {
+      "methods": {
+        "find": {
+          "responseBody": {
+            "find_result": {
+              "required": false,
+              "ref": "find_replace_result",
+              "properties": {
+                "matched_cells": {
+                  "type": "array",
+                  "description": "符合查找条件的单元格数组，不包含公式",
+                  "required": false
+                },
+                "matched_formula_cells": {
+                  "description": "符合查找条件的含有公式的单元格数组",
+                  "required": false,
+                  "type": "array"
+                },
+                "rows_count": {
+                  "example": "2",
+                  "type": "integer",
+                  "description": "符合查找条件的总行数",
+                  "required": false
+                }
+              },
+              "type": "object",
+              "description": "符合条件的信息"
+            }
+          },
+          "accessTokens": [
+            "user",
+            "tenant"
+          ],
+          "parameterOrder": [
+            "spreadsheet_token",
+            "sheet_id"
+          ],
+          "requestBody": {
+            "find_condition": {
+              "type": "object",
+              "description": "指定查找单元格的条件。",
+              "required": true,
+              "ref": "find_condition",
+              "properties": {
+                "range": {
+                  "type": "string",
+                  "description": "查找范围。格式为 `<sheetId>!<开始位置>:<结束位置>`。其中：;- `sheetId` 为工作表 ID，通过[获取工作表](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet/query) 获取;- `<开始位置>:<结束位置>` 为工作表中单元格的范围，数字表示行索引，字母表示列索引。如 `A2:B2` 表示该工作表第 2 行的 A 列到 B 列。`range`支持四种写法，详情参考[电子表格概述](https://open.feishu.cn/document/ukTMukTMukTM/uATMzUjLwEzM14CMxMTN/overview)",
+                  "required": true,
+                  "example": "PNIfrm!A1:C5"
+                },
+                "match_case": {
+                  "required": false,
+                  "example": "true",
+                  "type": "boolean",
+                  "description": "是否忽略查找字符串的大小写，默认为 false。;- `true`：忽略字符串中字母大小写差异;- `false`：区分字符串中字母大小写"
+                },
+                "match_entire_cell": {
+                  "type": "boolean",
+                  "description": "字符串是否需要完全匹配整个单元格，默认值为 false。;- `true`：完全匹配单元格，比如 `find` 参数 取值为 \"hello\"，则单元格中的内容必须为 \"hello\" 才会匹配替换;- `false`：允许部分匹配单元格，比如 `find` 取值为 \"hello\"，则单元格中的内容包含 \"hello\" 即可匹配替换",
+                  "required": false,
+                  "example": "false"
+                },
+                "search_by_regex": {
+                  "required": false,
+                  "example": "false",
+                  "type": "boolean",
+                  "description": "是否使用正则表达式查找，默认值为 false。;- `true`：使用正则表达式;- `false`：不使用正则表达式"
+                },
+                "include_formulas": {
+                  "example": "false",
+                  "type": "boolean",
+                  "description": "是否仅搜索单元格公式，默认值为 false。;- `true`：仅搜索单元格公式;- `false`：仅搜索单元格内容",
+                  "required": false
+                }
+              }
+            },
+            "find": {
+              "type": "string",
+              "description": "查找的字符串。当`search_by_regex` 字段为 true 时，你需填入正则表达式",
+              "required": true,
+              "example": "如下所示：;- 字符串查找示例： \"hello\";- 正则表达式查找示例：\"[A-Z]\\w+"
+            }
+          },
+          "scopes": [
+            "sheets:spreadsheet",
+            "sheets:spreadsheet:readonly",
+            "drive:drive",
+            "drive:drive:readonly",
+            "sheets:spreadsheet:read"
+          ],
+          "danger": true,
+          "docUrl": "https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet/find",
+          "id": "spreadsheet.sheet.find",
+          "path": "spreadsheets/{spreadsheet_token}/sheets/{sheet_id}/find",
+          "parameters": {
+            "spreadsheet_token": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "电子表格的 token。可通过以下两种方式获取。了解更多，参考[电子表格概述](https://open.feishu.cn/document/ukTMukTMukTM/uATMzUjLwEzM14CMxMTN/overview)。;- 电子表格的 URL：https://sample.feishu.cn/sheets/==Iow7sNNEphp3WbtnbCscPqabcef==;- 调用[获取文件夹中的文件清单](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/drive-v1/file/list)",
+              "example": "Iow7sNNEphp3WbtnbCscPqabcef"
+            },
+            "sheet_id": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "工作表的 ID，获取方式见[获取工作表](https://open.feishu.cn/document/ukTMukTMukTM/uUDN04SN0QjL1QDN/sheets-v3/spreadsheet-sheet/query)。",
+              "example": "PNIfrm"
+            }
+          },
+          "description": "查找单元格",
+          "httpMethod": "POST"
+        }
+      }
+    }
+  },
+  "name": "sheets",
+  "version": "v3"
+}

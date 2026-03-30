@@ -62,7 +62,7 @@ feishu search doc-wiki --query "weekly report" --doc-filter-json '{"only_title":
 
 ## Notes
 
-- The `search` command group defaults to `auth_mode=user` (override with `--auth-mode tenant` if needed).
+- The `search` command group defaults to user identity (override with `--as bot` only when the endpoint supports bot identity).
 - `--all` auto-paginates and returns an aggregated result (`items` or `res_units`).
 - Official search APIs typically require `user_access_token` and scopes like `search:app`, `search:message`, and `search:docs:read`.
 - For `search doc-wiki`, official docs recommend combining `query` with at least one of `doc_filter` or `wiki_filter`.

@@ -1,279 +1,375 @@
 # CLI Command Reference
 
+## 命令体系概览
+
+```
+feishu
+├── config          # 配置管理
+├── auth            # 认证/身份
+├── doctor          # 环境诊断
+├── schema          # 查看 API schema
+├── api             # Raw API 调用
+├── completion      # Shell 自动补全
+├── webhook         # Webhook 工具命令
+├── ws              # WebSocket 长连接
+├── server          # 托管服务
+├── media           # 上传/下载 IM 媒体
+├── <service>       # 元数据驱动的 service commands
+│   ├── <resource> <method>    # Layer 2: service command
+│   └── +<shortcut>            # Layer 1: 高层工作流
+├── bitable         # 多维表格（shortcuts + service commands）
+└── docx            # 云文档（shortcuts）
+```
+
+---
+
 ## Global Flags
 
+所有命令共享的参数：
+
 ```
---format human|json         Output format (default: human)
---app-id TEXT               Feishu app ID (env: FEISHU_APP_ID)
---app-secret TEXT           Feishu app secret (env: FEISHU_APP_SECRET)
---auth-mode tenant|user|auto Auth mode
---base-url URL              API base (default: https://open.feishu.cn/open-apis)
---timeout SECONDS           Request timeout
---max-output-chars INT      Stdout cap for regular command results (default: 25000)
---output-offset INT         Inspect a later slice of oversized JSON output
---save-output PATH          Write full normalized JSON to file before stdout truncation
---full-output               Disable regular-command stdout truncation
+--format json|pretty|table|csv|ndjson|human   输出格式（默认 json）
+--as user|bot|auto                            身份（默认 bot）
+--app-id TEXT                                 App ID (env: FEISHU_APP_ID)
+--app-secret TEXT                             App Secret (env: FEISHU_APP_SECRET)
+--profile TEXT                                CLI profile 名称
+--base-url URL                                API 地址 (默认: https://open.feishu.cn/open-apis)
+--timeout SECONDS                             HTTP 超时
+--max-output-chars INT                        stdout 上限 (默认: 25000)
+--output-offset INT                           查看后续 JSON 片段
+--save-output PATH                            完整 JSON 写盘
+--full-output                                 禁用 stdout 裁剪
+--no-store                                    禁用本地 token 存储
 ```
 
-## Large Output Control
+Service command / api / shortcut 额外支持：
+
+```
+--params JSON                                 查询/路径参数
+--data JSON                                   请求体
+--page-all                                    自动分页
+--page-size INT                               每页条数
+--page-limit INT                              最大页数 (默认: 10)
+--page-delay INT                              页间延迟 ms (默认: 200)
+--output PATH                                 业务输出写文件（如下载）
+--dry-run                                     预览将执行的 API 调用
+```
+
+---
+
+## config — 配置管理
 
 ```bash
-# Keep full JSON on disk, but return a capped stdout preview
-feishu search app --query "calendar" --save-output ./search-full.json --format json
+# 初始化 profile
+printf 'your_app_secret' | feishu config init --profile default --app-id cli_xxx --app-secret-stdin --default-as auto --set-default --format json
 
-# Inspect the next JSON slice when _cli_output.next_output_offset is returned
-feishu search app --query "calendar" --output-offset 25000 --max-output-chars 25000 --format json
+# 查看当前 profile
+feishu config show --format json
 
-# Disable truncation only when you explicitly want the full stdout payload
-feishu search app --query "calendar" --full-output --format json
+# 列出所有 profiles
+feishu config list-profiles --format json
+
+# 设置默认 profile
+feishu config set-default-profile my-profile
+
+# 设置默认身份
+feishu config set-default-as --as user
+
+# 删除 profile
+feishu config remove-profile old-profile
+
+# 从旧 token store 迁移
+feishu config migrate-token-store --source-path /path/to/old/tokens.json
 ```
 
-Agent rule:
-- Prefer `--page-size` and `--page-token` for large result sets.
-- Use `--all` only when the total result volume is expected to stay manageable.
-- For non-paged commands such as `drive list-members`, `calendar list-freebusy`, and `calendar batch-freebusy`, prefer `--save-output`.
+---
 
-## auth - Authentication
+## auth — 认证/身份
 
 ```bash
-# Get tenant access token
+# 获取当前 token
 feishu auth token --format json
+feishu auth token --as bot --format json
 
-# Inspect current authenticated user (requires user auth)
-feishu auth whoami --auth-mode user --format json
+# 查看当前登录用户
+feishu auth whoami --format json
 
-# Raw API request
-feishu auth request GET /contact/v3/users/me
-feishu auth request POST /im/v1/messages --params-json '{"receive_id_type":"open_id"}' \
-  --payload-json '{"receive_id":"ou_xxx","msg_type":"text","content":"{\"text\":\"hi\"}"}'
+# 查看完整认证状态
+feishu auth status --format json
+feishu auth status --verify --format json         # 额外服务端校验
+
+# 检查 scope 是否满足
+feishu auth check --scope "drive:file:upload" --scope "docs:doc" --format json
+feishu auth check --scope "drive:file:upload docs:doc" --format json
+
+# 列出可用 scopes
+feishu auth scopes --format json
+feishu auth scopes --domain calendar drive --recommend --format json
+
+# 列出所有已配置的 profiles
+feishu auth list --format json
+
+# 登录（OAuth，默认 device flow）
+feishu auth login --scope "offline_access contact:user:search" --format json
+feishu auth login --recommend --domain calendar drive --format json
+feishu auth login --device-code --format json
+feishu auth login --localhost --no-browser --format json
+
+# 刷新 token
+feishu auth refresh --format json
+
+# 登出
+feishu auth logout --format json
+feishu auth logout --all-profiles --format json
 ```
 
-## im - Instant Messaging
+---
+
+## doctor — 环境诊断
 
 ```bash
-# Send text message
-feishu im send-text --receive-id ou_xxx --text "Hello"
-
-# Send markdown
-feishu im send-markdown --receive-id ou_xxx --markdown "# Title\n\nContent"
-feishu im send-markdown --receive-id ou_xxx --markdown-file report.md
-cat report.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin
-
-# Reply with markdown
-feishu im reply-markdown om_xxx --markdown "Got it!"
-
-# Send arbitrary message type
-feishu im send --receive-id ou_xxx --msg-type text --content-json '{"text":"hello"}'
-echo '{"text":"piped"}' | feishu im send --receive-id ou_xxx --msg-type text --content-stdin
-
-# Reply to message
-feishu im reply om_xxx --msg-type text --content-json '{"text":"reply"}'
-
-# Get/recall message
-feishu im get om_xxx
-feishu im recall om_xxx
+feishu doctor --format json                # 检查 config、metadata、token、网络
+feishu doctor --offline --format json       # 跳过网络检查
 ```
 
-**Receive ID**: defaults to `open_id`. Override with `--receive-id-type chat_id|user_id|union_id`.
+检查项：config、metadata、identity.user、identity.bot、token_store、open_api endpoint、accounts endpoint。
 
-## media - Media Upload
+---
+
+## schema — 查看 API 元数据
+
+**不确定某个 API 怎么调时，先查 schema。**
 
 ```bash
-# Upload image (returns image_key)
-feishu media upload-image photo.png
-feishu media upload-image avatar.jpg --image-type avatar
+# 列出所有 service
+feishu schema list --format json
 
-# Upload file (returns file_key)
-feishu media upload-file document.pdf --file-type pdf
-feishu media upload-file video.mp4 --file-type mp4 --duration 60000
+# 列出某个 service 的 resource / method
+feishu schema list drive --format json
+
+# 查看具体 method 的参数、scopes、文档链接
+feishu schema show drive.files.list --format json
+feishu schema show calendar.events.create --format json
+
+# 查看 shortcut schema
+feishu schema show bitable.+create-from-csv --format json
+
+# 列出所有 schema path
+feishu schema paths --format json
 ```
 
-## bitable - Bitable (Spreadsheet Database)
+---
+
+## api — Raw API 调用
 
 ```bash
-# Create bitable from CSV (returns app_token + url)
-feishu bitable create-from-csv data.csv --app-name "Sales Data" --table-name "Q1"
-feishu bitable create-from-csv data.csv --app-name "Sales" --table-name "Q1" --grant-member-id ou_xxx
+feishu api GET /open-apis/drive/v1/files --params '{"folder_token":"fld_xxx"}' --format json
+feishu api POST /open-apis/im/v1/messages --params '{"receive_id_type":"open_id"}' \
+  --data '{"receive_id":"ou_xxx","msg_type":"text","content":"{\"text\":\"hello\"}"}' --as bot --format json
+feishu api GET /authen/v1/user_info --as user --format json
 
-# List tables first when you need an explicit table choice
-feishu bitable list-tables --app-token bascnXXX --format json
-
-# Create table in existing app
-feishu bitable create-table --app-token bascnXXX --table-json '{"name":"Sheet2","fields":[...]}'
-
-# CRUD records
-# --table-id can be omitted when the app has a default table or exactly one table
-feishu bitable create-record --app-token bascnXXX --fields-json '{"Name":"Alice","Score":95}'
-feishu bitable list-records --app-token bascnXXX --table-id tblXXX --page-size 100 --format json
-feishu bitable list-records --app-token bascnXXX --all --format json
-feishu bitable list-views --app-token bascnXXX --format json
-
-# Grant edit permission
-feishu bitable grant-edit --app-token bascnXXX --member-id ou_xxx
-feishu bitable grant-edit --app-token bascnXXX --member-id me --member-id-type open_id --auth-mode auto --format json
+# 预览
+feishu api GET /open-apis/drive/v1/files --params '{"folder_token":"fld_xxx"}' --dry-run --format json
 ```
 
-## docx - Documents
+---
+
+## completion — Shell 自动补全
 
 ```bash
-# Create empty document
-feishu docx create --title "Weekly Report" --format json
-
-# Insert markdown/html content
-feishu docx insert-content --document-id docXXX --content "# Section\n\nContent" --content-type markdown --format json
-feishu docx insert-content --document-id docXXX --content-file content.md --content-type markdown --document-revision-id -1 --format json
-cat content.md | feishu docx insert-content --document-id docXXX --content-stdin --content-type markdown --format json
-
-# insert-content returns a compact summary by default; add --full-response only for debugging
-feishu docx insert-content --document-id docXXX --content-file content.md --content-type markdown --full-response --format json
-
-# Grant edit permission
-feishu docx grant-edit --document-id docXXX --member-id ou_xxx --format json
-feishu docx grant-edit --document-id docXXX --member-id me --member-id-type open_id --auth-mode auto --format json
-
-# Export document as markdown
-feishu docx get-content --doc-token docXXX --doc-type docx --content-type markdown --format json
-feishu docx get-content --doc-token docXXX --doc-type wiki_doc --content-type markdown --output ./doc.md --format json
+feishu completion bash
+feishu completion zsh
+feishu completion fish
 ```
 
-## drive - Drive Files
+---
+
+## Shortcuts（+前缀命令）
+
+### bitable +create-from-csv
+
+从 CSV 创建多维表格：
 
 ```bash
-# Upload file to drive
-feishu drive root-folder-meta --auth-mode user --format json
-feishu drive create-folder --auth-mode user --folder-token fld_root_xxx --name "Uploads" --format json
-feishu drive upload-file report.pdf --parent-type explorer --parent-node fldcnXXX
-feishu drive upload-file report.pdf --parent-type explorer --parent-node fldcnXXX --auth-mode user --check-requester-owner --format json
-
-# Import/export tasks
-feishu drive create-import-task --task-json '{"file_extension":"csv","file_token":"xxx","type":"bitable",...}'
-feishu drive get-import-task TICKET_ID
-
-feishu drive create-export-task --task-json '{"token":"xxx","type":"bitable"}'
-feishu drive get-export-task TICKET_ID --token xxx
-
-# Permissions
-feishu drive meta --request-docs-json '[{"doc_token":"file_xxx","doc_type":"file"}]' --auth-mode user --check-requester-owner --format json
-feishu drive grant-edit --token docXXX --resource-type docx --member-id ou_xxx --permission edit --format json
-feishu drive grant-edit --token docXXX --resource-type docx --member-id me --member-id-type open_id --permission edit --auth-mode auto --format json
-feishu drive list-members --token docXXX --resource-type docx --format json
-feishu drive list-members --token docXXX --resource-type docx --save-output ./drive-members.json --format json
+feishu bitable +create-from-csv data.csv --app-name "Sales" --table-name "Q1" --format json
+feishu bitable +create-from-csv data.csv --app-name "Sales" --table-name "Q1" --grant-member-id ou_xxx --format json
+feishu bitable +create-from-csv data.csv --app-name "Sales" --table-name "Q1" --dry-run --format json
 ```
 
-## wiki - Knowledge Base
+### docx +insert-content
+
+将 Markdown/HTML 内容插入云文档：
 
 ```bash
-# List wiki spaces
-feishu wiki list-spaces --page-size 20 --format json
-feishu wiki list-spaces --all --format json
-
-# Search nodes
-feishu wiki search-nodes --query "project plan" --space-id spaceXXX --page-size 20 --format json
-feishu wiki search-nodes --query "project plan" --space-id spaceXXX --all --format json
-
-# Get node details
-feishu wiki get-node --token wikiXXX --format json
-
-# List child nodes
-feishu wiki list-nodes --space-id spaceXXX --parent-node-token wikiXXX --page-size 20 --format json
+feishu docx +insert-content --document-id doccn_xxx --content-file report.md --format json
+feishu docx +insert-content --document-id doccn_xxx --content "# Title\n\nBody" --content-type markdown --format json
+cat report.md | feishu docx +insert-content --document-id doccn_xxx --content-stdin --format json
+# 默认返回精简摘要，排查时加 --full-response
+feishu docx +insert-content --document-id doccn_xxx --content-file report.md --full-response --format json
 ```
 
-## calendar - Calendars and Events
+### docx +convert-content
+
+将 Markdown/HTML 转换为飞书 Docx 块：
 
 ```bash
-# Calendars
-feishu calendar list-calendars --page-size 50 --format json
-feishu calendar list-calendars --all --format json
-feishu calendar search-calendars --query "eng" --page-size 20 --format json
-feishu calendar search-calendars --query "eng" --all --format json
-
-# Events
-feishu calendar list-events --calendar-id calXXX --page-size 100 --format json
-feishu calendar list-events --calendar-id calXXX --all --format json
-feishu calendar search-events --calendar-id calXXX --query "weekly" --page-size 50 --format json
-feishu calendar search-events --calendar-id calXXX --all --format json
-
-# Freebusy results can be large and are not paged by the CLI; save before inspection
-feishu calendar list-freebusy --request-file freebusy.json --save-output ./freebusy.json --format json
-feishu calendar batch-freebusy --request-file batch-freebusy.json --save-output ./batch-freebusy.json --format json
+feishu docx +convert-content --content-file draft.md --content-type markdown --format json
+feishu docx +convert-content --content "# Hello" --output ./blocks.json --format json
 ```
 
-## contact - Users and Departments
+### calendar +attach-material
+
+上传文件并附加到日历事件：
 
 ```bash
-# Users
-feishu contact user get --user-id ou_xxx --user-id-type open_id --format json
-feishu contact user by-department --department-id od_xxx --page-size 50 --format json
-feishu contact user by-department --department-id od_xxx --all --format json
-feishu contact user search --query "Alice" --page-size 20 --auth-mode auto --format json
-feishu contact user search --query "Alice" --all --auth-mode auto --format json
-
-# Departments and scopes
-feishu contact department children --department-id od_xxx --page-size 50 --format json
-feishu contact department children --department-id od_xxx --all --format json
-feishu contact department parent --department-id od_xxx --all --format json
-feishu contact department search --query "engineering" --all --format json
-feishu contact scope get --page-size 100 --format json
-feishu contact scope get --all --format json
+feishu calendar +attach-material --calendar-id cal_xxx --event-id evt_xxx ./agenda.md --format json
 ```
 
-## webhook - Webhook Processing
+### drive +requester-upload
+
+以当前用户身份上传文件到用户空间（自动创建子目录 + 校验 owner）：
 
 ```bash
-# Decode encrypted webhook body
+feishu drive +requester-upload ./report.pdf --as user --format json
+feishu drive +requester-upload ./report.pdf --folder-name "Uploads" --format json
+```
+
+### mail +send-markdown
+
+渲染 Markdown 为 HTML 邮件并发送（自动处理图片内联）：
+
+```bash
+feishu mail +send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
+feishu mail +send-markdown --user-mailbox-id me --to-email a@example.com --to-email b@example.com --cc-email cc@example.com --subject "周报" --markdown "# 周报\n\n完成情况..." --format json
+```
+
+---
+
+## Service Commands（元数据驱动）
+
+Service commands 按 `<service> <resource> <method>` 结构组织，参数走 `--params` / `--data`。
+
+### 可用 services
+
+当前已同步的 service: `calendar`, `drive`, `im`, `mail`, `minutes`, `sheets`, `task`, `vc`, `wiki`。
+
+用 `feishu schema list` 查看实时列表。
+
+### 示例
+
+```bash
+# Drive
+feishu drive files list --params '{"folder_token":"fld_xxx"}' --as user --format json
+feishu drive files copy --params '{"file_token":"doc_xxx"}' --data '{"folder_token":"fld_xxx","name":"copy","type":"file"}' --format json
+
+# Calendar
+feishu calendar events list --params '{"calendar_id":"primary"}' --page-all --as user --format json
+feishu calendar events create --params '{"calendar_id":"primary"}' --data '{"summary":"Meeting","start_time":{"timestamp":"1700000000"},"end_time":{"timestamp":"1700003600"}}' --format json
+feishu calendar calendars search --data '{"query":"weekly sync"}' --format json
+
+# IM
+feishu im messages list --params '{"container_id":"oc_xxx","container_id_type":"chat"}' --page-all --format json
+
+# Task
+feishu task tasks list --format json
+feishu task tasks create --data '{"summary":"Review PR","due":{"timestamp":"1700086400"}}' --format json
+
+# Wiki
+feishu wiki spaces list --page-all --format json
+
+# Mail
+feishu mail mailboxes messages list --params '{"user_mailbox_id":"me","folder_id":"INBOX"}' --page-all --format json
+```
+
+---
+
+## Click 命令：webhook / ws / server / media
+
+### media -- 上传下载
+
+```bash
+feishu media upload-image photo.png --format json
+feishu media upload-file document.pdf --file-type pdf --format json
+feishu media download-file img_v3_xxx ./output.jpg --message-id om_xxx --resource-type image --as bot --format json
+```
+
+### webhook
+
+```bash
 feishu webhook decode --body-json '{"encrypt":"..."}' --encrypt-key KEY
-
-# Verify signature
-feishu webhook verify-signature --headers-json '{"X-Lark-Signature":"...","X-Lark-Request-Timestamp":"...","X-Lark-Request-Nonce":"..."}' \
-  --body-json '{"..."}' --encrypt-key KEY
-
-# Handle challenge
-feishu webhook challenge --challenge "feishu_xxx"
-
-# Parse webhook event
+feishu webhook verify-signature --headers-json '{"X-Lark-Signature":"..."}' --body-json '{"..."}' --encrypt-key KEY
 feishu webhook parse --body-json '{"..."}' --encrypt-key KEY
-
-# Start webhook HTTP server
 feishu webhook serve --host 0.0.0.0 --port 8000 --path /webhook/feishu --print-payload
-feishu webhook serve --max-requests 5  # Stop after 5 requests
 ```
 
-## ws - WebSocket
+### ws -- WebSocket
 
 ```bash
-# Get WebSocket endpoint info
 feishu ws endpoint --format json
-
-# Listen for events via WebSocket
 feishu ws run --print-payload
 feishu ws run --event-type im.message.receive_v1 --max-events 10
-feishu ws run --duration-seconds 300
 ```
 
-## server - Managed Bot Server
+### server -- 托管服务
 
 ```bash
-# Run bot server (foreground, blocks until SIGINT)
 feishu server run --print-payload
-feishu server run --event-type im.message.receive_v1
-
-# Daemon mode
 feishu server start --pid-file /tmp/feishu.pid --log-file /tmp/feishu.log
 feishu server status --pid-file /tmp/feishu.pid --format json
 feishu server stop --pid-file /tmp/feishu.pid
 ```
 
-## Stdin Piping Patterns
+---
 
-All commands with `--*-json` also support `--*-file PATH` and `--*-stdin`:
+## 大输出控制
 
 ```bash
-# Pipe markdown from another command
+# 先落盘再分析
+feishu search app --query "calendar" --save-output ./search-full.json --format json
+
+# 查看后续 JSON 片段（_cli_output.next_output_offset 指示）
+feishu search app --query "calendar" --output-offset 25000 --format json
+
+# 关闭裁剪
+feishu search app --query "calendar" --full-output --format json
+```
+
+Agent 规则：
+- service command 优先用 `--page-size` / `--page-all` 控制数据量
+- 不支持翻页的大结果（如 `calendar list-freebusy`）用 `--save-output`
+
+---
+
+## Stdin 输入模式
+
+所有支持 `--*-json` 的命令同时支持 `--*-file PATH` 和 `--*-stdin`：
+
+```bash
 generate_report | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --format json
-
-# Pipe JSON payload
 echo '{"text":"hello"}' | feishu im send --receive-id ou_xxx --msg-type text --content-stdin
-
-# Pipe from file
 feishu im send --receive-id ou_xxx --msg-type interactive --content-file card.json
 ```
+
+---
+
+## 错误输出格式
+
+`--format json` 时错误返回结构化 envelope：
+
+```json
+{
+  "ok": false,
+  "error": {
+    "type": "http_error",
+    "code": 99991679,
+    "message": "...",
+    "hint": "missing user scopes: contact:user:search; re-login with: feishu auth login --scope ...",
+    "retryable": false,
+    "status_code": 400,
+    "response_excerpt": "..."
+  },
+  "exit_code": 4
+}
+```
+
+Exit codes: 0=成功, 1=内部错误, 2=参数/配置错误, 3=飞书API错误, 4=HTTP错误。

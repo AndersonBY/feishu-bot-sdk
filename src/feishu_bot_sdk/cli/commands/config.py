@@ -42,7 +42,7 @@ def _cmd_config_init(args: argparse.Namespace) -> Mapping[str, Any]:
         auth_mode=getattr(args, "auth_mode", None) or (existing.auth_mode if existing else None),
         base_url=getattr(args, "base_url", None) or (existing.base_url if existing else None),
         timeout_seconds=getattr(args, "timeout", None) or (existing.timeout_seconds if existing else None),
-        default_identity=existing.default_identity if existing else None,
+        default_as=getattr(args, "default_as", None) or (existing.default_as if existing else None),
         token_store_path=getattr(args, "token_store", None) or (existing.token_store_path if existing else None),
     )
     updated = config.with_profile(
@@ -86,6 +86,8 @@ def _cmd_config_list_profiles(_args: argparse.Namespace) -> Mapping[str, Any]:
                 "default": name == config.default_profile,
                 "app_id": profile.app_id,
                 "auth_mode": profile.auth_mode,
+                "default_as": profile.default_as,
+                "default_identity": profile.default_as,
                 "base_url": profile.base_url,
                 "has_app_secret": profile.app_secret_ref is not None,
             }
@@ -129,6 +131,37 @@ def _cmd_config_remove_profile(args: argparse.Namespace) -> Mapping[str, Any]:
         "profile": profile_name,
         "deleted": True,
         "removed_secret": removed_secret,
+        "default_profile": updated.default_profile,
+        "config_path": str(config_path),
+    }
+
+
+def _cmd_config_set_default_as(args: argparse.Namespace) -> Mapping[str, Any]:
+    config = load_cli_config()
+    profile_name = resolve_cli_profile_name(getattr(args, "profile", None), config=config)
+    profile = config.profile(profile_name)
+    if profile is None:
+        raise ValueError(f"profile {profile_name!r} is not configured")
+    default_as = str(getattr(args, "as_value", None) or "").strip().lower()
+    if default_as not in {"user", "bot", "auto"}:
+        raise ValueError("set-default-as requires --as user|bot|auto")
+    updated_profile = CLIProfile(
+        name=profile.name,
+        app_id=profile.app_id,
+        app_secret_ref=profile.app_secret_ref,
+        auth_mode=profile.auth_mode,
+        base_url=profile.base_url,
+        timeout_seconds=profile.timeout_seconds,
+        default_as=default_as,
+        token_store_path=profile.token_store_path,
+        updated_at=profile.updated_at,
+    )
+    updated = config.with_profile(updated_profile, set_default=False)
+    config_path = save_cli_config(updated)
+    return {
+        "profile": profile_name,
+        "default_as": default_as,
+        "default_identity": default_as,
         "default_profile": updated.default_profile,
         "config_path": str(config_path),
     }
@@ -254,7 +287,8 @@ def _profile_payload(
         "auth_mode": profile.auth_mode,
         "base_url": profile.base_url,
         "timeout_seconds": profile.timeout_seconds,
-        "default_identity": profile.default_identity,
+        "default_as": profile.default_as,
+        "default_identity": profile.default_as,
         "token_store_path": profile.token_store_path,
         "has_app_secret": profile.app_secret_ref is not None,
         "app_secret_backend": profile.app_secret_ref.backend if profile.app_secret_ref else None,

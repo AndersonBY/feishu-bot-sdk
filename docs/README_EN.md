@@ -16,6 +16,8 @@ This directory contains module-based SDK documentation. Each module has a standa
 - [08 FeishuBotServer (Long Connection Service)](./en/08-bot-server.md)
 - [09 Types, Errors, and Rate Limit](./en/09-types-errors-rate-limit.md)
 - [10 CLI Tool](./en/10-cli.md)
+- [CLI Framework Decision](./cli-framework-decision.md)
+- [CLI Command Mapping](./cli-command-mapping.md)
 - [11 Calendar](./en/11-calendar.md)
 - [12 Contact](./en/12-contact.md)
 - [13 Search](./en/13-search.md)

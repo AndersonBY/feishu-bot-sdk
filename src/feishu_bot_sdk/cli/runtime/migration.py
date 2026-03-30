@@ -69,7 +69,7 @@ def migrate_token_store_to_cli_config(
             auth_mode=normalized_auth_mode or (existing.auth_mode if existing else None),
             base_url=normalized_base_url or (existing.base_url if existing else None),
             timeout_seconds=timeout_seconds if timeout_seconds is not None else (existing.timeout_seconds if existing else None),
-            default_identity=existing.default_identity if existing else None,
+            default_as=existing.default_as if existing else None,
             token_store_path=normalized_token_store_path,
         )
         updated = updated.with_profile(profile, set_default=False)

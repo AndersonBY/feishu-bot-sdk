@@ -137,4 +137,4 @@ def test_media_download_file_resource_type_requires_message_id(
     assert code == 2
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is False
-    assert "--resource-type requires --message-id" in payload["error"]
+    assert "--resource-type requires --message-id" in payload["error"]["message"]
