@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import copy
+import mimetypes
 import os
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, cast
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import httpx
 
@@ -80,6 +82,7 @@ class DocxService:
         document_revision_id: Optional[int] = None,
         client_token: Optional[str] = None,
         user_id_type: Optional[str] = None,
+        content_base_dir: str | os.PathLike[str] | None = None,
     ) -> Mapping[str, Any]:
         if not content:
             raise ValueError("content must not be empty")
@@ -113,6 +116,7 @@ class DocxService:
                         document_revision_id=document_revision_id,
                         client_token=client_token,
                         user_id_type=user_id_type,
+                        content_base_dir=content_base_dir,
                     )
                 )
             if current_index >= 0:
@@ -265,6 +269,7 @@ class DocxService:
         document_revision_id: Optional[int],
         client_token: Optional[str],
         user_id_type: Optional[str],
+        content_base_dir: str | os.PathLike[str] | None = None,
     ) -> List[Mapping[str, Any]]:
         relations = _extract_relation_map(inserted)
         replacements: List[Mapping[str, Any]] = []
@@ -272,7 +277,7 @@ class DocxService:
             block_id = relations.get(temp_block_id)
             if not block_id:
                 raise FeishuError(f"docx insert response missing block relation for image block {temp_block_id}")
-            downloaded = _download_binary(image_url)
+            downloaded = _download_binary(image_url, base_dir=content_base_dir)
             replacement = self.replace_image(
                 document_id,
                 block_id,
@@ -392,6 +397,7 @@ class AsyncDocxService:
         document_revision_id: Optional[int] = None,
         client_token: Optional[str] = None,
         user_id_type: Optional[str] = None,
+        content_base_dir: str | os.PathLike[str] | None = None,
     ) -> Mapping[str, Any]:
         if not content:
             raise ValueError("content must not be empty")
@@ -425,6 +431,7 @@ class AsyncDocxService:
                         document_revision_id=document_revision_id,
                         client_token=client_token,
                         user_id_type=user_id_type,
+                        content_base_dir=content_base_dir,
                     )
                 )
             if current_index >= 0:
@@ -577,6 +584,7 @@ class AsyncDocxService:
         document_revision_id: Optional[int],
         client_token: Optional[str],
         user_id_type: Optional[str],
+        content_base_dir: str | os.PathLike[str] | None = None,
     ) -> List[Mapping[str, Any]]:
         relations = _extract_relation_map(inserted)
         replacements: List[Mapping[str, Any]] = []
@@ -584,7 +592,7 @@ class AsyncDocxService:
             block_id = relations.get(temp_block_id)
             if not block_id:
                 raise FeishuError(f"docx insert response missing block relation for image block {temp_block_id}")
-            downloaded = await _download_binary_async(image_url)
+            downloaded = await _download_binary_async(image_url, base_dir=content_base_dir)
             replacement = await self.replace_image(
                 document_id,
                 block_id,
@@ -844,7 +852,14 @@ def _strip_table_merge_info(block: Dict[str, Any]) -> None:
         property_data.pop("merge_info", None)
 
 
-def _download_binary(url: str) -> _DownloadedAsset:
+def _download_binary(
+    url: str,
+    *,
+    base_dir: str | os.PathLike[str] | None = None,
+) -> _DownloadedAsset:
+    local_asset = _read_local_asset(url, base_dir=base_dir)
+    if local_asset is not None:
+        return local_asset
     normalized_url = _normalize_download_url(url)
     response = httpx.get(normalized_url, timeout=60)
     response.raise_for_status()
@@ -855,7 +870,14 @@ def _download_binary(url: str) -> _DownloadedAsset:
     )
 
 
-async def _download_binary_async(url: str) -> _DownloadedAsset:
+async def _download_binary_async(
+    url: str,
+    *,
+    base_dir: str | os.PathLike[str] | None = None,
+) -> _DownloadedAsset:
+    local_asset = _read_local_asset(url, base_dir=base_dir)
+    if local_asset is not None:
+        return local_asset
     normalized_url = _normalize_download_url(url)
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.get(normalized_url)
@@ -871,6 +893,61 @@ def _normalize_download_url(url: str) -> str:
     if url.startswith("//"):
         return f"https:{url}"
     return url
+
+
+def _read_local_asset(
+    url: str,
+    *,
+    base_dir: str | os.PathLike[str] | None = None,
+) -> _DownloadedAsset | None:
+    local_path = _resolve_local_asset_path(url, base_dir=base_dir)
+    if local_path is None:
+        return None
+    if not local_path.is_file():
+        raise FeishuError(f"local image file not found: {local_path}")
+    content_type, _ = mimetypes.guess_type(local_path.name)
+    return _DownloadedAsset(
+        content=local_path.read_bytes(),
+        file_name=local_path.name or f"asset-{uuid.uuid4().hex}",
+        content_type=content_type,
+    )
+
+
+def _resolve_local_asset_path(
+    url: str,
+    *,
+    base_dir: str | os.PathLike[str] | None = None,
+) -> Path | None:
+    normalized_url = _normalize_download_url(url)
+    parsed = urlparse(normalized_url)
+    if parsed.scheme in {"http", "https"}:
+        return None
+    if parsed.scheme and parsed.scheme != "file":
+        if len(parsed.scheme) == 1 and normalized_url[1:3] in {":\\", ":/"}:
+            return _resolve_local_path(Path(normalized_url), base_dir=base_dir)
+        return None
+
+    if parsed.scheme == "file":
+        path_text = unquote(parsed.path or "")
+        if parsed.netloc and parsed.netloc not in {"", "localhost"}:
+            path_text = f"//{parsed.netloc}{path_text}"
+        elif path_text.startswith("/") and len(path_text) >= 3 and path_text[2] == ":":
+            path_text = path_text[1:]
+        return _resolve_local_path(Path(path_text), base_dir=base_dir)
+
+    return _resolve_local_path(Path(normalized_url), base_dir=base_dir)
+
+
+def _resolve_local_path(
+    path: Path,
+    *,
+    base_dir: str | os.PathLike[str] | None = None,
+) -> Path:
+    candidate = path.expanduser()
+    if candidate.is_absolute():
+        return candidate.resolve(strict=False)
+    base = Path(base_dir).expanduser() if base_dir is not None else Path.cwd()
+    return (base / candidate).resolve(strict=False)
 
 
 def _guess_file_name(url: str, content_type: Optional[str]) -> str:

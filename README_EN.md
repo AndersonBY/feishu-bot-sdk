@@ -111,8 +111,10 @@ feishu bitable list-views --app-token app_xxx --format json
 
 # 7) Create and write Docx
 feishu docx create --title "Daily Report" --folder-token fld_xxx --format json
-feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
+feishu docx +insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
 feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --format json
+
+In `--content-file` mode, `docx +insert-content` resolves relative local image paths against the source Markdown file directory.
 
 # 8) Upload file to Drive
 feishu drive root-folder-meta --as user --format json

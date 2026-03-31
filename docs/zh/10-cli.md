@@ -124,6 +124,7 @@ feishu media download-file img_v3_xxx ./downloads/image.jpg --format json
 feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx --resource-type image --format json
 feishu bitable +create-from-csv ./final.csv --app-name "任务结果" --table-name "结果表"
 feishu docx +insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
+# `--content-file` 模式下，相对本地图片路径按 Markdown 文件所在目录解析
 feishu drive +requester-upload ./final.csv --folder-name "Uploads" --format json
 
 # 日历附件

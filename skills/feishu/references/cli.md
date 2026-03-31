@@ -222,6 +222,11 @@ cat report.md | feishu docx +insert-content --document-id doccn_xxx --content-st
 feishu docx +insert-content --document-id doccn_xxx --content-file report.md --full-response --format json
 ```
 
+说明：
+
+- `--content-file` 模式下，Markdown 中的相对本地图片路径按该文件所在目录解析
+- 如果 `docx create` 已成功但 `+insert-content` 失败，应保留原 `doc_id` 并报告部分成功，不要重复创建新文档
+
 ### docx +convert-content
 
 将 Markdown/HTML 转换为飞书 Docx 块：

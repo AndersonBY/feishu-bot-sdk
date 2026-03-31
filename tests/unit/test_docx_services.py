@@ -1,10 +1,12 @@
 import asyncio
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Mapping, Optional, cast
 
 from feishu_bot_sdk.docx import (
     AsyncDocxBlockService,
     AsyncDocxDocumentService,
+    AsyncDocxService,
     DocxBlockService,
     DocxDocumentService,
     DocxService,
@@ -253,7 +255,11 @@ def test_docx_service_insert_content_uses_convert_insert_and_replace_image(monke
     monkeypatch.setattr("feishu_bot_sdk.drive.DriveFileService.upload_media_bytes", fake_upload_media_bytes)
     monkeypatch.setattr(
         "feishu_bot_sdk.docx.service._download_binary",
-        lambda url: SimpleNamespace(content=b"img-bytes", file_name="a.png", content_type="image/png"),
+        lambda url, *, base_dir=None: SimpleNamespace(
+            content=b"img-bytes",
+            file_name="a.png",
+            content_type="image/png",
+        ),
     )
 
     stub = _SyncClientStub(resolver, doc_url_prefix="https://tenant.feishu.cn/docx")
@@ -271,6 +277,144 @@ def test_docx_service_insert_content_uses_convert_insert_and_replace_image(monke
     assert inserted_descendants[0]["table"]["property"] == {}
     assert stub.calls[2]["path"] == "/docx/v1/documents/doc_1/blocks/blk_image"
     assert stub.calls[2]["payload"] == {"replace_image": {"token": "file_img_1"}}
+
+
+def test_docx_service_insert_content_resolves_relative_local_images(tmp_path: Path, monkeypatch: Any):
+    image_dir = tmp_path / "images"
+    image_dir.mkdir()
+    image_path = image_dir / "chart.png"
+    image_path.write_bytes(b"png-bytes")
+
+    def resolver(call: Mapping[str, Any]) -> Mapping[str, Any]:
+        if call["path"] == "/docx/v1/documents/blocks/convert":
+            return {
+                "code": 0,
+                "data": {
+                    "first_level_block_ids": ["tmp_root"],
+                    "blocks": [
+                        {"block_id": "tmp_root", "block_type": 2, "children": ["tmp_image"]},
+                        {"block_id": "tmp_image", "block_type": 27, "children": [], "image": {}},
+                    ],
+                    "block_id_to_image_urls": [
+                        {"block_id": "tmp_image", "image_url": "images/chart.png"}
+                    ],
+                },
+            }
+        if call["path"] == "/docx/v1/documents/doc_1/blocks/doc_1/descendant":
+            return {
+                "code": 0,
+                "data": {
+                    "block_id_relations": [
+                        {"temporary_block_id": "tmp_root", "block_id": "blk_root"},
+                        {"temporary_block_id": "tmp_image", "block_id": "blk_image"},
+                    ]
+                },
+            }
+        return {"code": 0, "data": {"ok": True}}
+
+    uploaded: dict[str, Any] = {}
+
+    def fake_upload_media_bytes(
+        _self: Any,
+        filename: str,
+        content: bytes,
+        *,
+        parent_type: str,
+        parent_node: str,
+        extra: str | None = None,
+        checksum: str | None = None,
+        content_type: str | None = None,
+    ) -> Mapping[str, Any]:
+        uploaded["filename"] = filename
+        uploaded["content"] = content
+        uploaded["parent_type"] = parent_type
+        uploaded["parent_node"] = parent_node
+        uploaded["content_type"] = content_type
+        return {"file_token": "file_img_1"}
+
+    monkeypatch.setattr("feishu_bot_sdk.drive.DriveFileService.upload_media_bytes", fake_upload_media_bytes)
+
+    stub = _SyncClientStub(resolver)
+    service = DocxService(cast(FeishuClient, stub))
+
+    data = service.insert_content("doc_1", "# title", content_base_dir=tmp_path)
+
+    assert data["batch_count"] == 1
+    assert uploaded["filename"] == "chart.png"
+    assert uploaded["content"] == b"png-bytes"
+    assert uploaded["parent_type"] == "docx_image"
+    assert uploaded["parent_node"] == "blk_image"
+    assert uploaded["content_type"] == "image/png"
+
+
+def test_async_docx_service_insert_content_resolves_relative_local_images(
+    tmp_path: Path, monkeypatch: Any
+):
+    image_dir = tmp_path / "images"
+    image_dir.mkdir()
+    image_path = image_dir / "chart.png"
+    image_path.write_bytes(b"png-bytes")
+
+    def resolver(call: Mapping[str, Any]) -> Mapping[str, Any]:
+        if call["path"] == "/docx/v1/documents/blocks/convert":
+            return {
+                "code": 0,
+                "data": {
+                    "first_level_block_ids": ["tmp_root"],
+                    "blocks": [
+                        {"block_id": "tmp_root", "block_type": 2, "children": ["tmp_image"]},
+                        {"block_id": "tmp_image", "block_type": 27, "children": [], "image": {}},
+                    ],
+                    "block_id_to_image_urls": [
+                        {"block_id": "tmp_image", "image_url": "images/chart.png"}
+                    ],
+                },
+            }
+        if call["path"] == "/docx/v1/documents/doc_1/blocks/doc_1/descendant":
+            return {
+                "code": 0,
+                "data": {
+                    "block_id_relations": [
+                        {"temporary_block_id": "tmp_root", "block_id": "blk_root"},
+                        {"temporary_block_id": "tmp_image", "block_id": "blk_image"},
+                    ]
+                },
+            }
+        return {"code": 0, "data": {"ok": True}}
+
+    uploaded: dict[str, Any] = {}
+
+    async def fake_upload_media_bytes(
+        _self: Any,
+        filename: str,
+        content: bytes,
+        *,
+        parent_type: str,
+        parent_node: str,
+        extra: str | None = None,
+        checksum: str | None = None,
+        content_type: str | None = None,
+    ) -> Mapping[str, Any]:
+        uploaded["filename"] = filename
+        uploaded["content"] = content
+        uploaded["parent_type"] = parent_type
+        uploaded["parent_node"] = parent_node
+        uploaded["content_type"] = content_type
+        return {"file_token": "file_img_1"}
+
+    monkeypatch.setattr("feishu_bot_sdk.drive.AsyncDriveFileService.upload_media_bytes", fake_upload_media_bytes)
+
+    stub = _AsyncClientStub(resolver)
+    service = AsyncDocxService(cast(AsyncFeishuClient, stub))
+
+    data = asyncio.run(service.insert_content("doc_1", "# title", content_base_dir=tmp_path))
+
+    assert data["batch_count"] == 1
+    assert uploaded["filename"] == "chart.png"
+    assert uploaded["content"] == b"png-bytes"
+    assert uploaded["parent_type"] == "docx_image"
+    assert uploaded["parent_node"] == "blk_image"
+    assert uploaded["content_type"] == "image/png"
 
 
 def test_async_document_and_block_iterators():

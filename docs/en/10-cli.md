@@ -123,6 +123,7 @@ feishu media download-file file_xxx ./downloads/file.bin --format json
 feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx --resource-type image --format json
 feishu bitable +create-from-csv ./final.csv --app-name "Task Result" --table-name "Result"
 feishu docx +insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
+# In `--content-file` mode, relative local image paths resolve against the Markdown file directory
 feishu drive +requester-upload ./final.csv --folder-name "Uploads" --format json
 
 # calendar attachments

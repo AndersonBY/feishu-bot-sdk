@@ -23,6 +23,7 @@ def test_docx_insert_content_from_file(
         document_revision_id: int | None = None,
         client_token: str | None = None,
         user_id_type: str | None = None,
+        content_base_dir: str | None = None,
     ) -> dict[str, Any]:
         captured["document_id"] = document_id
         captured["content"] = content
@@ -32,6 +33,7 @@ def test_docx_insert_content_from_file(
         captured["document_revision_id"] = document_revision_id
         captured["client_token"] = client_token
         captured["user_id_type"] = user_id_type
+        captured["content_base_dir"] = content_base_dir
         return {
             "document_id": document_id,
             "block_id": block_id,
@@ -88,6 +90,7 @@ def test_docx_insert_content_from_file(
     assert str(captured["document_revision_id"]) == "-1"
     assert captured["client_token"] == "ct_1"
     assert captured["user_id_type"] == "open_id"
+    assert captured["content_base_dir"] == str(content_file.resolve().parent)
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is True
     assert payload["document_id"] == "doc_1"

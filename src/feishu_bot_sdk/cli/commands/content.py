@@ -954,12 +954,16 @@ def _cmd_docx_convert_content(args: argparse.Namespace) -> Mapping[str, Any]:
 
 
 def _cmd_docx_insert_content(args: argparse.Namespace) -> Mapping[str, Any]:
+    content_file = getattr(args, "content_file", None)
     content = _resolve_text_input(
         text=getattr(args, "content", None),
-        file_path=getattr(args, "content_file", None),
+        file_path=content_file,
         stdin_enabled=bool(getattr(args, "content_stdin", False)),
         name="content",
     )
+    content_base_dir = None
+    if content_file:
+        content_base_dir = str(Path(str(content_file)).expanduser().resolve().parent)
     service = DocxService(_build_client(args))
     data = service.insert_content(
         str(args.document_id),
@@ -970,6 +974,7 @@ def _cmd_docx_insert_content(args: argparse.Namespace) -> Mapping[str, Any]:
         document_revision_id=getattr(args, "document_revision_id", None),
         client_token=getattr(args, "client_token", None),
         user_id_type=getattr(args, "user_id_type", None),
+        content_base_dir=content_base_dir,
     )
     if bool(getattr(args, "full_response", False)):
         return data

@@ -111,8 +111,10 @@ feishu bitable list-views --app-token app_xxx --format json
 
 # 7) 创建并写入 Docx
 feishu docx create --title "日报" --folder-token fld_xxx --format json
-feishu docx insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
+feishu docx +insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
 feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --format json
+
+`docx +insert-content` 在 `--content-file` 模式下会按源 Markdown 文件所在目录解析相对本地图片路径。
 
 # 8) 上传云空间文件
 feishu drive root-folder-meta --as user --format json
