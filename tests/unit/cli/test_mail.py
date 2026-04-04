@@ -105,6 +105,7 @@ def test_mail_draft_create_reads_raw_file(
 ) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+    monkeypatch.setenv("FEISHU_USER_ACCESS_TOKEN", "user_test_token")
 
     captured: dict[str, Any] = {}
 
@@ -147,6 +148,7 @@ def test_mail_draft_create_reads_raw_file(
 def test_mail_draft_edit_uses_raw_text(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+    monkeypatch.setenv("FEISHU_USER_ACCESS_TOKEN", "user_test_token")
 
     captured: dict[str, Any] = {}
 
@@ -193,6 +195,7 @@ def test_mail_draft_edit_uses_raw_text(monkeypatch: Any, capsys: Any) -> None:
 def test_mail_thread_shortcut(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
     monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+    monkeypatch.setenv("FEISHU_USER_ACCESS_TOKEN", "user_test_token")
 
     captured: dict[str, Any] = {}
 
