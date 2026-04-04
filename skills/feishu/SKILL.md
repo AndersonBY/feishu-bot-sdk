@@ -52,6 +52,7 @@ feishu docx create --title "日报" --folder-token fld_xxx --as user --format js
 feishu docx +insert-content --document-id doccn_xxx --content-file report.md --format json
 feishu calendar +attach-material --calendar-id cal_xxx --event-id evt_xxx ./agenda.md --format json
 feishu drive +requester-upload ./report.pdf --as user --format json
+feishu task +delete --task-id task_xxx --as user --format json
 feishu mail +send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
 feishu docx +convert-content --content-file draft.md --content-type markdown --format json
 ```
@@ -252,6 +253,14 @@ feishu calendar +attach-material --calendar-id cal_xxx --event-id evt_xxx ./agen
 feishu calendar events list --params '{"calendar_id":"primary"}' --page-all --as user --format json
 ```
 
+### 任务
+
+```bash
+feishu task +create --summary "跟进合同" --assignee ou_xxx --due +2d --as user --format json
+feishu task +delete --task-id task_xxx --as user --format json
+feishu task +get-my-tasks --query "合同" --page-all --as user --format json
+```
+
 ### 搜索
 
 ```bash
@@ -300,6 +309,12 @@ config = FeishuConfig(app_id="cli_xxx", app_secret="xxx")
 client = FeishuClient(config)
 msg = MessageService(client)
 msg.send_text(receive_id_type="open_id", receive_id="ou_xxx", text="hello")
+
+from feishu_bot_sdk import TaskService
+
+task = TaskService(client)
+task.create_task({"summary": "Review PR"}, user_id_type="open_id")
+task.delete_task("task_xxx")
 ```
 
 所有服务都有 `Async*` 异步版本。详细 SDK API 见 [references/sdk.md](references/sdk.md)。

@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from typing import Any
 from feishu_bot_sdk import cli
 
@@ -168,3 +169,184 @@ def test_drive_requester_upload_file_fails_when_owner_mismatches(
     assert "requester-owned upload owner verification failed" in payload["error"]["message"]
     assert "file_token=file_uploaded_requester" in payload["error"]["message"]
     assert "created_folder_token=fld_child_requester" in payload["error"]["message"]
+
+
+def test_drive_import_shortcut_uploads_and_returns_ready(
+    monkeypatch: Any,
+    tmp_path: Path,
+    capsys: Any,
+) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    captured: dict[str, Any] = {}
+    source = tmp_path / "import.md"
+    source.write_text("# hello", encoding="utf-8")
+
+    def _fake_upload_media(
+        _self: Any,
+        path: str,
+        *,
+        parent_type: str,
+        parent_node: str,
+        file_name: str | None = None,
+        extra: str | None = None,
+        checksum: str | None = None,
+        content_type: str | None = None,
+    ) -> dict[str, Any]:
+        captured["upload"] = {
+            "path": path,
+            "parent_type": parent_type,
+            "parent_node": parent_node,
+            "file_name": file_name,
+            "extra": extra,
+        }
+        return {"file_token": "media_file_1"}
+
+    monkeypatch.setattr("feishu_bot_sdk.drive.DriveFileService.upload_media", _fake_upload_media)
+    monkeypatch.setattr(
+        "feishu_bot_sdk.drive.DriveFileService.create_import_task",
+        lambda _self, task: {"ticket": "ticket_1", "task": task},
+    )
+    monkeypatch.setattr(
+        "feishu_bot_sdk.drive.DriveFileService.get_import_task",
+        lambda _self, ticket: {"result": {"type": "docx", "token": "docx_1", "url": "https://feishu.cn/docx_1", "job_status": 0}},
+    )
+
+    code = cli.main(
+        [
+            "drive",
+            "+import",
+            "--file",
+            str(source),
+            "--type",
+            "docx",
+            "--format",
+            "json",
+        ]
+    )
+
+    assert code == 0
+    assert captured["upload"]["parent_type"] == "ccm_import_open"
+    assert captured["upload"]["parent_node"] == ""
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ticket"] == "ticket_1"
+    assert payload["token"] == "docx_1"
+    assert payload["ready"] is True
+
+
+def test_drive_export_shortcut_downloads_ready_file(
+    monkeypatch: Any,
+    tmp_path: Path,
+    capsys: Any,
+) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.drive.DriveFileService.create_export_task",
+        lambda _self, task: {"ticket": "ticket_2"},
+    )
+    monkeypatch.setattr(
+        "feishu_bot_sdk.drive.DriveFileService.get_export_task",
+        lambda _self, ticket, token=None: {"result": {"type": "docx", "file_extension": "pdf", "file_name": "Weekly Report", "file_token": "export_file_1", "job_status": 0}},
+    )
+    monkeypatch.setattr(
+        "feishu_bot_sdk.drive.DriveFileService.download_export_file",
+        lambda _self, file_token: b"pdf-bytes",
+    )
+
+    code = cli.main(
+        [
+            "drive",
+            "+export",
+            "--token",
+            "doc_1",
+            "--doc-type",
+            "docx",
+            "--file-extension",
+            "pdf",
+            "--output-dir",
+            str(tmp_path),
+            "--format",
+            "json",
+        ]
+    )
+
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ticket"] == "ticket_2"
+    assert payload["file_token"] == "export_file_1"
+    assert payload["saved_path"] == str(tmp_path / "Weekly Report.pdf")
+    assert (tmp_path / "Weekly Report.pdf").read_bytes() == b"pdf-bytes"
+
+
+def test_drive_move_shortcut_defaults_root_and_polls_folder_task(
+    monkeypatch: Any,
+    capsys: Any,
+) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.drive.DriveFileService.get_root_folder_meta",
+        lambda _self: {"token": "fld_root"},
+    )
+    monkeypatch.setattr(
+        "feishu_bot_sdk.drive.DriveFileService.move_file",
+        lambda _self, file_token, type=None, folder_token=None: {"task_id": "task_1"},
+    )
+    monkeypatch.setattr(
+        "feishu_bot_sdk.drive.DriveFileService.get_task_status",
+        lambda _self, task_id: {"result": {"status": "success"}},
+    )
+
+    code = cli.main(
+        [
+            "drive",
+            "+move",
+            "--file-token",
+            "fld_src",
+            "--type",
+            "folder",
+            "--format",
+            "json",
+        ]
+    )
+
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["task_id"] == "task_1"
+    assert payload["folder_token"] == "fld_root"
+    assert payload["ready"] is True
+
+
+def test_drive_task_result_shortcut_export(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.drive.DriveFileService.get_export_task",
+        lambda _self, ticket, token=None: {"result": {"type": "docx", "file_extension": "pdf", "file_token": "export_file_1", "job_status": 0}},
+    )
+
+    code = cli.main(
+        [
+            "drive",
+            "+task_result",
+            "--scenario",
+            "export",
+            "--ticket",
+            "ticket_2",
+            "--file-token",
+            "doc_1",
+            "--format",
+            "json",
+        ]
+    )
+
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["scenario"] == "export"
+    assert payload["ticket"] == "ticket_2"
+    assert payload["ready"] is True

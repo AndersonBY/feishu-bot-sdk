@@ -325,6 +325,49 @@ def _cmd_calendar_reply_event(args: argparse.Namespace) -> Mapping[str, Any]:
     return service.reply_event(str(args.calendar_id), str(args.event_id), reply)
 
 
+def _resolve_primary_calendar_id(payload: Mapping[str, Any]) -> str | None:
+    direct_calendar = payload.get("calendar")
+    if isinstance(direct_calendar, Mapping):
+        calendar_id = direct_calendar.get("calendar_id")
+        if isinstance(calendar_id, str) and calendar_id.strip():
+            return calendar_id.strip()
+
+    calendars = payload.get("calendars")
+    if isinstance(calendars, list):
+        for item in calendars:
+            if not isinstance(item, Mapping):
+                continue
+            direct_id = item.get("calendar_id")
+            if isinstance(direct_id, str) and direct_id.strip():
+                return direct_id.strip()
+            nested = item.get("calendar")
+            if isinstance(nested, Mapping):
+                nested_id = nested.get("calendar_id")
+                if isinstance(nested_id, str) and nested_id.strip():
+                    return nested_id.strip()
+    return None
+
+
+def _cmd_calendar_rsvp(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = CalendarService(_build_client(args))
+    calendar_id = str(getattr(args, "calendar_id", "") or "").strip()
+    if not calendar_id:
+        primary = service.primary_calendar(user_id_type=getattr(args, "user_id_type", None))
+        calendar_id = _resolve_primary_calendar_id(primary) or ""
+    if not calendar_id:
+        raise ValueError("unable to resolve primary calendar_id for RSVP shortcut")
+    result = service.reply_event(
+        calendar_id,
+        str(args.event_id),
+        {"rsvp_status": str(args.rsvp_status)},
+    )
+    payload = {str(key): value for key, value in result.items()}
+    payload.setdefault("calendar_id", calendar_id)
+    payload.setdefault("event_id", str(args.event_id))
+    payload.setdefault("rsvp_status", str(args.rsvp_status))
+    return payload
+
+
 def _cmd_calendar_list_freebusy(args: argparse.Namespace) -> Mapping[str, Any]:
     request = _parse_json_object(
         json_text=getattr(args, "request_json", None),

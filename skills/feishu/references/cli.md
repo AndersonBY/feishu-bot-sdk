@@ -262,6 +262,22 @@ feishu mail +send-markdown --user-mailbox-id me --to-email user@example.com --su
 feishu mail +send-markdown --user-mailbox-id me --to-email a@example.com --to-email b@example.com --cc-email cc@example.com --subject "周报" --markdown "# 周报\n\n完成情况..." --format json
 ```
 
+### task shortcuts
+
+任务快捷命令覆盖了创建、评论、删除、完成、重开、成员调整、提醒和我的任务列表：
+
+```bash
+feishu task +create --summary "Review PR" --assignee ou_xxx --due +2d --as user --format json
+feishu task +comment --task-id task_xxx --content "Please verify again" --as user --format json
+feishu task +delete --task-id task_xxx --as user --format json
+feishu task +complete --task-id task_xxx --as user --format json
+feishu task +reopen --task-id task_xxx --as user --format json
+feishu task +assign --task-id task_xxx --add ou_xxx,ou_yyy --as user --format json
+feishu task +followers --task-id task_xxx --add ou_xxx --as user --format json
+feishu task +reminder --task-id task_xxx --set 1h --as user --format json
+feishu task +get-my-tasks --query "review" --page-all --as user --format json
+```
+
 ---
 
 ## Service Commands（元数据驱动）
@@ -292,6 +308,7 @@ feishu im messages list --params '{"container_id":"oc_xxx","container_id_type":"
 # Task
 feishu task tasks list --format json
 feishu task tasks create --data '{"summary":"Review PR","due":{"timestamp":"1700086400"}}' --format json
+feishu task tasks delete --params '{"task_guid":"task_xxx"}' --as user --format json
 
 # Wiki
 feishu wiki spaces list --page-all --format json

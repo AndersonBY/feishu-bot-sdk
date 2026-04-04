@@ -16,7 +16,9 @@ A lightweight Python SDK for Feishu bot integrations, including:
 - Wiki APIs (space/node/member/search/task) and Docs content export (`docs/v1/content`)
 - Contact APIs (user/department/scope query + pagination iterators)
 - Calendar APIs (calendar/event CRUD, freebusy, CalDAV config)
-- Mail APIs (user mailboxes, mail groups, public mailboxes, address status, rules, event subscription)
+- Task APIs (task/tasklist/subtask/comment CRUD, member management, reminders, and shortcut workflows)
+- Mail APIs (user mailboxes, drafts, threads, mail groups, public mailboxes, address status, rules, event subscription)
+- Minutes APIs (minute metadata and media download URL retrieval)
 - Search APIs (app search, message search, doc/wiki search)
 - Official Docx convert/insert writes, block editing, and image/file replacement
 - Webhook callbacks and long connections (WebSocket)
@@ -119,6 +121,10 @@ In `--content-file` mode, `docx +insert-content` resolves relative local image p
 # 8) Upload file to Drive
 feishu drive root-folder-meta --as user --format json
 feishu drive create-folder --as user --folder-token <root_token> --name "Uploads" --format json
+feishu drive +import --file ./draft.md --type docx --format json
+feishu drive +export --token doccn_xxx --doc-type docx --file-extension pdf --output-dir ./exports --format json
+feishu drive +move --file-token fld_src --type folder --folder-token fld_dst --format json
+feishu drive +task_result --scenario export --ticket ticket_xxx --file-token doccn_xxx --format json
 feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx
 feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx --as user --check-requester-owner --format json
 feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
@@ -142,15 +148,34 @@ feishu contact scope get --page-size 100 --format json
 # 11) Calendar query and create event
 feishu calendar list-calendars --page-size 50 --format json
 feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json
-feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
+feishu calendar +attach-material ./agenda.md --calendar-id cal_xxx --event-id evt_xxx --format json
+feishu calendar +rsvp --event-id evt_xxx --rsvp-status accept --format json
 
 # 11.1) Mail APIs
 feishu mail address query-status --email ops@example.com --email alerts@example.com --format json
 feishu mail message list --user-mailbox-id me --folder-id INBOX --all --format json
-feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "Daily Report" --markdown-file ./report.md --format json
+feishu mail +send-markdown --user-mailbox-id me --to-email user@example.com --subject "Daily Report" --markdown-file ./report.md --format json
+feishu mail +draft-create --user-mailbox-id me --raw-file ./draft.eml --format json
+feishu mail +draft-edit --user-mailbox-id me --draft-id draft_xxx --raw-file ./draft-updated.eml --format json
+feishu mail +thread --user-mailbox-id me --thread-id th_xxx --thread-format metadata --format json
 feishu mail mailbox alias create --user-mailbox-id me --email-alias alias@example.com --format json
 feishu mail group create --mailgroup-json '{"email":"ops@example.com","name":"Ops Group"}' --format json
 feishu mail public-mailbox member batch-create --public-mailbox-id support@example.com --items-file ./members.json --format json
+
+# 11.2) Minutes APIs
+feishu minutes get --params '{"minute_token":"obcnq3b9jl72l83w4f14xxxx"}' --format json
+feishu minutes +download --minute-tokens obcnq3b9jl72l83w4f14xxxx --url-only --format json
+
+# 11.3) Task APIs
+feishu task +create --summary "Follow up contract" --assignee ou_xxx --due +2d --format json
+feishu task +comment --task-id task_xxx --content "Customer contacted" --format json
+feishu task +delete --task-id task_xxx --format json
+feishu task +complete --task-id task_xxx --format json
+feishu task +reopen --task-id task_xxx --format json
+feishu task +assign --task-id task_xxx --add ou_xxx,ou_yyy --format json
+feishu task +followers --task-id task_xxx --add ou_xxx --format json
+feishu task +reminder --task-id task_xxx --set 1h --format json
+feishu task +get-my-tasks --as user --query "contract" --page-all --format json
 
 # 12) Parse webhook envelope
 feishu webhook parse --body-file ./webhook.json --format json
@@ -505,9 +530,10 @@ print(mailboxes.items)
 - `ChatService` / `AsyncChatService`: chats, announcements, members/managers, menu, and chat tabs
 - `CalendarService` / `AsyncCalendarService`: calendars, events, freebusy, and CalDAV config
 - `ContactService` / `AsyncContactService`: contact users, departments, and scopes
-- `MailMailboxService` / `AsyncMailMailboxService`, `MailMessageService` / `AsyncMailMessageService`, `MailFolderService` / `AsyncMailFolderService`, `MailContactService` / `AsyncMailContactService`, `MailRuleService` / `AsyncMailRuleService`, `MailEventService` / `AsyncMailEventService`, `MailAddressService` / `AsyncMailAddressService`: user mailboxes, messages, folders, contacts, rules, event subscription, and address status
+- `MailMailboxService` / `AsyncMailMailboxService`, `MailMessageService` / `AsyncMailMessageService`, `MailDraftService` / `AsyncMailDraftService`, `MailThreadService` / `AsyncMailThreadService`, `MailFolderService` / `AsyncMailFolderService`, `MailContactService` / `AsyncMailContactService`, `MailRuleService` / `AsyncMailRuleService`, `MailEventService` / `AsyncMailEventService`, `MailAddressService` / `AsyncMailAddressService`: user mailboxes, messages, drafts, threads, folders, contacts, rules, event subscription, and address status
 - `MailGroupService` / `AsyncMailGroupService`, `MailGroupAliasService` / `AsyncMailGroupAliasService`, `MailGroupMemberService` / `AsyncMailGroupMemberService`, `MailGroupPermissionMemberService` / `AsyncMailGroupPermissionMemberService`, `MailGroupManagerService` / `AsyncMailGroupManagerService`: mail groups, aliases, members, permission members, and managers
 - `PublicMailboxService` / `AsyncPublicMailboxService`, `PublicMailboxAliasService` / `AsyncPublicMailboxAliasService`, `PublicMailboxMemberService` / `AsyncPublicMailboxMemberService`: public mailboxes, aliases, and members
+- `MinutesService` / `AsyncMinutesService`: minute metadata and media download URL helpers
 - `SearchService` / `AsyncSearchService`: app, message, and doc/wiki search
 - `MessageService` / `AsyncMessageService`: message management
 - `CardKitService` / `AsyncCardKitService`: CardKit card entity create, streaming update, settings

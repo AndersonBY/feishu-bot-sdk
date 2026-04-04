@@ -130,6 +130,14 @@ feishu drive +requester-upload ./final.csv --folder-name "Uploads" --format json
 # 日历附件
 feishu calendar +attach-material ./agenda.md --calendar-id cal_xxx --event-id evt_xxx --format json
 
+# 任务
+feishu task +create --summary "跟进合同" --assignee ou_xxx --due +2d --format json
+feishu task +comment --task-id task_xxx --content "已联系客户" --format json
+feishu task +delete --task-id task_xxx --format json
+feishu task +assign --task-id task_xxx --add ou_xxx,ou_yyy --format json
+feishu task +reminder --task-id task_xxx --set 1h --format json
+feishu task +get-my-tasks --as user --query "合同" --page-all --format json
+
 # 邮件
 feishu mail +send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
 ```

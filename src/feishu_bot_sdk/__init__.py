@@ -14,6 +14,7 @@ from .contact import AsyncContactService, ContactService
 from .mail import (
     AsyncMailAddressService,
     AsyncMailContactService,
+    AsyncMailDraftService,
     AsyncMailEventService,
     AsyncMailFolderService,
     AsyncMailGroupAliasService,
@@ -24,6 +25,7 @@ from .mail import (
     AsyncMailMailboxService,
     AsyncMailMessageService,
     AsyncMailRuleService,
+    AsyncMailThreadService,
     AsyncPublicMailboxAliasService,
     AsyncPublicMailboxMemberService,
     AsyncPublicMailboxService,
@@ -31,6 +33,7 @@ from .mail import (
     LatexMode,
     MailAddressService,
     MailContactService,
+    MailDraftService,
     MailEventService,
     MailFolderService,
     MailGroupAliasService,
@@ -41,6 +44,7 @@ from .mail import (
     MailMailboxService,
     MailMessageService,
     MailRuleService,
+    MailThreadService,
     PublicMailboxAliasService,
     PublicMailboxMemberService,
     PublicMailboxService,
@@ -113,6 +117,7 @@ from .im import (
     MessageResponse,
     MessageService,
 )
+from .minutes import AsyncMinutesService, MinutesService
 from .rate_limit import (
     AdaptiveRateLimiter,
     AsyncAdaptiveRateLimiter,
@@ -160,6 +165,7 @@ __all__ = [
     "AsyncLongConnectionClient",
     "AsyncMailAddressService",
     "AsyncMailContactService",
+    "AsyncMailDraftService",
     "AsyncMailEventService",
     "AsyncMailFolderService",
     "AsyncMailGroupAliasService",
@@ -170,8 +176,10 @@ __all__ = [
     "AsyncMailMailboxService",
     "AsyncMailMessageService",
     "AsyncMailRuleService",
+    "AsyncMailThreadService",
     "AsyncMediaService",
     "AsyncMessageService",
+    "AsyncMinutesService",
     "AsyncPublicMailboxAliasService",
     "AsyncPublicMailboxMemberService",
     "AsyncPublicMailboxService",
@@ -219,6 +227,7 @@ __all__ = [
     "LongConnectionClient",
     "MailAddressService",
     "MailContactService",
+    "MailDraftService",
     "MailEventService",
     "MailFolderService",
     "MailGroupAliasService",
@@ -229,6 +238,7 @@ __all__ = [
     "MailMailboxService",
     "MailMessageService",
     "MailRuleService",
+    "MailThreadService",
     "MessageContent",
     "MediaService",
     "Message",
@@ -236,6 +246,7 @@ __all__ = [
     "MediaMessageContent",
     "MessageService",
     "MessageResponse",
+    "MinutesService",
     "MailAddressService",
     "AsyncMailAddressService",
     "MailContactService",
@@ -317,4 +328,3 @@ __all__ = [
     "parse_received_message_content",
     "parse_event_envelope",
 ]
-

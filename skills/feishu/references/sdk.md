@@ -140,6 +140,27 @@ perm.list_members(token, resource_type="bitable")
 perm.set_public_access(token, resource_type="bitable", public_perm="anyone_readable")
 ```
 
+## TaskService
+
+```python
+from feishu_bot_sdk import TaskService
+
+task = TaskService(client)
+
+# Task CRUD
+task.create_task({"summary": "Review PR"}, user_id_type="open_id")
+task.get_task("task_xxx", user_id_type="open_id")
+task.update_task("task_xxx", {"completed_at": "0"}, update_fields=["completed_at"], user_id_type="open_id")
+task.delete_task("task_xxx")
+
+# Members / reminders / comments
+task.add_task_members("task_xxx", [{"id": "ou_xxx", "role": "assignee", "type": "user"}], user_id_type="open_id")
+task.remove_task_members("task_xxx", [{"id": "ou_xxx", "role": "follower", "type": "user"}], user_id_type="open_id")
+task.add_task_reminders("task_xxx", [{"relative_fire_minute": 60}], user_id_type="open_id")
+task.remove_task_reminders("task_xxx", ["rid_xxx"], user_id_type="open_id")
+task.create_comment("task_xxx", "Please verify again")
+```
+
 ## WikiService / DocContentService
 
 ```python

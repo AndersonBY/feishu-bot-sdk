@@ -1,4 +1,4 @@
-from typing import Any, AsyncIterator, Iterator, Mapping, Optional
+from typing import Any, AsyncIterator, Iterator, Mapping, Optional, Sequence
 
 from .feishu import AsyncFeishuClient, FeishuClient
 from .response import DataResponse
@@ -70,6 +70,7 @@ class TaskService:
     def list_tasks(
         self,
         *,
+        type: Optional[str] = None,
         page_size: Optional[int] = None,
         page_token: Optional[str] = None,
         completed: Optional[bool] = None,
@@ -77,6 +78,7 @@ class TaskService:
     ) -> Mapping[str, Any]:
         params = _drop_none(
             {
+                "type": type,
                 "page_size": page_size,
                 "page_token": page_token,
                 "completed": completed,
@@ -93,6 +95,7 @@ class TaskService:
     def iter_tasks(
         self,
         *,
+        type: Optional[str] = None,
         page_size: int = 50,
         completed: Optional[bool] = None,
         user_id_type: Optional[str] = None,
@@ -100,6 +103,7 @@ class TaskService:
         page_token: Optional[str] = None
         while True:
             data = self.list_tasks(
+                type=type,
                 page_size=page_size,
                 page_token=page_token,
                 completed=completed,
@@ -129,6 +133,81 @@ class TaskService:
             f"/task/v2/tasks/{task_guid}",
             params=params,
             payload=payload,
+        )
+        return _unwrap_data(response)
+
+    def delete_task(self, task_guid: str) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "DELETE",
+            f"/task/v2/tasks/{task_guid}",
+        )
+        return _unwrap_data(response)
+
+    def add_task_members(
+        self,
+        task_guid: str,
+        members: Sequence[Mapping[str, object]],
+        *,
+        client_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        payload: dict[str, object] = {"members": [dict(member) for member in members]}
+        if client_token is not None:
+            payload["client_token"] = client_token
+        response = self._client.request_json(
+            "POST",
+            f"/task/v2/tasks/{task_guid}/add_members",
+            params=params,
+            payload=payload,
+        )
+        return _unwrap_data(response)
+
+    def remove_task_members(
+        self,
+        task_guid: str,
+        members: Sequence[Mapping[str, object]],
+        *,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        response = self._client.request_json(
+            "POST",
+            f"/task/v2/tasks/{task_guid}/remove_members",
+            params=params,
+            payload={"members": [dict(member) for member in members]},
+        )
+        return _unwrap_data(response)
+
+    def add_task_reminders(
+        self,
+        task_guid: str,
+        reminders: list[Mapping[str, object]],
+        *,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        response = self._client.request_json(
+            "POST",
+            f"/task/v2/tasks/{task_guid}/add_reminders",
+            params=params,
+            payload={"reminders": [dict(reminder) for reminder in reminders]},
+        )
+        return _unwrap_data(response)
+
+    def remove_task_reminders(
+        self,
+        task_guid: str,
+        reminder_ids: list[str],
+        *,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        response = self._client.request_json(
+            "POST",
+            f"/task/v2/tasks/{task_guid}/remove_reminders",
+            params=params,
+            payload={"reminder_ids": list(reminder_ids)},
         )
         return _unwrap_data(response)
 
@@ -482,6 +561,7 @@ class AsyncTaskService:
     async def list_tasks(
         self,
         *,
+        type: Optional[str] = None,
         page_size: Optional[int] = None,
         page_token: Optional[str] = None,
         completed: Optional[bool] = None,
@@ -489,6 +569,7 @@ class AsyncTaskService:
     ) -> Mapping[str, Any]:
         params = _drop_none(
             {
+                "type": type,
                 "page_size": page_size,
                 "page_token": page_token,
                 "completed": completed,
@@ -505,6 +586,7 @@ class AsyncTaskService:
     async def iter_tasks(
         self,
         *,
+        type: Optional[str] = None,
         page_size: int = 50,
         completed: Optional[bool] = None,
         user_id_type: Optional[str] = None,
@@ -512,6 +594,7 @@ class AsyncTaskService:
         page_token: Optional[str] = None
         while True:
             data = await self.list_tasks(
+                type=type,
                 page_size=page_size,
                 page_token=page_token,
                 completed=completed,
@@ -542,6 +625,81 @@ class AsyncTaskService:
             f"/task/v2/tasks/{task_guid}",
             params=params,
             payload=payload,
+        )
+        return _unwrap_data(response)
+
+    async def delete_task(self, task_guid: str) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "DELETE",
+            f"/task/v2/tasks/{task_guid}",
+        )
+        return _unwrap_data(response)
+
+    async def add_task_members(
+        self,
+        task_guid: str,
+        members: Sequence[Mapping[str, object]],
+        *,
+        client_token: Optional[str] = None,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        payload: dict[str, object] = {"members": [dict(member) for member in members]}
+        if client_token is not None:
+            payload["client_token"] = client_token
+        response = await self._client.request_json(
+            "POST",
+            f"/task/v2/tasks/{task_guid}/add_members",
+            params=params,
+            payload=payload,
+        )
+        return _unwrap_data(response)
+
+    async def remove_task_members(
+        self,
+        task_guid: str,
+        members: Sequence[Mapping[str, object]],
+        *,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        response = await self._client.request_json(
+            "POST",
+            f"/task/v2/tasks/{task_guid}/remove_members",
+            params=params,
+            payload={"members": [dict(member) for member in members]},
+        )
+        return _unwrap_data(response)
+
+    async def add_task_reminders(
+        self,
+        task_guid: str,
+        reminders: list[Mapping[str, object]],
+        *,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        response = await self._client.request_json(
+            "POST",
+            f"/task/v2/tasks/{task_guid}/add_reminders",
+            params=params,
+            payload={"reminders": [dict(reminder) for reminder in reminders]},
+        )
+        return _unwrap_data(response)
+
+    async def remove_task_reminders(
+        self,
+        task_guid: str,
+        reminder_ids: list[str],
+        *,
+        user_id_type: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        params = _drop_none({"user_id_type": user_id_type})
+        response = await self._client.request_json(
+            "POST",
+            f"/task/v2/tasks/{task_guid}/remove_reminders",
+            params=params,
+            payload={"reminder_ids": list(reminder_ids)},
         )
         return _unwrap_data(response)
 

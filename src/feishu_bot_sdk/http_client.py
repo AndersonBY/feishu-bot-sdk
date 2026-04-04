@@ -26,23 +26,18 @@ class JsonHttpClient:
         timeout_seconds: Optional[float] = None,
     ) -> Dict[str, Any]:
         method_upper = method.upper()
-        if method_upper == "GET":
-            response = self._session.request(
-                method_upper,
-                url,
-                headers=dict(headers or {}),
-                params=dict(params or {}),
-                timeout=timeout_seconds or self._timeout_seconds,
-            )
-        else:
-            response = self._session.request(
-                method_upper,
-                url,
-                headers=dict(headers or {}),
-                params=dict(params or {}),
-                json=dict(payload or {}),
-                timeout=timeout_seconds or self._timeout_seconds,
-            )
+        request_kwargs: dict[str, Any] = {
+            "headers": dict(headers or {}),
+            "params": dict(params or {}),
+            "timeout": timeout_seconds or self._timeout_seconds,
+        }
+        if payload is not None and method_upper != "GET":
+            request_kwargs["json"] = dict(payload)
+        response = self._session.request(
+            method_upper,
+            url,
+            **request_kwargs,
+        )
         if response.status_code >= 400:
             raise HTTPRequestError(
                 f"http request failed: {response.status_code}",
@@ -80,23 +75,18 @@ class AsyncJsonHttpClient:
         timeout_seconds: Optional[float] = None,
     ) -> Dict[str, Any]:
         method_upper = method.upper()
-        if method_upper == "GET":
-            response = await self._client.request(
-                method_upper,
-                url,
-                headers=dict(headers or {}),
-                params=dict(params or {}),
-                timeout=timeout_seconds or self._timeout_seconds,
-            )
-        else:
-            response = await self._client.request(
-                method_upper,
-                url,
-                headers=dict(headers or {}),
-                params=dict(params or {}),
-                json=dict(payload or {}),
-                timeout=timeout_seconds or self._timeout_seconds,
-            )
+        request_kwargs: dict[str, Any] = {
+            "headers": dict(headers or {}),
+            "params": dict(params or {}),
+            "timeout": timeout_seconds or self._timeout_seconds,
+        }
+        if payload is not None and method_upper != "GET":
+            request_kwargs["json"] = dict(payload)
+        response = await self._client.request(
+            method_upper,
+            url,
+            **request_kwargs,
+        )
         if response.status_code >= 400:
             raise HTTPRequestError(
                 f"http request failed: {response.status_code}",

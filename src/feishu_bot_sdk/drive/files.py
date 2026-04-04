@@ -370,6 +370,14 @@ class DriveFileService:
         )
         return _unwrap_data(response)
 
+    def get_task_status(self, task_id: str) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "GET",
+            "/drive/v1/files/task_check",
+            params={"task_id": task_id},
+        )
+        return _unwrap_data(response)
+
     def download_export_file(self, file_token: str) -> bytes:
         return self._request_bytes_raw("GET", f"/drive/v1/export_tasks/file/{file_token}/download")
 
@@ -969,6 +977,14 @@ class AsyncDriveFileService:
             "GET",
             f"/drive/v1/export_tasks/{ticket}",
             params=params,
+        )
+        return _unwrap_data(response)
+
+    async def get_task_status(self, task_id: str) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "GET",
+            "/drive/v1/files/task_check",
+            params={"task_id": task_id},
         )
         return _unwrap_data(response)
 

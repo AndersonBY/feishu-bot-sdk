@@ -106,3 +106,64 @@ def test_calendar_attach_material_append(monkeypatch: Any, capsys: Any) -> None:
     payload = json.loads(capsys.readouterr().out)
     assert payload["file_token"] == "file_new_1"
     assert payload["attachments_count"] == 2
+
+
+def test_calendar_rsvp_uses_primary_calendar_when_omitted(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    captured: dict[str, Any] = {}
+
+    def _fake_primary_calendar(
+        _self: CalendarService,
+        *,
+        user_id_type: str | None = None,
+    ) -> dict[str, Any]:
+        captured["primary"] = {"user_id_type": user_id_type}
+        return {"calendars": [{"calendar_id": "cal_primary"}]}
+
+    def _fake_reply_event(
+        _self: CalendarService,
+        calendar_id: str,
+        event_id: str,
+        reply: dict[str, Any],
+    ) -> dict[str, Any]:
+        captured["reply"] = {
+            "calendar_id": calendar_id,
+            "event_id": event_id,
+            "reply": reply,
+        }
+        return {"ok": True}
+
+    monkeypatch.setattr(
+        "feishu_bot_sdk.calendar.CalendarService.primary_calendar",
+        _fake_primary_calendar,
+    )
+    monkeypatch.setattr(
+        "feishu_bot_sdk.calendar.CalendarService.reply_event",
+        _fake_reply_event,
+    )
+
+    code = cli.main(
+        [
+            "calendar",
+            "+rsvp",
+            "--event-id",
+            "evt_1",
+            "--rsvp-status",
+            "accept",
+            "--format",
+            "json",
+        ]
+    )
+
+    assert code == 0
+    assert captured["reply"] == {
+        "calendar_id": "cal_primary",
+        "event_id": "evt_1",
+        "reply": {"rsvp_status": "accept"},
+    }
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["calendar_id"] == "cal_primary"
+    assert payload["event_id"] == "evt_1"
+    assert payload["rsvp_status"] == "accept"

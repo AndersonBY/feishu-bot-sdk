@@ -16,7 +16,9 @@
 - Wiki 知识库（space/node/member/search/task）与云文档内容导出（`docs/v1/content`）
 - 通讯录能力（用户/部门/授权范围查询 + 分页迭代）
 - 日历能力（日历 CRUD、日程 CRUD、忙闲查询、CalDAV 配置）
-- 邮箱能力（用户邮箱、邮件组、公共邮箱、地址状态、规则、事件订阅）
+- 任务能力（任务/清单/子任务/评论 CRUD、成员管理、提醒与快捷命令）
+- 邮箱能力（用户邮箱、草稿、会话线程、邮件组、公共邮箱、地址状态、规则、事件订阅）
+- Minutes 能力（妙记元数据与媒体下载地址）
 - 搜索能力（应用搜索、消息搜索、文档/Wiki 搜索）
 - 云文档官方 convert/insert 写入、块级编辑、图片/附件替换
 - 事件回调（Webhook）与长连接（WebSocket）
@@ -120,6 +122,10 @@ feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type mar
 feishu drive root-folder-meta --as user --format json
 feishu drive create-folder --as user --folder-token <root_token> --name "Uploads" --format json
 feishu drive +requester-upload ./final.csv --folder-name "Requester Uploads" --as user --format json
+feishu drive +import --file ./draft.md --type docx --format json
+feishu drive +export --token doccn_xxx --doc-type docx --file-extension pdf --output-dir ./exports --format json
+feishu drive +move --file-token fld_src --type folder --folder-token fld_dst --format json
+feishu drive +task_result --scenario export --ticket ticket_xxx --file-token doccn_xxx --format json
 feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx
 feishu drive upload-file ./final.csv --parent-type explorer --parent-node fld_xxx --as user --check-requester-owner --format json
 feishu drive meta --request-docs-json '[{"doc_token":"doccn_xxx","doc_type":"docx"}]' --with-url true --format json
@@ -145,15 +151,34 @@ feishu contact scope get --page-size 100 --format json
 # 11) 日历查询与创建日程
 feishu calendar list-calendars --page-size 50 --format json
 feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json
-feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
+feishu calendar +attach-material ./agenda.md --calendar-id cal_xxx --event-id evt_xxx --format json
+feishu calendar +rsvp --event-id evt_xxx --rsvp-status accept --format json
 
 # 11.1) 邮箱能力
 feishu mail address query-status --email ops@example.com --email alerts@example.com --format json
 feishu mail message list --user-mailbox-id me --folder-id INBOX --all --format json
-feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
+feishu mail +send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
+feishu mail +draft-create --user-mailbox-id me --raw-file ./draft.eml --format json
+feishu mail +draft-edit --user-mailbox-id me --draft-id draft_xxx --raw-file ./draft-updated.eml --format json
+feishu mail +thread --user-mailbox-id me --thread-id th_xxx --thread-format metadata --format json
 feishu mail mailbox alias create --user-mailbox-id me --email-alias alias@example.com --format json
 feishu mail group create --mailgroup-json '{"email":"ops@example.com","name":"Ops Group"}' --format json
 feishu mail public-mailbox member batch-create --public-mailbox-id support@example.com --items-file ./members.json --format json
+
+# 11.2) 妙记能力
+feishu minutes get --params '{"minute_token":"obcnq3b9jl72l83w4f14xxxx"}' --format json
+feishu minutes +download --minute-tokens obcnq3b9jl72l83w4f14xxxx --url-only --format json
+
+# 11.3) 任务能力
+feishu task +create --summary "跟进合同" --assignee ou_xxx --due +2d --format json
+feishu task +comment --task-id task_xxx --content "已联系客户" --format json
+feishu task +delete --task-id task_xxx --format json
+feishu task +complete --task-id task_xxx --format json
+feishu task +reopen --task-id task_xxx --format json
+feishu task +assign --task-id task_xxx --add ou_xxx,ou_yyy --format json
+feishu task +followers --task-id task_xxx --add ou_xxx --format json
+feishu task +reminder --task-id task_xxx --set 1h --format json
+feishu task +get-my-tasks --as user --query "合同" --page-all --format json
 
 # 12) 解析 webhook 事件信封
 feishu webhook parse --body-file ./webhook.json --format json
@@ -508,9 +533,10 @@ print(mailboxes.items)
 - `ChatService` / `AsyncChatService`：群组、群公告、成员/管理员、群菜单、会话标签页
 - `CalendarService` / `AsyncCalendarService`：日历、日程、忙闲和 CalDAV 配置
 - `ContactService` / `AsyncContactService`：通讯录用户、部门、授权范围
-- `MailMailboxService` / `AsyncMailMailboxService`、`MailMessageService` / `AsyncMailMessageService`、`MailFolderService` / `AsyncMailFolderService`、`MailContactService` / `AsyncMailContactService`、`MailRuleService` / `AsyncMailRuleService`、`MailEventService` / `AsyncMailEventService`、`MailAddressService` / `AsyncMailAddressService`：用户邮箱、邮件、文件夹、联系人、规则、事件订阅、地址状态
+- `MailMailboxService` / `AsyncMailMailboxService`、`MailMessageService` / `AsyncMailMessageService`、`MailDraftService` / `AsyncMailDraftService`、`MailThreadService` / `AsyncMailThreadService`、`MailFolderService` / `AsyncMailFolderService`、`MailContactService` / `AsyncMailContactService`、`MailRuleService` / `AsyncMailRuleService`、`MailEventService` / `AsyncMailEventService`、`MailAddressService` / `AsyncMailAddressService`：用户邮箱、邮件、草稿、会话线程、文件夹、联系人、规则、事件订阅、地址状态
 - `MailGroupService` / `AsyncMailGroupService`、`MailGroupAliasService` / `AsyncMailGroupAliasService`、`MailGroupMemberService` / `AsyncMailGroupMemberService`、`MailGroupPermissionMemberService` / `AsyncMailGroupPermissionMemberService`、`MailGroupManagerService` / `AsyncMailGroupManagerService`：邮件组、别名、成员、权限成员、管理员
 - `PublicMailboxService` / `AsyncPublicMailboxService`、`PublicMailboxAliasService` / `AsyncPublicMailboxAliasService`、`PublicMailboxMemberService` / `AsyncPublicMailboxMemberService`：公共邮箱、别名、成员
+- `MinutesService` / `AsyncMinutesService`：妙记元数据与媒体下载地址
 - `SearchService` / `AsyncSearchService`：应用、消息、文档/Wiki 搜索
 - `MessageService` / `AsyncMessageService`：消息管理
 - `CardKitService` / `AsyncCardKitService`：CardKit 卡片实体创建、流式更新、配置管理

@@ -337,6 +337,205 @@ class MailFolderService:
         return _unwrap_data(response)
 
 
+class MailDraftService:
+    def __init__(self, feishu_client: FeishuClient) -> None:
+        self._client = feishu_client
+
+    def list_drafts(
+        self,
+        user_mailbox_id: str,
+        *,
+        page_size: int = 20,
+        page_token: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "GET",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/drafts",
+            params=_drop_none({"page_size": page_size, "page_token": page_token}),
+        )
+        return _unwrap_data(response)
+
+    def iter_drafts(
+        self,
+        user_mailbox_id: str,
+        *,
+        page_size: int = 20,
+    ) -> Iterator[Any]:
+        page_token: Optional[str] = None
+        while True:
+            data = self.list_drafts(user_mailbox_id, page_size=page_size, page_token=page_token)
+            yield from _iter_items(data)
+            if not _has_more(data):
+                return
+            page_token = _next_page_token(data)
+            if not page_token:
+                return
+
+    def create_draft(self, user_mailbox_id: str, draft: Mapping[str, object]) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "POST",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/drafts",
+            payload=_normalize_mapping(draft),
+        )
+        return _unwrap_data(response)
+
+    def get_draft(
+        self,
+        user_mailbox_id: str,
+        draft_id: str,
+        *,
+        format: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "GET",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/drafts/{draft_id}",
+            params=_drop_none({"format": format}),
+        )
+        return _unwrap_data(response)
+
+    def update_draft(
+        self,
+        user_mailbox_id: str,
+        draft_id: str,
+        draft: Mapping[str, object],
+    ) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "PUT",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/drafts/{draft_id}",
+            payload=_normalize_mapping(draft),
+        )
+        return _unwrap_data(response)
+
+    def delete_draft(self, user_mailbox_id: str, draft_id: str) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "DELETE",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/drafts/{draft_id}",
+        )
+        return _unwrap_data(response)
+
+    def send_draft(self, user_mailbox_id: str, draft_id: str) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "POST",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/drafts/{draft_id}/send",
+        )
+        return _unwrap_data(response)
+
+
+class MailThreadService:
+    def __init__(self, feishu_client: FeishuClient) -> None:
+        self._client = feishu_client
+
+    def list_threads(
+        self,
+        user_mailbox_id: str,
+        *,
+        folder_id: Optional[str] = None,
+        label_id: Optional[str] = None,
+        page_size: int = 20,
+        page_token: Optional[str] = None,
+        only_unread: Optional[bool] = None,
+    ) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "GET",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/threads",
+            params=_drop_none(
+                {
+                    "folder_id": folder_id,
+                    "label_id": label_id,
+                    "page_size": page_size,
+                    "page_token": page_token,
+                    "only_unread": only_unread,
+                }
+            ),
+        )
+        return _unwrap_data(response)
+
+    def iter_threads(
+        self,
+        user_mailbox_id: str,
+        *,
+        folder_id: Optional[str] = None,
+        label_id: Optional[str] = None,
+        page_size: int = 20,
+        only_unread: Optional[bool] = None,
+    ) -> Iterator[Any]:
+        page_token: Optional[str] = None
+        while True:
+            data = self.list_threads(
+                user_mailbox_id,
+                folder_id=folder_id,
+                label_id=label_id,
+                page_size=page_size,
+                page_token=page_token,
+                only_unread=only_unread,
+            )
+            yield from _iter_items(data)
+            if not _has_more(data):
+                return
+            page_token = _next_page_token(data)
+            if not page_token:
+                return
+
+    def get_thread(
+        self,
+        user_mailbox_id: str,
+        thread_id: str,
+        *,
+        format: Optional[str] = None,
+        include_spam_trash: Optional[bool] = None,
+    ) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "GET",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/threads/{thread_id}",
+            params=_drop_none({"format": format, "include_spam_trash": include_spam_trash}),
+        )
+        return _unwrap_data(response)
+
+    def modify_thread(
+        self,
+        user_mailbox_id: str,
+        thread_id: str,
+        payload: Mapping[str, object],
+    ) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "POST",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/threads/{thread_id}/modify",
+            payload=_normalize_mapping(payload),
+        )
+        return _unwrap_data(response)
+
+    def batch_modify_threads(
+        self,
+        user_mailbox_id: str,
+        payload: Mapping[str, object],
+    ) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "POST",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/threads/batch_modify",
+            payload=_normalize_mapping(payload),
+        )
+        return _unwrap_data(response)
+
+    def trash_thread(self, user_mailbox_id: str, thread_id: str) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "POST",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/threads/{thread_id}/trash",
+        )
+        return _unwrap_data(response)
+
+    def batch_trash_threads(
+        self,
+        user_mailbox_id: str,
+        payload: Mapping[str, object],
+    ) -> Mapping[str, Any]:
+        response = self._client.request_json(
+            "POST",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/threads/batch_trash",
+            payload=_normalize_mapping(payload),
+        )
+        return _unwrap_data(response)
+
+
 class MailContactService:
     def __init__(self, feishu_client: FeishuClient) -> None:
         self._client = feishu_client
@@ -737,6 +936,207 @@ class AsyncMailFolderService:
         response = await self._client.request_json(
             "DELETE",
             f"/mail/v1/user_mailboxes/{user_mailbox_id}/folders/{folder_id}",
+        )
+        return _unwrap_data(response)
+
+
+class AsyncMailDraftService:
+    def __init__(self, feishu_client: AsyncFeishuClient) -> None:
+        self._client = feishu_client
+
+    async def list_drafts(
+        self,
+        user_mailbox_id: str,
+        *,
+        page_size: int = 20,
+        page_token: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "GET",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/drafts",
+            params=_drop_none({"page_size": page_size, "page_token": page_token}),
+        )
+        return _unwrap_data(response)
+
+    async def iter_drafts(
+        self,
+        user_mailbox_id: str,
+        *,
+        page_size: int = 20,
+    ) -> AsyncIterator[Any]:
+        page_token: Optional[str] = None
+        while True:
+            data = await self.list_drafts(user_mailbox_id, page_size=page_size, page_token=page_token)
+            for item in _iter_items(data):
+                yield item
+            if not _has_more(data):
+                return
+            page_token = _next_page_token(data)
+            if not page_token:
+                return
+
+    async def create_draft(self, user_mailbox_id: str, draft: Mapping[str, object]) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "POST",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/drafts",
+            payload=_normalize_mapping(draft),
+        )
+        return _unwrap_data(response)
+
+    async def get_draft(
+        self,
+        user_mailbox_id: str,
+        draft_id: str,
+        *,
+        format: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "GET",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/drafts/{draft_id}",
+            params=_drop_none({"format": format}),
+        )
+        return _unwrap_data(response)
+
+    async def update_draft(
+        self,
+        user_mailbox_id: str,
+        draft_id: str,
+        draft: Mapping[str, object],
+    ) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "PUT",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/drafts/{draft_id}",
+            payload=_normalize_mapping(draft),
+        )
+        return _unwrap_data(response)
+
+    async def delete_draft(self, user_mailbox_id: str, draft_id: str) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "DELETE",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/drafts/{draft_id}",
+        )
+        return _unwrap_data(response)
+
+    async def send_draft(self, user_mailbox_id: str, draft_id: str) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "POST",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/drafts/{draft_id}/send",
+        )
+        return _unwrap_data(response)
+
+
+class AsyncMailThreadService:
+    def __init__(self, feishu_client: AsyncFeishuClient) -> None:
+        self._client = feishu_client
+
+    async def list_threads(
+        self,
+        user_mailbox_id: str,
+        *,
+        folder_id: Optional[str] = None,
+        label_id: Optional[str] = None,
+        page_size: int = 20,
+        page_token: Optional[str] = None,
+        only_unread: Optional[bool] = None,
+    ) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "GET",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/threads",
+            params=_drop_none(
+                {
+                    "folder_id": folder_id,
+                    "label_id": label_id,
+                    "page_size": page_size,
+                    "page_token": page_token,
+                    "only_unread": only_unread,
+                }
+            ),
+        )
+        return _unwrap_data(response)
+
+    async def iter_threads(
+        self,
+        user_mailbox_id: str,
+        *,
+        folder_id: Optional[str] = None,
+        label_id: Optional[str] = None,
+        page_size: int = 20,
+        only_unread: Optional[bool] = None,
+    ) -> AsyncIterator[Any]:
+        page_token: Optional[str] = None
+        while True:
+            data = await self.list_threads(
+                user_mailbox_id,
+                folder_id=folder_id,
+                label_id=label_id,
+                page_size=page_size,
+                page_token=page_token,
+                only_unread=only_unread,
+            )
+            for item in _iter_items(data):
+                yield item
+            if not _has_more(data):
+                return
+            page_token = _next_page_token(data)
+            if not page_token:
+                return
+
+    async def get_thread(
+        self,
+        user_mailbox_id: str,
+        thread_id: str,
+        *,
+        format: Optional[str] = None,
+        include_spam_trash: Optional[bool] = None,
+    ) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "GET",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/threads/{thread_id}",
+            params=_drop_none({"format": format, "include_spam_trash": include_spam_trash}),
+        )
+        return _unwrap_data(response)
+
+    async def modify_thread(
+        self,
+        user_mailbox_id: str,
+        thread_id: str,
+        payload: Mapping[str, object],
+    ) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "POST",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/threads/{thread_id}/modify",
+            payload=_normalize_mapping(payload),
+        )
+        return _unwrap_data(response)
+
+    async def batch_modify_threads(
+        self,
+        user_mailbox_id: str,
+        payload: Mapping[str, object],
+    ) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "POST",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/threads/batch_modify",
+            payload=_normalize_mapping(payload),
+        )
+        return _unwrap_data(response)
+
+    async def trash_thread(self, user_mailbox_id: str, thread_id: str) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "POST",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/threads/{thread_id}/trash",
+        )
+        return _unwrap_data(response)
+
+    async def batch_trash_threads(
+        self,
+        user_mailbox_id: str,
+        payload: Mapping[str, object],
+    ) -> Mapping[str, Any]:
+        response = await self._client.request_json(
+            "POST",
+            f"/mail/v1/user_mailboxes/{user_mailbox_id}/threads/batch_trash",
+            payload=_normalize_mapping(payload),
         )
         return _unwrap_data(response)
 

@@ -246,12 +246,12 @@ class FeishuClient:
         params: Optional[Mapping[str, object]] = None,
     ) -> Dict[str, Any]:
         method_upper = method.upper()
-        url = f"{self._config.base_url}{path}"
+        url = _build_openapi_url(self._config.base_url, path)
         query_params = dict(params or {})
-        json_payload = dict(payload or {})
+        json_payload = dict(payload) if payload is not None else None
         if method_upper == "GET" and not query_params:
-            query_params = json_payload
-            json_payload = {}
+            query_params = dict(json_payload or {})
+            json_payload = None
         key = build_rate_limit_key(method_upper, path)
         auth_modes = self._request_auth_modes_for_path(path)
         last_error: Exception | None = None
@@ -469,7 +469,7 @@ class FeishuClient:
         bearer_token: str,
     ) -> Dict[str, Any]:
         method_upper = method.upper()
-        url = f"{self._config.base_url}{path}"
+        url = _build_openapi_url(self._config.base_url, path)
         headers = {"Authorization": f"Bearer {bearer_token}"}
         if method_upper != "GET":
             headers["Content-Type"] = "application/json"
@@ -478,7 +478,7 @@ class FeishuClient:
             url,
             headers=headers,
             params=dict(params or {}),
-            payload=dict(payload or {}),
+            payload=dict(payload) if payload is not None else None,
             timeout_seconds=self._config.timeout_seconds,
         )
         if data.get("code") != 0:
@@ -658,12 +658,12 @@ class AsyncFeishuClient:
         params: Optional[Mapping[str, object]] = None,
     ) -> Dict[str, Any]:
         method_upper = method.upper()
-        url = f"{self._config.base_url}{path}"
+        url = _build_openapi_url(self._config.base_url, path)
         query_params = dict(params or {})
-        json_payload = dict(payload or {})
+        json_payload = dict(payload) if payload is not None else None
         if method_upper == "GET" and not query_params:
-            query_params = json_payload
-            json_payload = {}
+            query_params = dict(json_payload or {})
+            json_payload = None
         key = build_rate_limit_key(method_upper, path)
         auth_modes = self._request_auth_modes_for_path(path)
         last_error: Exception | None = None
@@ -884,7 +884,7 @@ class AsyncFeishuClient:
         bearer_token: str,
     ) -> Dict[str, Any]:
         method_upper = method.upper()
-        url = f"{self._config.base_url}{path}"
+        url = _build_openapi_url(self._config.base_url, path)
         headers = {"Authorization": f"Bearer {bearer_token}"}
         if method_upper != "GET":
             headers["Content-Type"] = "application/json"
@@ -893,7 +893,7 @@ class AsyncFeishuClient:
             url,
             headers=headers,
             params=dict(params or {}),
-            payload=dict(payload or {}),
+            payload=dict(payload) if payload is not None else None,
             timeout_seconds=self._config.timeout_seconds,
         )
         if data.get("code") != 0:
@@ -1018,6 +1018,18 @@ def _derive_open_domain(base_url: str) -> str:
     if index >= 0:
         return base_url[:index]
     return base_url.rstrip("/")
+
+
+def _build_openapi_url(base_url: str, path: str) -> str:
+    normalized_base = str(base_url or "").rstrip("/")
+    normalized_path = str(path or "").strip()
+    if normalized_path.startswith(("http://", "https://")):
+        return normalized_path
+    if not normalized_path.startswith("/"):
+        normalized_path = f"/{normalized_path}"
+    if normalized_path == "/open-apis" or normalized_path.startswith("/open-apis/"):
+        return f"{_derive_open_domain(normalized_base)}{normalized_path}"
+    return f"{normalized_base}{normalized_path}"
 
 
 def _preferred_auth_mode_for_path(path: str) -> str:

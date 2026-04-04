@@ -1,9 +1,10 @@
+import asyncio
 from typing import Any, cast
 
 from feishu_bot_sdk.config import FeishuConfig
 from feishu_bot_sdk.exceptions import FeishuError
-from feishu_bot_sdk.feishu import FeishuClient, _initial_user_token_cache
-from feishu_bot_sdk.http_client import JsonHttpClient
+from feishu_bot_sdk.feishu import AsyncFeishuClient, FeishuClient, _initial_user_token_cache
+from feishu_bot_sdk.http_client import AsyncJsonHttpClient, JsonHttpClient
 
 
 class _HttpClientStub:
@@ -59,6 +60,60 @@ class _HttpClientStub:
         raise AssertionError(f"unexpected request: {method} {url}")
 
 
+class _CaptureHttpClient:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    def request_json(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        params: dict[str, object] | None = None,
+        payload: dict[str, object] | None = None,
+        timeout_seconds: float | None = None,
+    ) -> dict[str, Any]:
+        self.calls.append(
+            {
+                "method": method,
+                "url": url,
+                "headers": headers,
+                "params": params,
+                "payload": payload,
+                "timeout_seconds": timeout_seconds,
+            }
+        )
+        return {"code": 0, "data": {}}
+
+
+class _AsyncCaptureHttpClient:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    async def request_json(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        params: dict[str, object] | None = None,
+        payload: dict[str, object] | None = None,
+        timeout_seconds: float | None = None,
+    ) -> dict[str, Any]:
+        self.calls.append(
+            {
+                "method": method,
+                "url": url,
+                "headers": headers,
+                "params": params,
+                "payload": payload,
+                "timeout_seconds": timeout_seconds,
+            }
+        )
+        return {"code": 0, "data": {}}
+
+
 def test_initial_user_token_cache_keeps_access_token_when_expiry_unknown() -> None:
     cache = _initial_user_token_cache(
         FeishuConfig(
@@ -98,3 +153,42 @@ def test_get_user_info_refreshes_only_after_token_failure() -> None:
     ]
     assert http.calls[0]["headers"]["Authorization"] == "Bearer stale-access"
     assert http.calls[-1]["headers"]["Authorization"] == "Bearer fresh-access"
+
+
+def test_request_json_uses_openapi_root_for_full_openapi_paths_and_keeps_delete_payload_none() -> None:
+    http = _CaptureHttpClient()
+    client = FeishuClient(
+        FeishuConfig(
+            auth_mode="tenant",
+            access_token="tenant-token",
+        ),
+        http_client=cast(JsonHttpClient, http),
+    )
+
+    client.request_json("DELETE", "/open-apis/task/v2/tasks/task_1")
+
+    assert len(http.calls) == 1
+    call = http.calls[0]
+    assert call["url"] == "https://open.feishu.cn/open-apis/task/v2/tasks/task_1"
+    assert call["payload"] is None
+
+
+def test_async_request_json_uses_openapi_root_for_full_openapi_paths_and_keeps_delete_payload_none() -> None:
+    http = _AsyncCaptureHttpClient()
+    client = AsyncFeishuClient(
+        FeishuConfig(
+            auth_mode="tenant",
+            access_token="tenant-token",
+        ),
+        http_client=cast(AsyncJsonHttpClient, http),
+    )
+
+    async def run() -> None:
+        await client.request_json("DELETE", "/open-apis/task/v2/tasks/task_1")
+
+    asyncio.run(run())
+
+    assert len(http.calls) == 1
+    call = http.calls[0]
+    assert call["url"] == "https://open.feishu.cn/open-apis/task/v2/tasks/task_1"
+    assert call["payload"] is None

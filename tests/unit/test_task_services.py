@@ -72,10 +72,10 @@ def test_task_crud_requests():
     assert stub.calls[1]["params"] == {"user_id_type": "open_id"}
 
     # list_tasks
-    service.list_tasks(page_size=20, completed=True)
+    service.list_tasks(page_size=20, completed=True, type="my_tasks")
     assert stub.calls[2]["method"] == "GET"
     assert stub.calls[2]["path"] == "/task/v2/tasks"
-    assert stub.calls[2]["params"] == {"page_size": 20, "completed": True}
+    assert stub.calls[2]["params"] == {"type": "my_tasks", "page_size": 20, "completed": True}
 
     # update_task
     service.update_task(
@@ -87,6 +87,57 @@ def test_task_crud_requests():
     assert stub.calls[3]["method"] == "PATCH"
     assert stub.calls[3]["path"] == "/task/v2/tasks/task_001"
     assert stub.calls[3]["payload"] == {"task": {"summary": "Buy eggs"}, "update_fields": ["summary"]}
+    assert stub.calls[3]["params"] == {"user_id_type": "open_id"}
+
+    # delete_task
+    service.delete_task("task_001")
+    assert stub.calls[4]["method"] == "DELETE"
+    assert stub.calls[4]["path"] == "/task/v2/tasks/task_001"
+    assert stub.calls[4]["payload"] == {}
+    assert stub.calls[4]["params"] == {}
+
+    assert len(stub.calls) == 5
+
+
+def test_task_members_and_reminders_requests():
+    def resolver(_call: Mapping[str, Any]) -> Mapping[str, Any]:
+        return {"code": 0, "data": {"ok": True}}
+
+    stub = _SyncClientStub(resolver)
+    service = TaskService(cast(FeishuClient, stub))
+
+    members = [{"id": "ou_111", "type": "user", "role": "assignee"}]
+
+    service.add_task_members(
+        "task_001",
+        members,
+        client_token="token_1",
+        user_id_type="open_id",
+    )
+    assert stub.calls[0]["method"] == "POST"
+    assert stub.calls[0]["path"] == "/task/v2/tasks/task_001/add_members"
+    assert stub.calls[0]["payload"] == {
+        "members": [{"id": "ou_111", "type": "user", "role": "assignee"}],
+        "client_token": "token_1",
+    }
+    assert stub.calls[0]["params"] == {"user_id_type": "open_id"}
+
+    service.remove_task_members("task_001", members, user_id_type="open_id")
+    assert stub.calls[1]["method"] == "POST"
+    assert stub.calls[1]["path"] == "/task/v2/tasks/task_001/remove_members"
+    assert stub.calls[1]["payload"] == {"members": [{"id": "ou_111", "type": "user", "role": "assignee"}]}
+    assert stub.calls[1]["params"] == {"user_id_type": "open_id"}
+
+    service.add_task_reminders("task_001", [{"relative_fire_minute": 30}], user_id_type="open_id")
+    assert stub.calls[2]["method"] == "POST"
+    assert stub.calls[2]["path"] == "/task/v2/tasks/task_001/add_reminders"
+    assert stub.calls[2]["payload"] == {"reminders": [{"relative_fire_minute": 30}]}
+    assert stub.calls[2]["params"] == {"user_id_type": "open_id"}
+
+    service.remove_task_reminders("task_001", ["rid_1"], user_id_type="open_id")
+    assert stub.calls[3]["method"] == "POST"
+    assert stub.calls[3]["path"] == "/task/v2/tasks/task_001/remove_reminders"
+    assert stub.calls[3]["payload"] == {"reminder_ids": ["rid_1"]}
     assert stub.calls[3]["params"] == {"user_id_type": "open_id"}
 
     assert len(stub.calls) == 4
@@ -281,3 +332,51 @@ def test_async_iter_subtasks():
     assert stub.calls[0]["path"] == "/task/v2/tasks/task_001/subtasks"
     assert stub.calls[0]["params"] == {"page_size": 1}
     assert stub.calls[1]["params"] == {"page_size": 1, "page_token": "p2"}
+
+
+def test_async_task_list_and_member_requests():
+    def resolver(_call: Mapping[str, Any]) -> Mapping[str, Any]:
+        return {"code": 0, "data": {"ok": True}}
+
+    stub = _AsyncClientStub(resolver)
+    service = AsyncTaskService(cast(AsyncFeishuClient, stub))
+
+    async def run() -> None:
+        await service.list_tasks(type="my_tasks", page_size=10, completed=False, user_id_type="open_id")
+        await service.delete_task("task_001")
+        await service.add_task_members(
+            "task_001",
+            [{"id": "ou_111", "type": "user", "role": "follower"}],
+            client_token="token_2",
+            user_id_type="open_id",
+        )
+        await service.remove_task_members(
+            "task_001",
+            [{"id": "ou_111", "type": "user", "role": "follower"}],
+            user_id_type="open_id",
+        )
+        await service.add_task_reminders("task_001", [{"relative_fire_minute": 15}], user_id_type="open_id")
+        await service.remove_task_reminders("task_001", ["rid_2"], user_id_type="open_id")
+
+    asyncio.run(run())
+
+    assert stub.calls[0]["method"] == "GET"
+    assert stub.calls[0]["path"] == "/task/v2/tasks"
+    assert stub.calls[0]["params"] == {
+        "type": "my_tasks",
+        "page_size": 10,
+        "completed": False,
+        "user_id_type": "open_id",
+    }
+    assert stub.calls[1]["method"] == "DELETE"
+    assert stub.calls[1]["path"] == "/task/v2/tasks/task_001"
+    assert stub.calls[2]["path"] == "/task/v2/tasks/task_001/add_members"
+    assert stub.calls[2]["payload"] == {
+        "members": [{"id": "ou_111", "type": "user", "role": "follower"}],
+        "client_token": "token_2",
+    }
+    assert stub.calls[3]["path"] == "/task/v2/tasks/task_001/remove_members"
+    assert stub.calls[4]["path"] == "/task/v2/tasks/task_001/add_reminders"
+    assert stub.calls[4]["payload"] == {"reminders": [{"relative_fire_minute": 15}]}
+    assert stub.calls[5]["path"] == "/task/v2/tasks/task_001/remove_reminders"
+    assert stub.calls[5]["payload"] == {"reminder_ids": ["rid_2"]}

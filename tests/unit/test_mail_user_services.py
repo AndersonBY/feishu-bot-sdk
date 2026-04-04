@@ -6,18 +6,22 @@ from feishu_bot_sdk.feishu import AsyncFeishuClient, FeishuClient
 from feishu_bot_sdk.mail import (
     AsyncMailAddressService,
     AsyncMailContactService,
+    AsyncMailDraftService,
     AsyncMailEventService,
     AsyncMailFolderService,
     AsyncMailMailboxService,
     AsyncMailMessageService,
     AsyncMailRuleService,
+    AsyncMailThreadService,
     MailAddressService,
     MailContactService,
+    MailDraftService,
     MailEventService,
     MailFolderService,
     MailMailboxService,
     MailMessageService,
     MailRuleService,
+    MailThreadService,
 )
 
 
@@ -75,10 +79,12 @@ def test_mail_user_request_shapes() -> None:
     mailbox = MailMailboxService(cast(FeishuClient, stub))
     message = MailMessageService(cast(FeishuClient, stub))
     folder = MailFolderService(cast(FeishuClient, stub))
+    draft = MailDraftService(cast(FeishuClient, stub))
     contact = MailContactService(cast(FeishuClient, stub))
     rule = MailRuleService(cast(FeishuClient, stub))
     event = MailEventService(cast(FeishuClient, stub))
     address = MailAddressService(cast(FeishuClient, stub))
+    thread = MailThreadService(cast(FeishuClient, stub))
 
     mailbox.list_aliases("me")
     mailbox.create_alias("me", "alias@example.com")
@@ -96,6 +102,13 @@ def test_mail_user_request_shapes() -> None:
     folder.update_folder("me", "folder_1", {"name": "Archive 2"})
     folder.delete_folder("me", "folder_1")
 
+    draft.list_drafts("me", page_size=10, page_token="d_1")
+    draft.create_draft("me", {"raw": "raw-eml"})
+    draft.get_draft("me", "draft_1", format="raw")
+    draft.update_draft("me", "draft_1", {"raw": "raw-eml-updated"})
+    draft.delete_draft("me", "draft_1")
+    draft.send_draft("me", "draft_1")
+
     contact.list_contacts("me", page_size=50, page_token="c_1")
     contact.create_contact("me", {"email": "alice@example.com"})
     contact.update_contact("me", "contact_1", {"name": "Alice"})
@@ -111,6 +124,12 @@ def test_mail_user_request_shapes() -> None:
     event.subscribe("me", event_type=1)
     event.unsubscribe("me", event_type=1)
     address.query_status(["a@example.com", "b@example.com"])
+    thread.list_threads("me", folder_id="INBOX", label_id="UNREAD", page_size=20, page_token="t_1", only_unread=True)
+    thread.get_thread("me", "th_1", format="full", include_spam_trash=True)
+    thread.modify_thread("me", "th_1", {"add_folder": "ARCHIVED"})
+    thread.batch_modify_threads("me", {"thread_ids": ["th_1"], "add_label_ids": ["FLAGGED"]})
+    thread.trash_thread("me", "th_1")
+    thread.batch_trash_threads("me", {"thread_ids": ["th_1", "th_2"]})
 
     assert stub.calls[0]["path"] == "/mail/v1/user_mailboxes/me/aliases"
     assert stub.calls[1]["payload"] == {"email_alias": "alias@example.com"}
@@ -130,13 +149,26 @@ def test_mail_user_request_shapes() -> None:
     }
     assert stub.calls[8]["params"] == {"attachment_ids": ["att_1", "att_2"]}
     assert stub.calls[9]["params"] == {"folder_type": 2}
-    assert stub.calls[13]["path"] == "/mail/v1/user_mailboxes/me/mail_contacts"
-    assert stub.calls[17]["path"] == "/mail/v1/user_mailboxes/me/rules"
-    assert stub.calls[21]["payload"] == {"rule_ids": ["rule_1", "rule_2"]}
-    assert stub.calls[22]["path"] == "/mail/v1/user_mailboxes/me/event/subscription"
-    assert stub.calls[23]["payload"] == {"event_type": 1}
-    assert stub.calls[25]["path"] == "/mail/v1/users/query"
-    assert stub.calls[25]["payload"] == {"email_list": ["a@example.com", "b@example.com"]}
+    assert stub.calls[13]["path"] == "/mail/v1/user_mailboxes/me/drafts"
+    assert stub.calls[15]["params"] == {"format": "raw"}
+    assert stub.calls[18]["path"] == "/mail/v1/user_mailboxes/me/drafts/draft_1/send"
+    assert stub.calls[19]["path"] == "/mail/v1/user_mailboxes/me/mail_contacts"
+    assert stub.calls[23]["path"] == "/mail/v1/user_mailboxes/me/rules"
+    assert stub.calls[27]["payload"] == {"rule_ids": ["rule_1", "rule_2"]}
+    assert stub.calls[28]["path"] == "/mail/v1/user_mailboxes/me/event/subscription"
+    assert stub.calls[29]["payload"] == {"event_type": 1}
+    assert stub.calls[31]["path"] == "/mail/v1/users/query"
+    assert stub.calls[31]["payload"] == {"email_list": ["a@example.com", "b@example.com"]}
+    assert stub.calls[32]["params"] == {
+        "folder_id": "INBOX",
+        "label_id": "UNREAD",
+        "page_size": 20,
+        "page_token": "t_1",
+        "only_unread": True,
+    }
+    assert stub.calls[33]["params"] == {"format": "full", "include_spam_trash": True}
+    assert stub.calls[35]["path"] == "/mail/v1/user_mailboxes/me/threads/batch_modify"
+    assert stub.calls[37]["path"] == "/mail/v1/user_mailboxes/me/threads/batch_trash"
 
 
 def test_mail_message_send_markdown_builds_rendered_payload(tmp_path: Path) -> None:
@@ -220,34 +252,44 @@ def test_async_mail_user_iterators_and_calls() -> None:
             return {"code": 0, "data": {"items": ["msg_1"], "has_more": True, "page_token": "msg_2"}}
         if path == "/mail/v1/user_mailboxes/me/folders":
             return {"code": 0, "data": {"items": [{"folder_id": "f_1"}, {"folder_id": "f_2"}]}}
+        if path == "/mail/v1/user_mailboxes/me/drafts":
+            return {"code": 0, "data": {"items": [{"draft_id": "d_1"}], "has_more": False}}
         if path == "/mail/v1/user_mailboxes/me/mail_contacts":
             return {"code": 0, "data": {"items": [{"contact_id": "c_1"}], "has_more": False}}
         if path == "/mail/v1/user_mailboxes/me/rules":
             return {"code": 0, "data": {"items": [{"rule_id": "r_1"}], "has_more": False}}
+        if path == "/mail/v1/user_mailboxes/me/threads":
+            return {"code": 0, "data": {"items": [{"thread_id": "th_1"}], "has_more": False}}
         return {"code": 0, "data": {"ok": True}}
 
     stub = _AsyncClientStub(resolver)
     mailbox = AsyncMailMailboxService(cast(AsyncFeishuClient, stub))
     message = AsyncMailMessageService(cast(AsyncFeishuClient, stub))
     folder = AsyncMailFolderService(cast(AsyncFeishuClient, stub))
+    draft = AsyncMailDraftService(cast(AsyncFeishuClient, stub))
     contact = AsyncMailContactService(cast(AsyncFeishuClient, stub))
     rule = AsyncMailRuleService(cast(AsyncFeishuClient, stub))
     event = AsyncMailEventService(cast(AsyncFeishuClient, stub))
     address = AsyncMailAddressService(cast(AsyncFeishuClient, stub))
+    thread = AsyncMailThreadService(cast(AsyncFeishuClient, stub))
 
     async def run() -> None:
         await mailbox.create_alias("me", "alias@example.com")
         messages = [item async for item in message.iter_messages("me", folder_id="INBOX", page_size=1)]
         folders = [item async for item in folder.iter_folders("me", folder_type=2)]
+        drafts = [item async for item in draft.iter_drafts("me", page_size=10)]
         contacts = [item async for item in contact.iter_contacts("me", page_size=10)]
         rules = [item async for item in rule.iter_rules("me", page_size=10)]
+        threads = [item async for item in thread.iter_threads("me", folder_id="INBOX", page_size=10)]
         await event.subscribe("me", event_type=1)
         await address.query_status(["ops@example.com"])
 
         assert messages == ["msg_1", "msg_2"]
         assert folders == [{"folder_id": "f_1"}, {"folder_id": "f_2"}]
+        assert drafts == [{"draft_id": "d_1"}]
         assert contacts == [{"contact_id": "c_1"}]
         assert rules == [{"rule_id": "r_1"}]
+        assert threads == [{"thread_id": "th_1"}]
 
     asyncio.run(run())
     assert stub.calls[0]["path"] == "/mail/v1/user_mailboxes/me/aliases"

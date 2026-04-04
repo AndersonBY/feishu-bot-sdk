@@ -85,14 +85,17 @@ def test_drive_file_import_export_paths():
     service.get_import_task("ticket_1")
     service.create_export_task({"token": "doc_1", "type": "docx"})
     service.get_export_task("ticket_2", token="doc_1")
+    service.get_task_status("task_1")
 
-    assert len(stub.calls) == 4
+    assert len(stub.calls) == 5
     assert stub.calls[0]["path"] == "/drive/v1/import_tasks"
     assert stub.calls[0]["payload"] == {"file_token": "file_1", "type": "docx"}
     assert stub.calls[1]["path"] == "/drive/v1/import_tasks/ticket_1"
     assert stub.calls[2]["path"] == "/drive/v1/export_tasks"
     assert stub.calls[3]["path"] == "/drive/v1/export_tasks/ticket_2"
     assert stub.calls[3]["params"] == {"token": "doc_1"}
+    assert stub.calls[4]["path"] == "/drive/v1/files/task_check"
+    assert stub.calls[4]["params"] == {"task_id": "task_1"}
 
 
 def test_drive_file_meta_stats_view_copy_move_delete_shortcut_and_version_payloads():
