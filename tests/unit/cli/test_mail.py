@@ -130,6 +130,8 @@ def test_mail_draft_create_reads_raw_file(
             "me",
             "--raw-file",
             str(raw_file),
+            "--as",
+            "user",
             "--format",
             "json",
         ]
@@ -171,6 +173,8 @@ def test_mail_draft_edit_uses_raw_text(monkeypatch: Any, capsys: Any) -> None:
             "draft_2",
             "--raw",
             "Subject: Updated\n\nbody",
+            "--as",
+            "user",
             "--format",
             "json",
         ]
@@ -219,6 +223,8 @@ def test_mail_thread_shortcut(monkeypatch: Any, capsys: Any) -> None:
             "--thread-format",
             "metadata",
             "--include-spam-trash",
+            "--as",
+            "user",
             "--format",
             "json",
         ]

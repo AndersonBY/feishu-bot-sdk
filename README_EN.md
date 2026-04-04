@@ -155,9 +155,9 @@ feishu calendar +rsvp --event-id evt_xxx --rsvp-status accept --format json
 feishu mail address query-status --email ops@example.com --email alerts@example.com --format json
 feishu mail message list --user-mailbox-id me --folder-id INBOX --all --format json
 feishu mail +send-markdown --user-mailbox-id me --to-email user@example.com --subject "Daily Report" --markdown-file ./report.md --format json
-feishu mail +draft-create --user-mailbox-id me --raw-file ./draft.eml --format json
-feishu mail +draft-edit --user-mailbox-id me --draft-id draft_xxx --raw-file ./draft-updated.eml --format json
-feishu mail +thread --user-mailbox-id me --thread-id th_xxx --thread-format metadata --format json
+feishu mail +draft-create --user-mailbox-id me --raw-file ./draft.eml --as user --format json
+feishu mail +draft-edit --user-mailbox-id me --draft-id draft_xxx --raw-file ./draft-updated.eml --as user --format json
+feishu mail +thread --user-mailbox-id me --thread-id th_xxx --thread-format metadata --as user --format json
 feishu mail mailbox alias create --user-mailbox-id me --email-alias alias@example.com --format json
 feishu mail group create --mailgroup-json '{"email":"ops@example.com","name":"Ops Group"}' --format json
 feishu mail public-mailbox member batch-create --public-mailbox-id support@example.com --items-file ./members.json --format json
