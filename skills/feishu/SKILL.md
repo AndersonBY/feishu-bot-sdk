@@ -42,8 +42,6 @@ description: >
 
 CLI 按用途分为三层，从高到低：
 
-当前 CLI 对齐 `third_party_service/lark-cli` commit `b37adfd`（2026-04-29 20:04:06 +0800，v1.0.22）。基线 210 个生产 `+shortcut` 已同名覆盖；本 SDK 另外保留 7 个兼容扩展：`bitable +create-from-csv`、`calendar +attach-material`、`docx +convert-content`、`docx +insert-content`、`drive +requester-upload`、`mail +send-markdown`、`task +delete`。
-
 ### Layer 1: Shortcut（+前缀）— 高层工作流
 
 把多个 API 调用封装成一步操作，面向人类和 Agent 最友好的入口。命名带 `+` 前缀。
@@ -75,7 +73,7 @@ feishu docx +convert-content --content-file draft.md --content-type markdown --f
 按 `<service> <resource> <method>` 结构自动生成，参数统一走 `--params` / `--data`：
 
 ```bash
-feishu drive files list --params '{"folder_token":"fld_xxx"}' --format json
+feishu drive files copy --params '{"file_token":"docx_xxx"}' --data '{"folder_token":"fld_xxx","name":"副本","type":"docx"}' --dry-run --format json
 feishu calendar events list --params '{"calendar_id":"primary"}' --format json
 feishu im messages list --params '{"container_id":"oc_xxx","container_id_type":"chat"}' --format json
 feishu task tasks list --format json
@@ -84,14 +82,13 @@ feishu task tasks list --format json
 **不确定接口怎么调？先查 schema：**
 
 ```bash
-feishu schema                             # lark-style 列出所有 service
-feishu schema drive                       # lark-style 查看 drive service schema
-feishu schema drive.files.copy            # lark-style 查看方法 schema
-feishu schema list drive                  # 兼容旧形态：列出 drive 下的 resource/method
-feishu schema show drive.files.list       # 兼容旧形态：查看参数、scopes、文档链接
+feishu schema --format pretty                    # 列出所有 service
+feishu schema drive --format pretty              # 查看 drive service schema
+feishu schema drive.files.copy --format pretty   # 查看方法 schema
+feishu bitable +create-from-csv --help           # 查看 shortcut 参数
 ```
 
-注意：`schema list <service>` 主要覆盖 metadata service command 和 `+shortcut`，不保证列出所有手写命令；例如创建原生云文档时，还要看 `feishu docx --help` 里的 `docx create`。
+注意：`feishu schema <path>` 用于查看 service command。对于 shortcut 和 `docx create`、`media upload-image` 这类手写命令，直接查看对应命令的 `--help`。
 
 ### Layer 3: Raw API — 兜底调试
 
@@ -105,8 +102,8 @@ feishu api POST /open-apis/im/v1/messages --params '{"receive_id_type":"open_id"
 ### 优先级选择
 
 1. 有 shortcut 时用 shortcut（最简洁）
-2. 没有 shortcut 时用 service command（`feishu schema show` 查看用法）
-3. 都不覆盖时用 `feishu api`（全覆盖兜底）
+2. 没有 shortcut 时用 service command（`feishu schema <path>` 查看用法）
+3. 都没有合适入口时用 `feishu api` 兜底
 
 ---
 
@@ -121,7 +118,7 @@ feishu api POST /open-apis/im/v1/messages --params '{"receive_id_type":"open_id"
 | `--as auto` | 根据命令元数据和登录状态自动选择 |
 
 ```bash
-feishu drive files list --params '{"folder_token":"fld_xxx"}' --as user --format json
+feishu drive files copy --params '{"file_token":"docx_xxx"}' --data '{"folder_token":"fld_xxx","name":"副本","type":"docx"}' --dry-run --as user --format json
 feishu im messages list --params '{"container_id":"oc_xxx","container_id_type":"chat"}' --as bot --format json
 ```
 
@@ -277,7 +274,7 @@ feishu drive +requester-upload ./report.pdf --as user --format json
 feishu drive +upload --file ./report.pdf --folder-token fld_xxx --format json
 feishu drive +download --file-token file_xxx --output ./report.pdf --format json
 feishu drive +apply-permission --token doc_xxx --type docx --perm view --remark "需要访问" --format json
-feishu drive files list --params '{"folder_token":"fld_xxx"}' --as user --format json
+feishu drive files copy --params '{"file_token":"docx_xxx"}' --data '{"folder_token":"fld_xxx","name":"副本","type":"docx"}' --dry-run --as user --format json
 ```
 
 ### 日历
@@ -382,7 +379,7 @@ cat ./event.json | feishu event consume im.message.receive_v1 --stdin --format j
 feishu event +subscribe --event-types im.message.receive_v1 --output-dir ./events --dry-run --format json
 ```
 
-`event schema` 会带上从 `lark-cli/internal/event/schemas` commit `b37adfd` 同步来的本地 schema 快照。
+`event schema` 会输出事件 envelope、payload 字段和可用于消费测试的结构化 schema。
 
 ```python
 from feishu_bot_sdk import FeishuBotServer

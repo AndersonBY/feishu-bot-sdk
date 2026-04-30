@@ -78,8 +78,6 @@ feishu config set-default-as --as user
 # 删除 profile
 feishu config remove-profile old-profile
 
-# 从旧 token store 迁移
-feishu config migrate-token-store --source-path /path/to/old/tokens.json
 ```
 
 ---
@@ -142,20 +140,18 @@ feishu doctor --offline --format json       # 跳过网络检查
 
 ```bash
 # 列出所有 service
-feishu schema list --format json
+feishu schema --format pretty
 
-# 列出某个 service 的 resource / method
-feishu schema list drive --format json
+# 查看某个 service 的 resource / method
+feishu schema drive --format pretty
 
 # 查看具体 method 的参数、scopes、文档链接
-feishu schema show drive.files.list --format json
-feishu schema show calendar.events.create --format json
+feishu schema drive.files.copy --format pretty
+feishu schema calendar.events.create --format pretty
 
-# 查看 shortcut schema
-feishu schema show bitable.+create-from-csv --format json
-
-# 列出所有 schema path
-feishu schema paths --format json
+# 查看 shortcut 或手写命令参数
+feishu bitable +create-from-csv --help
+feishu docx create --help
 ```
 
 ---
@@ -208,7 +204,7 @@ feishu docx create --title "日报" --as user --format json
 说明：
 
 - `docx create` 是常规命令，不是 `+shortcut`
-- 它可能不会出现在 `feishu schema list docx` 的 shortcuts 列表里；需要创建文档时优先看 `feishu docx --help`
+- 需要创建原生云文档时优先看 `feishu docx --help`
 
 ### docx +insert-content
 
@@ -264,7 +260,7 @@ feishu mail +send-markdown --user-mailbox-id me --to-email a@example.com --to-em
 
 ### task shortcuts
 
-任务快捷命令覆盖了创建、评论、删除、完成、重开、成员调整、提醒和我的任务列表：
+任务快捷命令支持创建、评论、删除、完成、重开、成员调整、提醒和我的任务列表：
 
 ```bash
 feishu task +create --summary "Review PR" --assignee ou_xxx --due +2d --as user --format json
@@ -286,16 +282,13 @@ Service commands 按 `<service> <resource> <method>` 结构组织，参数走 `-
 
 ### 可用 services
 
-当前已同步的 service: `calendar`, `drive`, `im`, `mail`, `minutes`, `sheets`, `task`, `vc`, `wiki`。
-
-用 `feishu schema list` 查看实时列表。
+用 `feishu schema --format pretty` 查看可用 service。
 
 ### 示例
 
 ```bash
 # Drive
-feishu drive files list --params '{"folder_token":"fld_xxx"}' --as user --format json
-feishu drive files copy --params '{"file_token":"doc_xxx"}' --data '{"folder_token":"fld_xxx","name":"copy","type":"file"}' --format json
+feishu drive files copy --params '{"file_token":"docx_xxx"}' --data '{"folder_token":"fld_xxx","name":"副本","type":"docx"}' --dry-run --as user --format json
 
 # Calendar
 feishu calendar events list --params '{"calendar_id":"primary"}' --page-all --as user --format json
