@@ -14,10 +14,13 @@ from .groups import (
     config_group,
     doctor_command,
     docx_group,
+    event_group,
     media_group,
+    profile_group,
     register_service_groups,
     schema_group,
     server_group,
+    update_command,
     webhook_group,
     ws_group,
 )
@@ -49,16 +52,20 @@ def app() -> None:
 def _register_static_groups() -> None:
     app.add_command(config_group)
     app.add_command(auth_group)
+    app.add_command(profile_group)
     app.add_command(api_command)
     app.add_command(schema_group)
     app.add_command(doctor_command)
+    app.add_command(update_command)
+    attach_shortcuts(event_group, "event")
+    app.add_command(event_group)
     app.add_command(completion_command)
     app.add_command(docx_group)
     app.add_command(webhook_group)
     app.add_command(ws_group)
     app.add_command(server_group)
     app.add_command(media_group)
-    for shortcut_only_service in ("bitable",):
+    for shortcut_only_service in ("base", "bitable", "contact", "docs", "okr", "slides", "whiteboard"):
         group = click.Group(shortcut_only_service, help=f"{shortcut_only_service} shortcuts")
         attach_shortcuts(group, shortcut_only_service)
         app.add_command(group)

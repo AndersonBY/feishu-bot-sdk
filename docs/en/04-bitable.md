@@ -74,3 +74,16 @@ feishu bitable list-views --app-token app_xxx --format json
 
 - `AsyncBitableService` keeps the same method names.
 - `iter_*` methods return async iterators.
+
+## lark-cli Base Shortcut Bridge
+
+The lark-cli baseline uses the `base` domain for modern Bitable/Base workflows. `bitable +create-from-csv` remains as an SDK compatibility extension, while `base` exposes the parity shortcuts:
+
+```bash
+feishu base +table-list --base-token app_xxx --format json
+feishu base +field-create --base-token app_xxx --table-id tbl_xxx --json '{"field_name":"Status","type":1}' --format json
+feishu base +record-search --base-token app_xxx --table-id tbl_xxx --json '{"filter":{"conjunction":"and","conditions":[]}}' --format json
+feishu base +record-upsert --base-token app_xxx --table-id tbl_xxx --json '{"fields":{"Task":"Done"}}' --format json
+feishu base +workflow-list --base-token app_xxx --format json
+feishu base +dashboard-list --base-token app_xxx --format json
+```

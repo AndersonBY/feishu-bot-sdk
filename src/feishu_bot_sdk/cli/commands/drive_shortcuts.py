@@ -6,10 +6,14 @@ import os
 import time
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import quote
 
+import httpx
+
+from ...exceptions import HTTPRequestError
 from ...docx import DocContentService
 from ...drive import DriveFileService
-from ..runtime import _build_client
+from ..runtime import _build_client, infer_mime_type
 
 
 def _optional_string(value: Any) -> str | None:
@@ -24,6 +28,17 @@ def _extract_response_data(payload: Mapping[str, Any]) -> Mapping[str, Any]:
     if isinstance(data, Mapping):
         return data
     return payload
+
+
+def _data(response: Mapping[str, Any]) -> dict[str, Any]:
+    data = response.get("data")
+    if isinstance(data, Mapping):
+        return {str(key): value for key, value in data.items()}
+    return {}
+
+
+def _split_csv(value: Any) -> list[str]:
+    return [item.strip() for item in str(value or "").split(",") if item.strip()]
 
 
 def _result_payload(payload: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -221,6 +236,39 @@ def _ensure_output_file(
         raise ValueError(f"output file already exists: {target}")
     target.write_bytes(content)
     return str(target)
+
+
+def _download_openapi_bytes(client: Any, path: str, *, params: dict[str, Any] | None = None) -> tuple[bytes, Mapping[str, str]]:
+    base_url = str(getattr(client.config, "base_url", "") or "https://open.feishu.cn/open-apis").rstrip("/")
+    url = f"{base_url}{path}"
+    headers = {"Authorization": f"Bearer {_download_bearer_token(client)}"}
+    request_kwargs: dict[str, Any] = {"headers": headers}
+    if params is not None:
+        request_kwargs["params"] = params
+    with httpx.Client(timeout=getattr(client.config, "timeout_seconds", 30.0)) as http_client:
+        try:
+            response = http_client.get(url, **request_kwargs)
+        except httpx.TimeoutException as exc:
+            raise HTTPRequestError(f"http request timed out: {exc}") from exc
+        except httpx.RequestError as exc:
+            raise HTTPRequestError(f"http request failed: {exc}") from exc
+    if response.status_code >= 400:
+        raise HTTPRequestError(
+            f"http request failed: {response.status_code}",
+            status_code=response.status_code,
+            response_text=response.text,
+            response_headers=dict(response.headers),
+        )
+    return response.content, response.headers
+
+
+def _download_bearer_token(client: Any) -> str:
+    config = getattr(client, "config", None)
+    for field in ("access_token", "user_access_token", "app_access_token"):
+        token = getattr(config, field, None)
+        if token:
+            return str(token)
+    return str(client.get_access_token())
 
 
 def _safe_filename_component(value: str) -> str:
@@ -434,6 +482,237 @@ def _cmd_drive_move_shortcut(args: argparse.Namespace) -> Mapping[str, Any]:
     return status
 
 
+def _cmd_drive_upload(args: argparse.Namespace) -> Mapping[str, Any]:
+    file_path = str(getattr(args, "file", "") or "").strip()
+    if not file_path:
+        raise ValueError("specify --file")
+    file_bytes = Path(file_path).read_bytes()
+    file_name = _optional_string(getattr(args, "name", None)) or os.path.basename(file_path)
+    wiki_token = _optional_string(getattr(args, "wiki_token", None))
+    folder_token = _optional_string(getattr(args, "folder_token", None))
+    if wiki_token and folder_token:
+        raise ValueError("--folder-token and --wiki-token are mutually exclusive")
+    parent_type = "wiki" if wiki_token else "explorer"
+    parent_node = wiki_token or folder_token or ""
+    client = _build_client(args)
+    data = _data(
+        client.request_multipart(
+            "POST",
+            "/drive/v1/files/upload_all",
+            data={
+                "file_name": file_name,
+                "parent_type": parent_type,
+                "parent_node": parent_node,
+                "size": len(file_bytes),
+            },
+            files={"file": (file_name, file_bytes, infer_mime_type(file_path))},
+        )
+    )
+    return {
+        "file_token": data.get("file_token"),
+        "file_name": file_name,
+        "size": len(file_bytes),
+        "parent_type": parent_type,
+        "parent_node": parent_node,
+    }
+
+
+def _cmd_drive_download(args: argparse.Namespace) -> Mapping[str, Any]:
+    file_token = str(getattr(args, "file_token", "") or "").strip()
+    if not file_token:
+        raise ValueError("specify --file-token")
+    output = str(getattr(args, "output", "") or file_token)
+    overwrite = bool(getattr(args, "overwrite", False))
+    target = Path(output)
+    if target.exists() and not overwrite:
+        raise ValueError(f"output file already exists: {target}")
+    client = _build_client(args)
+    content, headers = _download_openapi_bytes(client, f"/drive/v1/files/{quote(file_token, safe='')}/download")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(content)
+    return {
+        "saved_path": str(target),
+        "size_bytes": len(content),
+        "content_type": headers.get("content-type"),
+    }
+
+
+def _cmd_drive_create_folder(args: argparse.Namespace) -> Mapping[str, Any]:
+    name = str(getattr(args, "name", "") or "").strip()
+    if not name:
+        raise ValueError("specify --name")
+    folder_token = str(getattr(args, "folder_token", "") or "").strip()
+    client = _build_client(args)
+    data = _data(
+        client.request_json(
+            "POST",
+            "/drive/v1/files/create_folder",
+            payload={"name": name, "folder_token": folder_token},
+        )
+    )
+    return {
+        "created": True,
+        "name": name,
+        "folder_token": data.get("token"),
+        "parent_folder_token": folder_token,
+        "url": data.get("url"),
+    }
+
+
+def _cmd_drive_create_shortcut(args: argparse.Namespace) -> Mapping[str, Any]:
+    file_token = str(getattr(args, "file_token", "") or "").strip()
+    file_type = str(getattr(args, "type", "") or "").strip().lower()
+    folder_token = str(getattr(args, "folder_token", "") or "").strip()
+    if not file_token or not file_type or not folder_token:
+        raise ValueError("specify --file-token, --type, and --folder-token")
+    body = {
+        "parent_token": folder_token,
+        "refer_entity": {"refer_token": file_token, "refer_type": file_type},
+    }
+    client = _build_client(args)
+    data = _data(client.request_json("POST", "/drive/v1/files/create_shortcut", payload=body))
+    node = data.get("succ_shortcut_node")
+    node_map = node if isinstance(node, Mapping) else {}
+    return {
+        "created": True,
+        "source_file_token": file_token,
+        "source_type": file_type,
+        "folder_token": folder_token,
+        "shortcut_token": node_map.get("token"),
+        "url": node_map.get("url"),
+        "title": node_map.get("name"),
+    }
+
+
+def _cmd_drive_delete(args: argparse.Namespace) -> Mapping[str, Any]:
+    file_token = str(getattr(args, "file_token", "") or "").strip()
+    file_type = str(getattr(args, "type", "") or "").strip().lower()
+    if not file_token or not file_type:
+        raise ValueError("specify --file-token and --type")
+    client = _build_client(args)
+    data = _data(
+        client.request_json(
+            "DELETE",
+            f"/drive/v1/files/{quote(file_token, safe='')}",
+            params={"type": file_type},
+        )
+    )
+    return {"deleted": True, "file_token": file_token, "type": file_type, **data}
+
+
+def _cmd_drive_apply_permission(args: argparse.Namespace) -> Mapping[str, Any]:
+    token = str(getattr(args, "token", "") or "").strip()
+    doc_type = str(getattr(args, "type", "") or "").strip()
+    perm = str(getattr(args, "perm", "") or "").strip()
+    if not token or not doc_type or not perm:
+        raise ValueError("specify --token, --type, and --perm")
+    body: dict[str, Any] = {"perm": perm}
+    remark = str(getattr(args, "remark", "") or "").strip()
+    if remark:
+        body["remark"] = remark
+    client = _build_client(args)
+    return _data(
+        client.request_json(
+            "POST",
+            f"/drive/v1/permissions/{quote(token, safe='')}/members/apply",
+            params={"type": doc_type},
+            payload=body,
+        )
+    )
+
+
+def _comment_reply_elements(value: str) -> list[dict[str, Any]]:
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError("--content must be valid reply_elements JSON") from exc
+    if not isinstance(parsed, list):
+        raise ValueError("--content must be a JSON array")
+    return [dict(item) for item in parsed if isinstance(item, Mapping)]
+
+
+def _cmd_drive_add_comment(args: argparse.Namespace) -> Mapping[str, Any]:
+    doc_token = str(getattr(args, "doc", "") or "").strip()
+    doc_type = str(getattr(args, "type", "") or "").strip() or "docx"
+    content = str(getattr(args, "content", "") or "").strip()
+    if not doc_token or not content:
+        raise ValueError("specify --doc and --content")
+    body: dict[str, Any] = {
+        "file_type": doc_type,
+        "reply_elements": _comment_reply_elements(content),
+    }
+    block_id = str(getattr(args, "block_id", "") or "").strip()
+    if block_id:
+        body["block_id"] = block_id
+    if bool(getattr(args, "full_comment", False)):
+        body["is_whole"] = True
+    client = _build_client(args)
+    return _data(
+        client.request_json(
+            "POST",
+            f"/drive/v1/files/{quote(doc_token, safe='')}/new_comments",
+            payload=body,
+        )
+    )
+
+
+def _cmd_drive_search(args: argparse.Namespace) -> Mapping[str, Any]:
+    body: dict[str, Any] = {
+        "query": str(getattr(args, "query", "") or ""),
+        "page_size": int(getattr(args, "page_size", 15) or 15),
+    }
+    page_token = _optional_string(getattr(args, "page_token", None))
+    if page_token:
+        body["page_token"] = page_token
+    doc_filter: dict[str, Any] = {}
+    doc_types = _split_csv(getattr(args, "doc_types", None))
+    if doc_types:
+        doc_filter["doc_types"] = [item.upper() for item in doc_types]
+    folder_tokens = _split_csv(getattr(args, "folder_tokens", None))
+    if folder_tokens:
+        doc_filter["folder_tokens"] = folder_tokens
+    wiki_filter: dict[str, Any] = {}
+    space_ids = _split_csv(getattr(args, "space_ids", None))
+    if space_ids:
+        wiki_filter["space_ids"] = space_ids
+    body["doc_filter"] = doc_filter
+    body["wiki_filter"] = wiki_filter
+    client = _build_client(args)
+    data = _data(client.request_json("POST", "/search/v2/doc_wiki/search", payload=body))
+    items = data.get("res_units") if isinstance(data.get("res_units"), list) else []
+    return {
+        "total": data.get("total"),
+        "has_more": data.get("has_more"),
+        "page_token": data.get("page_token"),
+        "results": items,
+    }
+
+
+def _cmd_drive_export_download(args: argparse.Namespace) -> Mapping[str, Any]:
+    file_token = str(getattr(args, "file_token", "") or "").strip()
+    if not file_token:
+        raise ValueError("specify --file-token")
+    output_dir = _optional_string(getattr(args, "output_dir", None)) or "."
+    file_name = _optional_string(getattr(args, "file_name", None)) or file_token
+    overwrite = bool(getattr(args, "overwrite", False))
+    client = _build_client(args)
+    content, headers = _download_openapi_bytes(
+        client,
+        f"/drive/v1/export_tasks/file/{quote(file_token, safe='')}/download",
+    )
+    saved_path = _ensure_output_file(
+        output_dir=output_dir,
+        filename=file_name,
+        overwrite=overwrite,
+        content=content,
+    )
+    return {
+        "saved_path": saved_path,
+        "size_bytes": len(content),
+        "content_type": headers.get("content-type"),
+    }
+
+
 def _cmd_drive_task_result_shortcut(args: argparse.Namespace) -> Mapping[str, Any]:
     scenario = str(args.scenario).strip().lower()
     client = _build_client(args)
@@ -470,8 +749,17 @@ def _cmd_drive_task_result_shortcut(args: argparse.Namespace) -> Mapping[str, An
 
 
 __all__ = [
+    "_cmd_drive_add_comment",
+    "_cmd_drive_apply_permission",
+    "_cmd_drive_create_folder",
+    "_cmd_drive_create_shortcut",
+    "_cmd_drive_delete",
+    "_cmd_drive_download",
     "_cmd_drive_export_shortcut",
+    "_cmd_drive_export_download",
     "_cmd_drive_import_shortcut",
     "_cmd_drive_move_shortcut",
+    "_cmd_drive_search",
     "_cmd_drive_task_result_shortcut",
+    "_cmd_drive_upload",
 ]

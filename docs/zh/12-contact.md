@@ -55,6 +55,10 @@ feishu contact department search --query 研发 --format json
 
 # 权限范围
 feishu contact scope get --page-size 100 --format json
+
+# lark-cli shortcuts
+feishu contact +get-user --user-id ou_xxx --user-id-type open_id --format json
+feishu contact +search-user --query Alice --format json
 ```
 
 ## 注意事项

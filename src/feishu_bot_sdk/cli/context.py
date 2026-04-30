@@ -17,6 +17,7 @@ RUNTIME_OPTION_NAMES = (
     "as_type",
     "base_url",
     "full_output",
+    "jq",
     "max_output_chars",
     "no_store",
     "output_format",
@@ -49,6 +50,7 @@ class CLIContext:
     base_url: str | None = None
     timeout: float | None = None
     as_type: str = "auto"
+    jq: str | None = None
 
     def normalized_output_format(self) -> str:
         if self.output_format == "human":
@@ -77,6 +79,7 @@ class CLIContext:
             "base_url": self.base_url,
             "timeout": self.timeout,
             "auth_mode": auth_mode,
+            "jq": self.jq,
         }
         payload.update(overrides)
         return argparse.Namespace(**payload)
@@ -90,6 +93,7 @@ class CLIContext:
             full_output=self.full_output,
             save_output=self.save_output,
             cli_args=cli_args,
+            jq_expr=self.jq,
         )
 
 
@@ -124,6 +128,7 @@ def with_runtime_options(
         click.option("--app-secret", help="Feishu app_secret"),
         click.option("--app-id", help="Feishu app_id"),
         click.option("--save-output", help="Write the full normalized JSON result to a file before stdout truncation"),
+        click.option("--jq", "-q", help="jq-style expression to filter JSON output"),
         click.option("--full-output", is_flag=True, help="Disable stdout truncation for regular command results"),
         click.option("--output-offset", type=int, default=0, show_default=True, help="Start JSON preview from this character offset"),
         click.option("--max-output-chars", type=int, default=25000, show_default=True, help="Maximum stdout characters for regular command results"),
@@ -163,6 +168,8 @@ def with_runtime_options(
 def with_service_io_options(func: Callable[..., Any]) -> Callable[..., Any]:
     options = [
         click.option("--dry-run", is_flag=True, help="Print request plan without executing"),
+        click.option("--yes", is_flag=True, help="Confirm high-risk write operations"),
+        click.option("--file", "file_upload", help="File to upload ([field=]path, supports - for stdin)"),
         click.option("--output", help="Write command semantic output to a file"),
         click.option("--page-delay", type=int, default=200, show_default=True, help="Delay in ms between pages"),
         click.option("--page-limit", type=int, default=10, show_default=True, help="Max pages to fetch when --page-all is enabled (0 = unlimited)"),

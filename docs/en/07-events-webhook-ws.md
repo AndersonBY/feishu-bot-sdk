@@ -131,3 +131,16 @@ Related objects:
 - `MemoryIdempotencyStore` / `AsyncMemoryIdempotencyStore`
 
 Use idempotency checks at your webhook/WS entrypoint to prevent duplicate processing.
+
+## lark-cli Event Commands
+
+```bash
+feishu event list --format json
+feishu event schema im.message.receive_v1 --format json
+cat ./event.json | feishu event consume im.message.receive_v1 --stdin --format json
+feishu event status --format json
+feishu event stop --format json
+feishu event +subscribe --event-types im.message.receive_v1 --output-dir ./events --dry-run --format json
+```
+
+`event schema` includes the local event schema snapshot synced from `lark-cli/internal/event/schemas` at commit `b37adfd`.

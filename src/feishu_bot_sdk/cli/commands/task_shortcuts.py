@@ -151,7 +151,7 @@ def _timestamp_to_iso(value: Any) -> str | None:
     return datetime.fromtimestamp(numeric / 1000, tz=timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
-def _task_member_payload(member_ids: list[str], *, role: str) -> list[dict[str, str]]:
+def _task_member_payload(member_ids: list[str], *, role: str) -> list[Mapping[str, object]]:
     return [{"id": member_id, "role": role, "type": "user"} for member_id in member_ids]
 
 
@@ -494,6 +494,189 @@ def _cmd_task_get_my_tasks_shortcut(args: argparse.Namespace) -> Mapping[str, An
     }
 
 
+def _update_fields_for(payload: Mapping[str, Any]) -> list[str]:
+    return [str(key) for key in payload if key]
+
+
+def _cmd_task_update_shortcut(args: argparse.Namespace) -> Mapping[str, Any]:
+    payload = _require_json_object(getattr(args, "data", None), flag_name="--data")
+    summary = _optional_string(getattr(args, "summary", None))
+    if summary is not None:
+        payload["summary"] = summary
+    description = _optional_string(getattr(args, "description", None))
+    if description is not None:
+        payload["description"] = description
+    due = _optional_string(getattr(args, "due", None))
+    if due is not None:
+        payload["due"] = _task_due_payload(due)
+    if not payload:
+        raise ValueError("no fields to update")
+    service = TaskService(_build_client(args))
+    tasks = []
+    for task_id in _split_member_ids(getattr(args, "task_id", None)):
+        result = service.update_task(
+            task_id,
+            payload,
+            update_fields=_update_fields_for(payload),
+            user_id_type="open_id",
+        )
+        tasks.append(_normalize_task_payload(result, guid=task_id))
+    return {"tasks": tasks, "count": len(tasks)}
+
+
+def _cmd_task_set_ancestor_shortcut(args: argparse.Namespace) -> Mapping[str, Any]:
+    task_id = str(getattr(args, "task_id", "") or "").strip()
+    ancestor_id = str(getattr(args, "ancestor_id", "") or "").strip()
+    if not task_id:
+        raise ValueError("specify --task-id")
+    service = TaskService(_build_client(args))
+    result = service.update_task(
+        task_id,
+        {"ancestor_guid": ancestor_id},
+        update_fields=["ancestor_guid"],
+        user_id_type="open_id",
+    )
+    return _normalize_task_payload(result, guid=task_id, ancestor_guid=ancestor_id or None)
+
+
+def _cmd_task_get_related_tasks_shortcut(args: argparse.Namespace) -> Mapping[str, Any]:
+    task_id = str(getattr(args, "task_id", "") or "").strip()
+    if not task_id:
+        raise ValueError("specify --task-id")
+    client = _build_client(args)
+    return _data_or_raw(
+        client.request_json(
+            "GET",
+            f"/task/v2/tasks/{task_id}/related_tasks",
+            params={"user_id_type": "open_id"},
+        )
+    )
+
+
+def _data_or_raw(response: Mapping[str, Any]) -> Mapping[str, Any]:
+    data = response.get("data")
+    return data if isinstance(data, Mapping) else response
+
+
+def _cmd_task_search_shortcut(args: argparse.Namespace) -> Mapping[str, Any]:
+    body: dict[str, Any] = {"query": str(getattr(args, "query", "") or "")}
+    filter_payload: dict[str, Any] = {}
+    creators = _split_member_ids(getattr(args, "creator", None))
+    if creators:
+        filter_payload["creator_ids"] = creators
+    assignees = _split_member_ids(getattr(args, "assignee", None))
+    if assignees:
+        filter_payload["assignee_ids"] = assignees
+    followers = _split_member_ids(getattr(args, "follower", None))
+    if followers:
+        filter_payload["follower_ids"] = followers
+    if bool(getattr(args, "completed", False)):
+        filter_payload["is_completed"] = True
+    if filter_payload:
+        body["filter"] = filter_payload
+    page_token = _optional_string(getattr(args, "page_token", None))
+    if page_token:
+        body["page_token"] = page_token
+    client = _build_client(args)
+    data = _data_or_raw(client.request_json("POST", "/task/v2/tasks/search", payload=body))
+    raw_items = data.get("items")
+    items: list[Any] = list(raw_items) if isinstance(raw_items, list) else []
+    return {"items": items, "count": len(items), "has_more": bool(data.get("has_more")), "page_token": data.get("page_token")}
+
+
+def _cmd_task_subscribe_event_shortcut(args: argparse.Namespace) -> Mapping[str, Any]:
+    client = _build_client(args)
+    payload = {
+        "resource_type": str(getattr(args, "resource_type", "") or "task"),
+        "resource_id": str(getattr(args, "resource_id", "") or getattr(args, "task_id", "") or ""),
+        "event_type": str(getattr(args, "event_type", "") or "task.updated"),
+    }
+    return _data_or_raw(client.request_json("POST", "/task/v2/tasks/subscribe", payload=payload))
+
+
+def _cmd_task_tasklist_create_shortcut(args: argparse.Namespace) -> Mapping[str, Any]:
+    tasklist = {"name": str(getattr(args, "name", "") or "")}
+    members = _task_member_payload(_split_member_ids(getattr(args, "member", None)), role="editor")
+    if members:
+        tasklist["members"] = members
+    service = TaskService(_build_client(args))
+    result = service.create_tasklist(tasklist, user_id_type="open_id")
+    tasklist_raw = result.get("tasklist")
+    tasklist_data: Mapping[str, Any] = tasklist_raw if isinstance(tasklist_raw, Mapping) else {}
+    tasklist_guid = str(tasklist_data.get("guid") or result.get("guid") or "")
+    created_tasks: list[Mapping[str, Any]] = []
+    for item in _json_array(getattr(args, "data", None), default=[]):
+        if not isinstance(item, Mapping):
+            continue
+        task = dict(item)
+        assignee = _optional_string(task.pop("assignee", None))
+        if assignee:
+            task["members"] = _task_member_payload([assignee], role="assignee")
+        task["tasklists"] = [{"tasklist_guid": tasklist_guid}]
+        created_tasks.append(service.create_task(task, user_id_type="open_id"))
+    return {"guid": tasklist_guid, "name": tasklist_data.get("name"), "created_tasks": created_tasks}
+
+
+def _json_array(value: Any, *, default: list[Any] | None = None) -> list[Any]:
+    text = _optional_string(value)
+    if text is None:
+        return [] if default is None else default
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError("expected JSON array") from exc
+    if not isinstance(parsed, list):
+        raise ValueError("expected JSON array")
+    return parsed
+
+
+def _cmd_task_tasklist_search_shortcut(args: argparse.Namespace) -> Mapping[str, Any]:
+    service = TaskService(_build_client(args))
+    data = service.list_tasklists(page_size=int(getattr(args, "page_size", 50) or 50), user_id_type="open_id")
+    raw_items = data.get("items")
+    items: list[Any] = list(raw_items) if isinstance(raw_items, list) else []
+    query = _optional_string(getattr(args, "query", None))
+    if query:
+        items = [item for item in items if isinstance(item, Mapping) and query in str(item.get("name") or "")]
+    return {"items": items, "count": len(items), "has_more": bool(data.get("has_more")), "page_token": data.get("page_token")}
+
+
+def _cmd_task_tasklist_task_add_shortcut(args: argparse.Namespace) -> Mapping[str, Any]:
+    tasklist_guid = _resolve_tasklist_guid(str(getattr(args, "tasklist_id", "") or ""))
+    if not tasklist_guid:
+        raise ValueError("specify --tasklist-id")
+    client = _build_client(args)
+    successful: list[Mapping[str, Any]] = []
+    for task_id in _split_member_ids(getattr(args, "task_id", None)):
+        body: dict[str, Any] = {"tasklist_guid": tasklist_guid}
+        section_guid = _optional_string(getattr(args, "section_guid", None))
+        if section_guid:
+            body["section_guid"] = section_guid
+        data = _data_or_raw(
+            client.request_json(
+                "POST",
+                f"/task/v2/tasks/{task_id}/add_tasklist",
+                params={"user_id_type": "open_id"},
+                payload=body,
+            )
+        )
+        successful.append(data)
+    return {"tasklist_guid": tasklist_guid, "successful_tasks": successful, "count": len(successful)}
+
+
+def _cmd_task_tasklist_members_shortcut(args: argparse.Namespace) -> Mapping[str, Any]:
+    tasklist_guid = _resolve_tasklist_guid(str(getattr(args, "tasklist_id", "") or ""))
+    add_ids = _split_member_ids(getattr(args, "add", None))
+    remove_ids = _split_member_ids(getattr(args, "remove", None))
+    service = TaskService(_build_client(args))
+    result: Mapping[str, Any] = {}
+    if add_ids:
+        result = service.add_tasklist_members(tasklist_guid, _task_member_payload(add_ids, role="editor"))
+    if remove_ids:
+        result = service.remove_tasklist_members(tasklist_guid, _task_member_payload(remove_ids, role="editor"))
+    return {"tasklist_guid": tasklist_guid, "member_ids": add_ids or remove_ids, **dict(result)}
+
+
 __all__ = [
     "_cmd_task_assign_shortcut",
     "_cmd_task_comment_shortcut",
@@ -502,6 +685,15 @@ __all__ = [
     "_cmd_task_delete_shortcut",
     "_cmd_task_followers_shortcut",
     "_cmd_task_get_my_tasks_shortcut",
+    "_cmd_task_get_related_tasks_shortcut",
     "_cmd_task_reminder_shortcut",
     "_cmd_task_reopen_shortcut",
+    "_cmd_task_search_shortcut",
+    "_cmd_task_set_ancestor_shortcut",
+    "_cmd_task_subscribe_event_shortcut",
+    "_cmd_task_tasklist_create_shortcut",
+    "_cmd_task_tasklist_members_shortcut",
+    "_cmd_task_tasklist_search_shortcut",
+    "_cmd_task_tasklist_task_add_shortcut",
+    "_cmd_task_update_shortcut",
 ]

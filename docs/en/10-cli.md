@@ -8,7 +8,7 @@
 
 The CLI is built on Click with a three-layer command model:
 
-- top-level commands: `api`, `schema`, `doctor`, `completion`, `webhook`, `ws`, `server`, `media`
+- top-level commands: `api`, `auth`, `profile`, `config`, `schema`, `doctor`, `update`, `completion`, `event`, `webhook`, `ws`, `server`, `media`
 - high-value workflow commands: `+shortcut` (e.g., `bitable +create-from-csv`, `docx +insert-content`)
 - service commands: metadata-driven API calls, `feishu <service> <resource> <method> --params ... --data ...`
 
@@ -23,6 +23,11 @@ See also:
 
 - [CLI Framework Decision](../cli-framework-decision.md)
 - [CLI Command Mapping](../cli-command-mapping.md)
+- [lark-cli Parity Shortcut Domains](./16-lark-cli-parity-domains.md)
+
+## lark-cli Parity Baseline
+
+The current CLI parity baseline is `third_party_service/lark-cli` commit `b37adfd` (2026-04-29 20:04:06 +0800, v1.0.22). The generated parity report currently shows 210/210 baseline production shortcuts covered, 9/9 raw metadata services covered, 120/120 metadata service methods covered, and no missing top-level command groups. `feishu-bot-sdk` also keeps 7 compatibility-only shortcuts documented in [CLI Command Mapping](../cli-command-mapping.md).
 
 ## Install
 
@@ -40,7 +45,8 @@ All Click commands expose these runtime flags:
 - `--profile`
 - `--app-id` / `--app-secret`
 - `--max-output-chars` / `--output-offset` / `--save-output` / `--full-output`
-- service/raw API commands also support `--params` / `--data` / `--page-all` / `--page-size` / `--page-limit` / `--page-delay` / `--output` / `--dry-run`
+- `--jq/-q`
+- service/raw API commands also support `--params` / `--data` / `--file` / `--output` / `--page-all` / `--page-size` / `--page-limit` / `--page-delay` / `--dry-run` / `--yes`
 
 Auth precedence: environment variables > CLI flags > CLI profile > local token store profile.
 
@@ -103,6 +109,19 @@ feishu config show --profile default --format json
 feishu config set-default-profile default --format json
 feishu config migrate-token-store --source-path ./tokens.json --default-profile default --format json
 feishu config remove-profile default --format json
+feishu config bind --source openclaw --identity user-default --format json
+feishu config strict-mode true --format json
+feishu profile list --format json
+feishu profile add --name ops --app-id cli_xxx --app-secret-stdin --use --format json
+feishu profile use ops --format json
+feishu profile rename ops production --format json
+feishu profile remove production --format json
+
+# schema / update
+feishu schema --format json
+feishu schema drive.files.copy --format pretty
+feishu schema list drive --format json
+feishu update --check --format json
 
 # auth
 feishu auth token --format json
@@ -121,13 +140,20 @@ feishu api POST /open-apis/im/v1/messages --data '{"receive_id":"ou_xxx","conten
 feishu media upload-file ./final.csv --format json
 feishu media download-file file_xxx ./downloads/file.bin --format json
 feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx --resource-type image --format json
+feishu drive +upload --file ./final.csv --folder-token fld_xxx --format json
+feishu drive +download --file-token file_xxx --output ./downloads/final.csv --format json
+feishu drive +search --query "weekly report" --format json
 feishu bitable +create-from-csv ./final.csv --app-name "Task Result" --table-name "Result"
+feishu base +record-upsert --base-token app_xxx --table-id tbl_xxx --json '{"fields":{"Task":"Done"}}' --format json
 feishu docx +insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
 # In `--content-file` mode, relative local image paths resolve against the Markdown file directory
+feishu docs +fetch --doc doccn_xxx --doc-format markdown --format json
+feishu whiteboard +query --whiteboard-token wb_xxx --output-as image --output ./board.png --format json
 feishu drive +requester-upload ./final.csv --folder-name "Uploads" --format json
 
 # calendar attachments
 feishu calendar +attach-material ./agenda.md --calendar-id cal_xxx --event-id evt_xxx --format json
+feishu calendar +agenda --calendar-id primary --start 1735700400 --end 1735786800 --format json
 
 # tasks
 feishu task +create --summary "Follow up contract" --assignee ou_xxx --due +2d --format json
@@ -136,9 +162,26 @@ feishu task +delete --task-id task_xxx --format json
 feishu task +assign --task-id task_xxx --add ou_xxx,ou_yyy --format json
 feishu task +reminder --task-id task_xxx --set 1h --format json
 feishu task +get-my-tasks --as user --query "contract" --page-all --format json
+feishu task +update --task-id task_xxx --summary "Updated summary" --format json
+feishu task +tasklist-create --name "Launch tasks" --format json
 
 # mail
 feishu mail +send-markdown --user-mailbox-id me --to-email user@example.com --subject "Daily Report" --markdown-file ./report.md --format json
+feishu mail +send --mailbox me --to user@example.com --subject "Daily Report" --body-file ./report.html --confirm-send --format json
+feishu mail +triage --mailbox me --folder-id INBOX --query "urgent" --format json
+
+# sheets / slides / okr
+feishu sheets +write --spreadsheet-token sht_xxx --range Sheet1!A1:B2 --values '[[1,2],[3,4]]' --format json
+feishu sheets +set-dropdown --spreadsheet-token sht_xxx --range Sheet1!A:A --options '["Todo","Done"]' --format json
+feishu slides +create --title "Quarterly Review" --slides '[{"title":"Intro"}]' --format json
+feishu okr +cycle-list --user-id ou_xxx --format json
+feishu okr +progress-create --target-id obj_xxx --target-type objective --content "On track" --progress-percent 80 --format json
+
+# events
+feishu event list --format json
+feishu event schema im.message.receive_v1 --format json
+cat ./event.json | feishu event consume im.message.receive_v1 --stdin --format json
+feishu event +subscribe --event-types im.message.receive_v1 --output-dir ./events --dry-run --format json
 ```
 
 ## User Auth (CLI Best Practice)
@@ -192,6 +235,12 @@ feishu server run --print-payload --output-file ./events.jsonl
 feishu server start --pid-file ./.feishu_server.pid --log-file ./feishu-server.log
 feishu server status --pid-file ./.feishu_server.pid --format json
 feishu server stop --pid-file ./.feishu_server.pid
+
+# lark-style local event commands
+feishu event list --format json
+feishu event schema im.message.receive_v1 --format json
+feishu event status --format json
+feishu event stop --format json
 ```
 
 `ws run` and `server run` support:

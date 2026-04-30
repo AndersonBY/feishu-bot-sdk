@@ -23,6 +23,8 @@ class JsonHttpClient:
         headers: Optional[Mapping[str, str]] = None,
         params: Optional[Mapping[str, object]] = None,
         payload: Optional[Mapping[str, object]] = None,
+        data: Optional[Mapping[str, object]] = None,
+        files: Optional[Mapping[str, tuple[str, bytes, str]]] = None,
         timeout_seconds: Optional[float] = None,
     ) -> Dict[str, Any]:
         method_upper = method.upper()
@@ -31,13 +33,21 @@ class JsonHttpClient:
             "params": dict(params or {}),
             "timeout": timeout_seconds or self._timeout_seconds,
         }
-        if payload is not None and method_upper != "GET":
+        if files is not None:
+            request_kwargs["data"] = dict(data or {})
+            request_kwargs["files"] = dict(files)
+        elif payload is not None and method_upper != "GET":
             request_kwargs["json"] = dict(payload)
-        response = self._session.request(
-            method_upper,
-            url,
-            **request_kwargs,
-        )
+        try:
+            response = self._session.request(
+                method_upper,
+                url,
+                **request_kwargs,
+            )
+        except httpx.TimeoutException as exc:
+            raise HTTPRequestError(f"http request timed out: {exc}") from exc
+        except httpx.RequestError as exc:
+            raise HTTPRequestError(f"http request failed: {exc}") from exc
         if response.status_code >= 400:
             raise HTTPRequestError(
                 f"http request failed: {response.status_code}",
@@ -72,6 +82,8 @@ class AsyncJsonHttpClient:
         headers: Optional[Mapping[str, str]] = None,
         params: Optional[Mapping[str, object]] = None,
         payload: Optional[Mapping[str, object]] = None,
+        data: Optional[Mapping[str, object]] = None,
+        files: Optional[Mapping[str, tuple[str, bytes, str]]] = None,
         timeout_seconds: Optional[float] = None,
     ) -> Dict[str, Any]:
         method_upper = method.upper()
@@ -80,13 +92,21 @@ class AsyncJsonHttpClient:
             "params": dict(params or {}),
             "timeout": timeout_seconds or self._timeout_seconds,
         }
-        if payload is not None and method_upper != "GET":
+        if files is not None:
+            request_kwargs["data"] = dict(data or {})
+            request_kwargs["files"] = dict(files)
+        elif payload is not None and method_upper != "GET":
             request_kwargs["json"] = dict(payload)
-        response = await self._client.request(
-            method_upper,
-            url,
-            **request_kwargs,
-        )
+        try:
+            response = await self._client.request(
+                method_upper,
+                url,
+                **request_kwargs,
+            )
+        except httpx.TimeoutException as exc:
+            raise HTTPRequestError(f"http request timed out: {exc}") from exc
+        except httpx.RequestError as exc:
+            raise HTTPRequestError(f"http request failed: {exc}") from exc
         if response.status_code >= 400:
             raise HTTPRequestError(
                 f"http request failed: {response.status_code}",

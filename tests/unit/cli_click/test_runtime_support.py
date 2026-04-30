@@ -51,6 +51,20 @@ def test_load_auto_approve_scopes_uses_nested_recommend_allow_deny(
     assert "drive:file:upload" not in approved
 
 
+def test_recommend_scopes_includes_shortcut_required_scopes() -> None:
+    scope_registry.load_scope_priorities.cache_clear()
+    try:
+        contact_scopes = scope_registry.recommend_scopes("user", services=["contact"])
+        drive_scopes = scope_registry.recommend_scopes("user", services=["drive"])
+        docs_scopes = scope_registry.recommend_scopes("user", services=["docs"])
+    finally:
+        scope_registry.load_scope_priorities.cache_clear()
+
+    assert "contact:user:search" in contact_scopes
+    assert "search:docs:read" in drive_scopes
+    assert "search:docs:read" in docs_scopes
+
+
 def test_print_error_outputs_structured_json_envelope(capsys: Any) -> None:
     code = output_runtime._print_error(
         "bad input",
@@ -99,6 +113,45 @@ def test_metadata_available_requires_service_json_files(
     assert registry_runtime.metadata_available() is False
     (services_dir / "drive.json").write_text("{}", encoding="utf-8")
     assert registry_runtime.metadata_available() is True
+
+
+def test_load_metadata_snapshot_exposes_source_commit(monkeypatch: Any, tmp_path: Path) -> None:
+    metadata_dir = tmp_path / "metadata"
+    services_dir = metadata_dir / "services"
+    services_dir.mkdir(parents=True)
+    (services_dir / "drive.json").write_text('{"name":"drive","resources":{}}', encoding="utf-8")
+    (metadata_dir / "meta_version.json").write_text(
+        '{"version":"1.0.0","source":"lark-cli","source_commit":"abc1234"}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(registry_runtime, "metadata_root", lambda: metadata_dir)
+    monkeypatch.setattr(registry_runtime, "services_root", lambda: services_dir)
+    registry_runtime.load_metadata_snapshot.cache_clear()
+    try:
+        snapshot = registry_runtime.load_metadata_snapshot()
+    finally:
+        registry_runtime.load_metadata_snapshot.cache_clear()
+
+    assert snapshot.version == "1.0.0"
+    assert snapshot.source == "lark-cli"
+    assert snapshot.source_commit == "abc1234"
+
+
+def test_get_service_description_reads_synced_description_file(monkeypatch: Any, tmp_path: Path) -> None:
+    metadata_dir = tmp_path / "metadata"
+    metadata_dir.mkdir()
+    (metadata_dir / "service_descriptions.json").write_text(
+        '{"drive":{"en":{"description":"Drive files"},"zh":{"description":"云空间文件"}}}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(registry_runtime, "metadata_root", lambda: metadata_dir)
+    registry_runtime.load_service_descriptions.cache_clear()
+    try:
+        assert registry_runtime.get_service_description("drive", "en") == "Drive files"
+        assert registry_runtime.get_service_description("drive", "zh") == "云空间文件"
+        assert registry_runtime.get_service_description("missing", "en") == ""
+    finally:
+        registry_runtime.load_service_descriptions.cache_clear()
 
 
 def test_resolve_identity_priority_chain(monkeypatch: Any) -> None:

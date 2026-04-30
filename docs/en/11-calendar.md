@@ -58,10 +58,18 @@ feishu calendar list-calendars --page-size 50 --format json
 feishu calendar create-event --calendar-id cal_xxx --event-file ./event.json --format json
 
 # attach meeting material to an event (uses correct upload point automatically)
-feishu calendar attach-material --calendar-id cal_xxx --event-id evt_xxx --path ./agenda.md --format json
+feishu calendar +attach-material ./agenda.md --calendar-id cal_xxx --event-id evt_xxx --format json
 
 # query freebusy
 feishu calendar list-freebusy --request-file ./freebusy.json --format json
+
+# lark-cli shortcuts
+feishu calendar +agenda --calendar-id primary --start 1735700400 --end 1735786800 --format json
+feishu calendar +create --calendar-id primary --summary "Project Review" --start 1735700400 --end 1735704000 --format json
+feishu calendar +freebusy --user-ids ou_a,ou_b --start 1735700400 --end 1735704000 --format json
+feishu calendar +room-find --slot 1735700400/1735704000 --format json
+feishu calendar +suggestion --attendee-ids ou_a,ou_b --duration-minutes 30 --start 1735700400 --end 1735704000 --format json
+feishu calendar +update --calendar-id primary --event-id evt_xxx --summary "Updated" --format json
 ```
 
 ## Async Version

@@ -5,7 +5,7 @@ from typing import Any
 import click
 
 from ..context import build_cli_context, with_runtime_options, with_service_io_options
-from ..runtime import _build_client, _normalize_path, _parse_json_object
+from ..runtime import _build_client, _normalize_path, _parse_json_object, build_multipart_file
 from ..runtime.identity import identity_to_auth_mode, resolve_identity
 
 
@@ -33,8 +33,21 @@ def api_command(**kwargs: Any) -> None:
         name="data",
         required=False,
     )
+    page_all = bool(params.pop("page_all", False))
     dry_run = bool(params.pop("dry_run", False))
     semantic_output = params.pop("output", None)
+    params.pop("page_size", None)
+    params.pop("page_limit", None)
+    params.pop("page_delay", None)
+    params.pop("yes", None)
+    file_upload = params.pop("file_upload", None)
+    file_field: str | None = None
+    file_payload: tuple[str, bytes, str] | None = None
+    file_meta: dict[str, str] | None = None
+    if file_upload:
+        file_field, file_payload, file_meta = build_multipart_file(str(file_upload))
+    if page_all and semantic_output:
+        raise ValueError("--output and --page-all are mutually exclusive")
     if dry_run:
         cli_ctx.emit(
             {
@@ -47,6 +60,7 @@ def api_command(**kwargs: Any) -> None:
                     "path": path,
                     "params": params_payload or None,
                     "data": data_payload or None,
+                    "file": file_meta,
                     "output": semantic_output,
                 },
             }
@@ -54,7 +68,16 @@ def api_command(**kwargs: Any) -> None:
         return
     args = cli_ctx.build_args(group="api", auth_mode=identity_to_auth_mode(resolution.identity))
     client = _build_client(args)
-    result = client.request_json(method, path, params=params_payload or None, payload=data_payload or None)
+    if file_field is not None and file_payload is not None:
+        result = client.request_multipart(
+            method,
+            path,
+            params=params_payload or None,
+            data=data_payload or None,
+            files={file_field: file_payload},
+        )
+    else:
+        result = client.request_json(method, path, params=params_payload or None, payload=data_payload or None)
     if semantic_output:
         from pathlib import Path
         import json

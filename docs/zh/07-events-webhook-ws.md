@@ -131,3 +131,16 @@ asyncio.run(client.start())
 - `MemoryIdempotencyStore` / `AsyncMemoryIdempotencyStore`: 内存级 TTL 去重。
 
 建议在 webhook/长连接入口处做去重，避免重复消费。
+
+## lark-cli Event 命令
+
+```bash
+feishu event list --format json
+feishu event schema im.message.receive_v1 --format json
+cat ./event.json | feishu event consume im.message.receive_v1 --stdin --format json
+feishu event status --format json
+feishu event stop --format json
+feishu event +subscribe --event-types im.message.receive_v1 --output-dir ./events --dry-run --format json
+```
+
+`event schema` 会包含从 `lark-cli/internal/event/schemas` commit `b37adfd` 同步来的本地事件 schema 快照。

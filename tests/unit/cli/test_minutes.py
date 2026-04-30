@@ -2,6 +2,7 @@ import json
 from typing import Any
 
 from feishu_bot_sdk import cli
+from feishu_bot_sdk.exceptions import FeishuError
 from feishu_bot_sdk.minutes import MinutesService
 
 
@@ -95,3 +96,30 @@ def test_minutes_download_saves_file(monkeypatch: Any, tmp_path: Any, capsys: An
     saved_path = tmp_path / "downloads" / "meeting.mp4"
     assert payload["saved_path"] == str(saved_path)
     assert saved_path.read_bytes() == b"minute-bytes"
+
+
+def test_minutes_download_preserves_single_feishu_error(monkeypatch: Any, capsys: Any) -> None:
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "cli_test_secret")
+
+    def _raise_feishu_error(_self: MinutesService, _minute_token: str) -> dict[str, Any]:
+        raise FeishuError("feishu api failed: {'code': 20026, 'msg': 'refresh token not found'}")
+
+    monkeypatch.setattr(MinutesService, "get_minute_media_download_url", _raise_feishu_error)
+
+    code = cli.main(
+        [
+            "minutes",
+            "+download",
+            "--minute-tokens",
+            "invalid_minute",
+            "--url-only",
+            "--format",
+            "json",
+        ]
+    )
+
+    assert code == 3
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["error"]["type"] == "feishu_error"
+    assert payload["error"]["code"] == 20026

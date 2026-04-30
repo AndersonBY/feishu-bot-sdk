@@ -319,6 +319,86 @@ class FeishuClient:
             raise last_error
         raise ConfigurationError("no Feishu auth mode available for this request")
 
+    def request_multipart(
+        self,
+        method: str,
+        path: str,
+        *,
+        data: Optional[Mapping[str, object]] = None,
+        files: Optional[Mapping[str, tuple[str, bytes, str]]] = None,
+        params: Optional[Mapping[str, object]] = None,
+    ) -> Dict[str, Any]:
+        method_upper = method.upper()
+        url = _build_openapi_url(self._config.base_url, path)
+        query_params = dict(params or {})
+        form_data = dict(data or {})
+        multipart_files = dict(files or {})
+        key = build_rate_limit_key(method_upper, path)
+        auth_modes = self._request_auth_modes_for_path(path)
+        last_error: Exception | None = None
+        for index, auth_mode in enumerate(auth_modes):
+            refreshed_once = False
+            while True:
+                token = self._resolve_access_token_for_mode(auth_mode)
+                headers = {"Authorization": f"Bearer {token}"}
+                if self._rate_limiter is not None:
+                    self._rate_limiter.acquire(key)
+                try:
+                    response = self._http.request_json(
+                        method_upper,
+                        url,
+                        headers=headers,
+                        params=query_params,
+                        data=form_data,
+                        files=multipart_files,
+                        timeout_seconds=self._config.timeout_seconds,
+                    )
+                except HTTPRequestError as exc:
+                    if self._rate_limiter is not None and exc.status_code == 429:
+                        self._rate_limiter.on_throttled(key, _extract_retry_after(exc.response_headers))
+                    if (
+                        not refreshed_once
+                        and auth_mode == "user"
+                        and _is_token_http_error(exc)
+                        and self._can_refresh_user_token()
+                    ):
+                        self._force_refresh_user_access_token()
+                        refreshed_once = True
+                        continue
+                    if index + 1 < len(auth_modes) and _should_retry_with_alternate_auth_mode(
+                        current_mode=auth_mode,
+                        http_error=exc,
+                    ):
+                        last_error = exc
+                        break
+                    raise
+                if response.get("code") != 0:
+                    if self._rate_limiter is not None and _is_throttled_response(response):
+                        self._rate_limiter.on_throttled(key)
+                    if (
+                        not refreshed_once
+                        and auth_mode == "user"
+                        and _is_token_api_error(response)
+                        and self._can_refresh_user_token()
+                    ):
+                        self._force_refresh_user_access_token()
+                        refreshed_once = True
+                        continue
+                    error = FeishuError(f"feishu api failed: {response}")
+                    if index + 1 < len(auth_modes) and _should_retry_with_alternate_auth_mode(
+                        current_mode=auth_mode,
+                        api_error=response,
+                    ):
+                        last_error = error
+                        break
+                    raise error
+                if self._rate_limiter is not None:
+                    self._rate_limiter.on_success(key)
+                return response
+        if last_error is not None:
+            raise last_error
+        raise ConfigurationError("no Feishu auth mode available for this request")
+
     def _resolve_access_token(self) -> str:
         return self._resolve_access_token_for_mode(self._default_access_token_mode())
 
@@ -975,17 +1055,18 @@ def _is_token_api_error(data: Mapping[str, object]) -> bool:
     if not message:
         return False
     lowered = message.lower()
+    if any(marker in lowered for marker in ("permission", "scope", "privilege", "docs token", "doc token", "object token")):
+        return False
     token_keywords = (
-        "token",
         "access token",
-        "token expired",
-        "token invalid",
+        "user access token",
+        "tenant access token",
         "invalid access token",
+        "access token invalid",
+        "access token expired",
         "refresh token",
     )
-    if not any(keyword in lowered for keyword in token_keywords):
-        return False
-    return "permission" not in lowered
+    return any(keyword in lowered for keyword in token_keywords)
 
 
 def _is_token_http_error(exc: HTTPRequestError) -> bool:
@@ -994,12 +1075,29 @@ def _is_token_http_error(exc: HTTPRequestError) -> bool:
     response = (exc.response_text or "").lower()
     if not response:
         return False
-    return (
-        "token" in response
-        or "unauthorized" in response
-        or "invalid access token" in response
-        or "expired" in response
+    if any(
+        marker in response
+        for marker in (
+            "permission",
+            "re-authorization",
+            "scope",
+            "privilege",
+            "unauthorized. you do not have permission",
+        )
+    ):
+        return False
+    token_keywords = (
+        "access token",
+        "user access token",
+        "tenant access token",
+        "invalid access token",
+        "access token invalid",
+        "access token expired",
+        "refresh token",
+        "invalid refresh token",
+        "expired refresh token",
     )
+    return any(keyword in response for keyword in token_keywords) or "unauthorized" in response
 
 
 def _is_token_feishu_error(exc: FeishuError) -> bool:

@@ -27,6 +27,21 @@ A lightweight Python SDK for Feishu bot integrations, including:
 - Adaptive rate limiter (auto backoff/recovery by endpoint feedback)
 - Both sync and async APIs
 
+## lark-cli Parity Status
+
+The CLI parity baseline is `third_party_service/lark-cli` commit `b37adfd` (2026-04-29 20:04:06 +0800, v1.0.22). `feishu` now registers 217 `+shortcut` commands: all 210 production shortcuts from that baseline plus 7 SDK compatibility extensions.
+
+| Domain | Shortcuts | Notes |
+| --- | ---: | --- |
+| Base | 75 | tables, fields, views, records, roles, advanced permissions, workflows, forms, dashboards |
+| Sheets / Slides | 41 | values, styles, filters, dropdowns, images, presentation creation and slide replacement |
+| Mail | 18 | message fetch, batch get, triage, watch, reply/forward/send, receipts, signatures, templates |
+| Task | 18 | task create/update/search, related tasks, event subscription, tasklists |
+| Drive / Docs / Docx / Whiteboard / Wiki | 30 | upload/download, permission requests, Docs AI, media, whiteboard, wiki nodes |
+| IM / Calendar / Contact / Minutes / VC / Event / OKR | 35 | messages/chats, calendar, contact, minutes, meetings, events, OKR |
+
+Compatibility extensions: `bitable +create-from-csv`, `calendar +attach-material`, `docx +convert-content`, `docx +insert-content`, `drive +requester-upload`, `mail +send-markdown`, `task +delete`. See the generated report in [`docs/lark-cli-parity-report.md`](./docs/lark-cli-parity-report.md) and the command taxonomy in [`docs/cli-command-mapping.md`](./docs/cli-command-mapping.md).
+
 ## Install
 
 ```bash
@@ -212,6 +227,7 @@ cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --fo
 - FeishuBotServer long-connection service: [`docs/en/08-bot-server.md`](./docs/en/08-bot-server.md)
 - Types, errors, and rate limit: [`docs/en/09-types-errors-rate-limit.md`](./docs/en/09-types-errors-rate-limit.md)
 - CLI tool: [`docs/en/10-cli.md`](./docs/en/10-cli.md)
+- lark-cli parity shortcut domains: [`docs/en/16-lark-cli-parity-domains.md`](./docs/en/16-lark-cli-parity-domains.md)
 - Calendar: [`docs/en/11-calendar.md`](./docs/en/11-calendar.md)
 - Contact: [`docs/en/12-contact.md`](./docs/en/12-contact.md)
 - Search: [`docs/en/13-search.md`](./docs/en/13-search.md)

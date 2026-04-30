@@ -122,12 +122,23 @@ feishu mail public-mailbox remove-to-recycle-bin --public-mailbox-id support@exa
 
 # batch add public mailbox members
 feishu mail public-mailbox member batch-create --public-mailbox-id support@example.com --items-file ./members.json --format json
+
+# lark-cli shortcuts
+feishu mail +message --mailbox me --message-id msg_xxx --format json
+feishu mail +messages --mailbox me --message-ids msg_a,msg_b --format json
+feishu mail +triage --mailbox me --folder-id INBOX --query urgent --format json
+feishu mail +send --mailbox me --to user@example.com --subject "Daily Report" --body-file ./report.html --confirm-send --format json
+feishu mail +reply --mailbox me --message-id msg_xxx --body "Thanks" --format json
+feishu mail +forward --mailbox me --message-id msg_xxx --to user@example.com --format json
+feishu mail +signature --mailbox me --format json
+feishu mail +template-create --mailbox me --name "Daily" --template-content-file ./template.html --format json
 ```
 
 ## Notes
 
 - `mailbox alias create`, `group alias create`, and `public-mailbox alias create` all use the request field `email_alias`. The CLI exposes a direct `--email-alias` flag for this.
 - `mail message send-markdown` automatically builds both `body_html` and `body_plain_text`, and converts local image paths or remote image URLs in Markdown into inline CID attachments.
+- `mail +send-markdown` is kept as a compatibility shortcut; current lark-cli parity send flows use `mail +send`, `mail +reply`, `mail +reply-all`, and `mail +forward`.
 - `mail message send-markdown` supports direct recipient flags (`--to-email`, `--cc-email`, `--bcc-email`) and JSON array inputs (`--to-json`, `--cc-json`, `--bcc-json`) when you need full recipient objects with `mail_address`.
 - When `--markdown-file` is used, relative image paths are resolved from that file's directory by default. Use `--base-dir` to override.
 - `MailMessageService.send_markdown()` and `AsyncMailMessageService.send_markdown()` accept plain string recipient lists and normalize them into `mail_address` objects for the send-mail API.

@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping
 
+from .fileio import read_value
+
 def _resolve_text_input(
     *,
     text: str | None,
@@ -45,7 +47,7 @@ def _parse_json_object(
         return {}
 
     if json_text is not None:
-        raw = json_text
+        raw = read_value(json_text)
     elif file_path is not None:
         raw = Path(str(file_path)).read_text(encoding="utf-8")
     else:
@@ -80,7 +82,7 @@ def _parse_json_array(
         return []
 
     if json_text is not None:
-        raw = json_text
+        raw = read_value(json_text)
     elif file_path is not None:
         raw = Path(str(file_path)).read_text(encoding="utf-8")
     else:

@@ -8,7 +8,7 @@
 
 CLI 基于 Click 框架，采用三层命令模型：
 
-- 顶层命令：`api`、`schema`、`doctor`、`completion`、`webhook`、`ws`、`server`、`media`
+- 顶层命令：`api`、`auth`、`profile`、`config`、`schema`、`doctor`、`update`、`completion`、`event`、`webhook`、`ws`、`server`、`media`
 - 高价值工作流命令：`+shortcut`（如 `bitable +create-from-csv`、`docx +insert-content`）
 - service command：metadata 驱动的 API 调用，`feishu <service> <resource> <method> --params ... --data ...`
 
@@ -23,6 +23,11 @@ CLI 基于 Click 框架，采用三层命令模型：
 
 - [CLI 框架决策](../cli-framework-decision.md)
 - [CLI 命令映射](../cli-command-mapping.md)
+- [lark-cli 对齐 Shortcut 域](./16-lark-cli-parity-domains.md)
+
+## lark-cli 对齐基线
+
+当前 CLI 以 `third_party_service/lark-cli` commit `b37adfd`（2026-04-29 20:04:06 +0800，v1.0.22）为对齐基线。生成的对齐报告显示：基线 210 个生产 shortcut 已全部覆盖，9 个 raw metadata service 已全部覆盖，120 个 metadata service method 已全部覆盖，顶层命令无缺失。`feishu-bot-sdk` 还保留 7 个仅 SDK 侧存在的兼容 shortcut，详见 [CLI 命令映射](../cli-command-mapping.md)。
 
 ## 安装
 
@@ -40,7 +45,8 @@ feishu --help
 - `--profile`
 - `--app-id` / `--app-secret`
 - `--max-output-chars` / `--output-offset` / `--save-output` / `--full-output`
-- service/raw API 额外支持：`--params` / `--data` / `--page-all` / `--page-size` / `--page-limit` / `--page-delay` / `--output` / `--dry-run`
+- `--jq/-q`
+- service/raw API 额外支持：`--params` / `--data` / `--file` / `--output` / `--page-all` / `--page-size` / `--page-limit` / `--page-delay` / `--dry-run` / `--yes`
 
 认证优先级：环境变量 > 命令行参数 > CLI profile > 本地 token store profile。
 
@@ -103,6 +109,19 @@ feishu config show --profile default --format json
 feishu config set-default-profile default --format json
 feishu config migrate-token-store --source-path ./tokens.json --default-profile default --format json
 feishu config remove-profile default --format json
+feishu config bind --source openclaw --identity user-default --format json
+feishu config strict-mode true --format json
+feishu profile list --format json
+feishu profile add --name ops --app-id cli_xxx --app-secret-stdin --use --format json
+feishu profile use ops --format json
+feishu profile rename ops production --format json
+feishu profile remove production --format json
+
+# schema / update
+feishu schema --format json
+feishu schema drive.files.copy --format pretty
+feishu schema list drive --format json
+feishu update --check --format json
 
 # 鉴权
 feishu auth token --format json
@@ -122,13 +141,20 @@ feishu media upload-file ./final.csv --format json
 feishu media download-file file_xxx ./downloads/file.bin --format json
 feishu media download-file img_v3_xxx ./downloads/image.jpg --format json
 feishu media download-file img_v3_xxx ./downloads/image.jpg --message-id om_xxx --resource-type image --format json
+feishu drive +upload --file ./final.csv --folder-token fld_xxx --format json
+feishu drive +download --file-token file_xxx --output ./downloads/final.csv --format json
+feishu drive +search --query "周报" --format json
 feishu bitable +create-from-csv ./final.csv --app-name "任务结果" --table-name "结果表"
+feishu base +record-upsert --base-token app_xxx --table-id tbl_xxx --json '{"fields":{"任务":"完成"}}' --format json
 feishu docx +insert-content --document-id doccn_xxx --content-file ./report.md --content-type markdown --document-revision-id -1 --format json
 # `--content-file` 模式下，相对本地图片路径按 Markdown 文件所在目录解析
+feishu docs +fetch --doc doccn_xxx --doc-format markdown --format json
+feishu whiteboard +query --whiteboard-token wb_xxx --output-as image --output ./board.png --format json
 feishu drive +requester-upload ./final.csv --folder-name "Uploads" --format json
 
 # 日历附件
 feishu calendar +attach-material ./agenda.md --calendar-id cal_xxx --event-id evt_xxx --format json
+feishu calendar +agenda --calendar-id primary --start 1735700400 --end 1735786800 --format json
 
 # 任务
 feishu task +create --summary "跟进合同" --assignee ou_xxx --due +2d --format json
@@ -137,9 +163,26 @@ feishu task +delete --task-id task_xxx --format json
 feishu task +assign --task-id task_xxx --add ou_xxx,ou_yyy --format json
 feishu task +reminder --task-id task_xxx --set 1h --format json
 feishu task +get-my-tasks --as user --query "合同" --page-all --format json
+feishu task +update --task-id task_xxx --summary "更新后的任务" --format json
+feishu task +tasklist-create --name "上线任务" --format json
 
 # 邮件
 feishu mail +send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
+feishu mail +send --mailbox me --to user@example.com --subject "日报" --body-file ./report.html --confirm-send --format json
+feishu mail +triage --mailbox me --folder-id INBOX --query "紧急" --format json
+
+# sheets / slides / okr
+feishu sheets +write --spreadsheet-token sht_xxx --range Sheet1!A1:B2 --values '[[1,2],[3,4]]' --format json
+feishu sheets +set-dropdown --spreadsheet-token sht_xxx --range Sheet1!A:A --options '["待办","完成"]' --format json
+feishu slides +create --title "季度复盘" --slides '[{"title":"开场"}]' --format json
+feishu okr +cycle-list --user-id ou_xxx --format json
+feishu okr +progress-create --target-id obj_xxx --target-type objective --content "进展正常" --progress-percent 80 --format json
+
+# 事件
+feishu event list --format json
+feishu event schema im.message.receive_v1 --format json
+cat ./event.json | feishu event consume im.message.receive_v1 --stdin --format json
+feishu event +subscribe --event-types im.message.receive_v1 --output-dir ./events --dry-run --format json
 ```
 
 ## User Auth（CLI 最佳实践）
@@ -193,6 +236,12 @@ feishu server run --print-payload --output-file ./events.jsonl
 feishu server start --pid-file ./.feishu_server.pid --log-file ./feishu-server.log
 feishu server status --pid-file ./.feishu_server.pid --format json
 feishu server stop --pid-file ./.feishu_server.pid
+
+# lark-style 本地事件命令
+feishu event list --format json
+feishu event schema im.message.receive_v1 --format json
+feishu event status --format json
+feishu event stop --format json
 ```
 
 `ws run` / `server run` 支持：
