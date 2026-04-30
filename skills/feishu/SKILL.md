@@ -30,10 +30,10 @@ description: >
 - 不要打印、回显或记录 token / secret / 敏感环境变量原值。
 - 优先使用环境变量或宿主注入的认证。除非做底层认证调试，不要手工传 `--user-access-token`、`--user-refresh-token`、`--access-token`、`--app-secret`。
 - 当用户要求"以我身份上传""归我所有""放到我的空间"时：
-  - 不要复用旧任务记忆里的 folder token / parent node
+  - 不要复用未经确认的 folder token / parent node
   - 先用 `feishu auth whoami --format json` 确认当前用户身份
   - 对 requester-owned 上传优先用 `feishu drive +requester-upload`
-  - 做最终 owner 校验：`feishu drive meta --check-requester-owner --as user --format json`
+  - 只有 `_cli_diagnostics.requester_owner_verified=true` 或 `owner_id` 明确等于当前 requester 时，才能宣称"归用户本人所有"
   - 如果目标是原生飞书云文档，优先 `feishu docx create`，再 `feishu docx +insert-content`
 
 ---
@@ -74,8 +74,8 @@ feishu docx +convert-content --content-file draft.md --content-type markdown --f
 
 ```bash
 feishu drive files copy --params '{"file_token":"docx_xxx"}' --data '{"folder_token":"fld_xxx","name":"副本","type":"docx"}' --dry-run --format json
-feishu calendar events list --params '{"calendar_id":"primary"}' --format json
-feishu im messages list --params '{"container_id":"oc_xxx","container_id_type":"chat"}' --format json
+feishu calendar events search --params '{"calendar_id":"primary"}' --data '{"query":"周会"}' --format json
+feishu im chats list --page-all --format json
 feishu task tasks list --format json
 ```
 
@@ -119,7 +119,7 @@ feishu api POST /open-apis/im/v1/messages --params '{"receive_id_type":"open_id"
 
 ```bash
 feishu drive files copy --params '{"file_token":"docx_xxx"}' --data '{"folder_token":"fld_xxx","name":"副本","type":"docx"}' --dry-run --as user --format json
-feishu im messages list --params '{"container_id":"oc_xxx","container_id_type":"chat"}' --as bot --format json
+feishu im chats list --page-all --as bot --format json
 ```
 
 **决策优先级**：显式 `--as` > 命令元数据 > profile `default_as` > 当前登录状态。
@@ -185,9 +185,9 @@ feishu ... --full-output
 service command 支持自动分页：
 
 ```bash
-feishu calendar events list --params '{"calendar_id":"primary"}' --page-all --format json
-feishu calendar events list --params '{"calendar_id":"primary"}' --page-all --page-limit 50 --format json
-feishu calendar events list --params '{"calendar_id":"primary"}' --page-size 20 --format json
+feishu calendar events search --params '{"calendar_id":"primary"}' --data '{"query":"周会"}' --page-all --format json
+feishu calendar events search --params '{"calendar_id":"primary"}' --data '{"query":"周会"}' --page-all --page-limit 50 --format json
+feishu calendar events search --params '{"calendar_id":"primary"}' --data '{"query":"周会"}' --page-size 20 --format json
 ```
 
 ### --dry-run
@@ -243,9 +243,9 @@ feishu update --check --format json
 ### 发消息
 
 ```bash
-feishu im send-text --receive-id ou_xxx --text "hello" --format json
-feishu im send-markdown --receive-id ou_xxx --markdown-file report.md --format json
-cat report.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --format json
+feishu im +messages-send --chat-id oc_xxx --text "hello" --format json
+feishu im +messages-send --user-id ou_xxx --text "hello" --format json
+feishu im +messages-send --chat-id oc_xxx --msg-type post --content '{"zh_cn":{"title":"日报","content":[[{"tag":"text","text":"完成情况"}]]}}' --format json
 ```
 
 ### 多维表格
@@ -254,7 +254,7 @@ cat report.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --f
 feishu bitable +create-from-csv data.csv --app-name "Sales" --table-name "Q1" --format json
 feishu base +table-list --base-token app_xxx --format json
 feishu base +record-search --base-token app_xxx --table-id tbl_xxx --json '{"filter":{"conjunction":"and","conditions":[]}}' --format json
-feishu bitable app_table_record records list --params '{"app_token":"app_xxx","table_id":"tbl_xxx"}' --page-all --format json
+feishu base +record-list --base-token app_xxx --table-id tbl_xxx --format json
 ```
 
 ### 云文档
@@ -262,7 +262,6 @@ feishu bitable app_table_record records list --params '{"app_token":"app_xxx","t
 ```bash
 feishu docx create --title "日报" --folder-token fld_xxx --as user --format json
 feishu docx +insert-content --document-id doccn_xxx --content-file report.md --as user --format json
-feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --output ./report.md
 feishu docs +fetch --doc doccn_xxx --doc-format markdown --format json
 feishu whiteboard +query --whiteboard-token wb_xxx --output-as image --output ./board.png --format json
 ```
@@ -282,7 +281,7 @@ feishu drive files copy --params '{"file_token":"docx_xxx"}' --data '{"folder_to
 ```bash
 feishu calendar +attach-material ./agenda.md --calendar-id cal_xxx --event-id evt_xxx --format json
 feishu calendar +agenda --calendar-id primary --start 1735700400 --end 1735786800 --format json
-feishu calendar events list --params '{"calendar_id":"primary"}' --page-all --as user --format json
+feishu calendar events search --params '{"calendar_id":"primary"}' --data '{"query":"周会"}' --page-all --as user --format json
 ```
 
 ### 任务
@@ -326,14 +325,14 @@ feishu mail +triage --mailbox me --folder-id INBOX --query urgent --format json
 
 ```bash
 feishu auth whoami --format json
-feishu contact user get --user-id ou_xxx --user-id-type open_id --format json
-feishu contact user search --query "Alice" --as user --format json
+feishu contact +get-user --user-id ou_xxx --user-id-type open_id --format json
+feishu contact +search-user --query "Alice" --as user --format json
 ```
 
 ### 权限
 
 ```bash
-feishu drive grant-edit --token doccn_xxx --resource-type docx --member-id ou_xxx --permission edit --format json
+feishu drive permission.members create --params '{"token":"doccn_xxx","type":"docx"}' --data '{"member_id":"ou_xxx","member_type":"openid","perm":"edit","type":"user"}' --format json
 ```
 
 ---

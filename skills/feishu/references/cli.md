@@ -291,12 +291,12 @@ Service commands 按 `<service> <resource> <method>` 结构组织，参数走 `-
 feishu drive files copy --params '{"file_token":"docx_xxx"}' --data '{"folder_token":"fld_xxx","name":"副本","type":"docx"}' --dry-run --as user --format json
 
 # Calendar
-feishu calendar events list --params '{"calendar_id":"primary"}' --page-all --as user --format json
+feishu calendar events search --params '{"calendar_id":"primary"}' --data '{"query":"weekly sync"}' --page-all --as user --format json
 feishu calendar events create --params '{"calendar_id":"primary"}' --data '{"summary":"Meeting","start_time":{"timestamp":"1700000000"},"end_time":{"timestamp":"1700003600"}}' --format json
 feishu calendar calendars search --data '{"query":"weekly sync"}' --format json
 
 # IM
-feishu im messages list --params '{"container_id":"oc_xxx","container_id_type":"chat"}' --page-all --format json
+feishu im +chat-messages-list --chat-id oc_xxx --page-size 20 --format json
 
 # Task
 feishu task tasks list --format json
@@ -304,10 +304,10 @@ feishu task tasks create --data '{"summary":"Review PR","due":{"timestamp":"1700
 feishu task tasks delete --params '{"task_guid":"task_xxx"}' --as user --format json
 
 # Wiki
-feishu wiki spaces list --page-all --format json
+feishu wiki spaces get_node --params '{"token":"wikcn_xxx"}' --format json
 
 # Mail
-feishu mail mailboxes messages list --params '{"user_mailbox_id":"me","folder_id":"INBOX"}' --page-all --format json
+feishu mail user_mailbox.messages list --params '{"user_mailbox_id":"me","folder_id":"INBOX"}' --page-all --format json
 ```
 
 ---
@@ -374,9 +374,9 @@ Agent 规则：
 所有支持 `--*-json` 的命令同时支持 `--*-file PATH` 和 `--*-stdin`：
 
 ```bash
-generate_report | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --format json
-echo '{"text":"hello"}' | feishu im send --receive-id ou_xxx --msg-type text --content-stdin
-feishu im send --receive-id ou_xxx --msg-type interactive --content-file card.json
+cat report.md | feishu docx +insert-content --document-id doccn_xxx --content-stdin --content-type markdown --format json
+feishu im +messages-send --chat-id oc_xxx --text "$(cat message.txt)" --format json
+feishu im +messages-send --chat-id oc_xxx --msg-type interactive --content "$(cat card.json)" --format json
 ```
 
 ---

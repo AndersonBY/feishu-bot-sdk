@@ -447,92 +447,29 @@ for img in rendered.inline_images:
 
 ## CLI 命令参考
 
-### 用户邮箱命令
+CLI 优先使用 `mail +shortcut`。没有 shortcut 时，使用 `feishu mail --help` 中暴露的 metadata service command（例如 `user_mailbox.messages list`）。
 
 ```bash
-# 邮箱别名
-feishu mail mailbox alias list --user-mailbox-id me --format json
-feishu mail mailbox alias create --user-mailbox-id me --email-alias alias@example.com
-feishu mail mailbox alias delete --user-mailbox-id me --email-alias alias@example.com
+# 发送 / 草稿 / 查询
+feishu mail +send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
+feishu mail +send --mailbox me --to user@example.com --subject "日报" --body-file ./report.html --confirm-send --format json
+feishu mail +triage --mailbox me --folder-id INBOX --query urgent --format json
+feishu mail +message --mailbox me --message-id msg_xxx --format json
+feishu mail +draft-create --user-mailbox-id me --raw-file ./draft.eml --format json
 
-# 永久删除邮箱
-feishu mail mailbox delete-from-recycle-bin --user-mailbox-id old@example.com --transfer-mailbox archive@example.com
+# 邮件、文件夹、联系人、标签、事件订阅
+feishu mail user_mailbox.messages list --params '{"user_mailbox_id":"me","folder_id":"INBOX"}' --page-all --format json
+feishu mail user_mailbox.messages get --params '{"user_mailbox_id":"me","message_id":"msg_xxx"}' --format json
+feishu mail user_mailbox.folders list --params '{"user_mailbox_id":"me"}' --format json
+feishu mail user_mailbox.folders create --params '{"user_mailbox_id":"me"}' --data '{"folder_name":"项目归档"}' --format json
+feishu mail user_mailbox.mail_contacts list --params '{"user_mailbox_id":"me"}' --page-all --format json
+feishu mail user_mailbox.labels list --params '{"user_mailbox_id":"me"}' --format json
+feishu mail user_mailbox.event subscription --params '{"user_mailbox_id":"me"}' --format json
+feishu mail user_mailbox.event subscribe --params '{"user_mailbox_id":"me"}' --data '{"event_type":"mail.message.received"}' --format json
 
-# 邮件管理
-feishu mail message list --user-mailbox-id me --folder-id INBOX --all --format json
-feishu mail message get --user-mailbox-id me --message-id msg_xxx --format json
-feishu mail message send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md
-
-# 文件夹管理
-feishu mail folder list --user-mailbox-id me --folder-type 2 --format json
-feishu mail folder create --user-mailbox-id me --name "项目归档"
-feishu mail folder delete --user-mailbox-id me --folder-id folder_xxx
-
-# 联系人管理
-feishu mail contact list --user-mailbox-id me --all --format json
-feishu mail contact create --user-mailbox-id me --contact-json '{"name":"张三","email":"zhangsan@example.com"}'
-
-# 收信规则
-feishu mail rule list --user-mailbox-id me --all --format json
-feishu mail rule create --user-mailbox-id me --rule-file ./rule.json
-
-# 事件订阅
-feishu mail event get-subscription --user-mailbox-id me
-feishu mail event subscribe --user-mailbox-id me
-feishu mail event unsubscribe --user-mailbox-id me
-
-# 地址状态查询
-feishu mail address query-status --email ops@example.com --email alerts@example.com --format json
-```
-
-### 邮件组命令
-
-```bash
-# 邮件组管理
-feishu mail group list --all --format json
-feishu mail group get --mailgroup-id ops@example.com --format json
-feishu mail group create --mailgroup-json '{"email":"ops@example.com","name":"Ops Group"}'
-feishu mail group update --mailgroup-id ops@example.com --mailgroup-json '{"name":"新名称"}'
-feishu mail group delete --mailgroup-id ops@example.com
-
-# 邮件组别名
-feishu mail group alias list --mailgroup-id ops@example.com
-feishu mail group alias create --mailgroup-id ops@example.com --email-alias operations@example.com
-
-# 邮件组成员
-feishu mail group member list --mailgroup-id ops@example.com --user-id-type open_id --all
-feishu mail group member create --mailgroup-id ops@example.com --member-id ou_xxx --user-id-type open_id
-feishu mail group member batch-create --mailgroup-id ops@example.com --member-ids-file ./members.json --user-id-type open_id
-feishu mail group member batch-delete --mailgroup-id ops@example.com --member-ids-stdin --user-id-type open_id
-
-# 权限成员
-feishu mail group permission-member list --mailgroup-id ops@example.com --user-id-type open_id --all
-feishu mail group permission-member batch-create --mailgroup-id ops@example.com --member-ids-file ./members.json --user-id-type open_id
-
-# 管理员
-feishu mail group manager list --mailgroup-id ops@example.com --user-id-type open_id --all
-feishu mail group manager batch-create --mailgroup-id ops@example.com --member-ids-file ./managers.json --user-id-type open_id
-```
-
-### 公共邮箱命令
-
-```bash
-# 公共邮箱管理
-feishu mail public-mailbox list --all --format json
-feishu mail public-mailbox get --public-mailbox-id support@example.com --format json
-feishu mail public-mailbox create --public-mailbox-json '{"email":"support@example.com","name":"客户支持"}'
-feishu mail public-mailbox update --public-mailbox-id support@example.com --public-mailbox-json '{"name":"新名称"}'
-feishu mail public-mailbox remove-to-recycle-bin --public-mailbox-id support@example.com --to-mail-address archive@example.com
-feishu mail public-mailbox delete --public-mailbox-id support@example.com
-
-# 公共邮箱别名
-feishu mail public-mailbox alias list --public-mailbox-id support@example.com
-feishu mail public-mailbox alias create --public-mailbox-id support@example.com --email-alias help@example.com
-
-# 公共邮箱成员
-feishu mail public-mailbox member list --public-mailbox-id support@example.com --user-id-type open_id --all
-feishu mail public-mailbox member batch-create --public-mailbox-id support@example.com --items-file ./members.json --user-id-type open_id
-feishu mail public-mailbox member clear --public-mailbox-id support@example.com
+# 搜索和个人邮箱信息
+feishu mail user_mailboxes profile --format json
+feishu mail user_mailboxes search --data '{"query":"urgent"}' --page-all --format json
 ```
 
 ## 异步版本
