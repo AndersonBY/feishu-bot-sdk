@@ -40,3 +40,11 @@ print(results.items)
 
 - `AsyncWikiService` keeps identical method names.
 - Async iterators are exposed for `iter_*` methods.
+
+## lark-cli Shortcut Examples
+
+```bash
+feishu wiki +node-create --space-id spc_xxx --parent-node-token wiki_xxx --title "Runbook" --format json
+feishu wiki +move --node-token wiki_xxx --source-space-id spc_xxx --target-space-id spc_xxx --target-parent-token wiki_parent --format json
+feishu wiki +delete-space --space-id spc_xxx --format json
+```

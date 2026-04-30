@@ -101,3 +101,18 @@ Use this for Markdown / HTML export workflows.
 - For partial edits, compose `list_children`, `update_block`, and `delete_children_range`
 - For image or attachment replacement, create the empty block first, then call `replace_image` or `replace_file`
 - For Markdown / HTML export, use `DocContentService` rather than write APIs
+
+## lark-cli Shortcut Examples
+
+```bash
+feishu docs +search --query "weekly report" --format json
+feishu docs +create --content '<doc><block type="heading1">Daily Report</block></doc>' --format json
+feishu docs +fetch --doc doccn_xxx --doc-format markdown --format json
+feishu docs +update --doc doccn_xxx --command append --content '<text>Done</text>' --format json
+feishu docs +media-upload --file ./image.png --parent-type docx_image --parent-node doccn_xxx --format json
+feishu docs +media-download --token file_xxx --output ./asset.bin --format json
+feishu docs +whiteboard-update --whiteboard-token wb_xxx --source ./diagram.mmd --input-format mermaid --format json
+feishu whiteboard +query --whiteboard-token wb_xxx --output-as image --output ./board.png --format json
+```
+
+Compatibility shortcuts: `docx +convert-content` and `docx +insert-content` remain available for SDK Markdown/HTML conversion and insertion workflows.

@@ -79,6 +79,11 @@ def recommend_scopes(identity: str, *, services: Iterable[str] | None = None) ->
             continue
         best_scope = max(method_scopes, key=lambda item: priorities.get(item, 0))
         recommended.add(best_scope)
+    allowed_services = {str(name).strip() for name in services or [] if str(name).strip()}
+    for service, scopes in _shortcut_required_scopes().items():
+        if allowed_services and service not in allowed_services:
+            continue
+        recommended.update(scopes)
     return sorted(recommended)
 
 
@@ -115,6 +120,14 @@ def _load_json_list(path: Path) -> list[dict[str, Any]]:
     if not isinstance(payload, list):
         return []
     return [item for item in payload if isinstance(item, dict)]
+
+
+def _shortcut_required_scopes() -> dict[str, tuple[str, ...]]:
+    return {
+        "contact": ("contact:user:search",),
+        "docs": ("search:docs:read",),
+        "drive": ("search:docs:read",),
+    }
 
 
 __all__ = [

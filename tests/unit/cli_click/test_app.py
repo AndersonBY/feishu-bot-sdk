@@ -89,6 +89,7 @@ def test_generated_service_command_executes_and_substitutes_path(monkeypatch: An
             '{"file_token":"doc_1","user_id_type":"open_id"}',
             "--data",
             '{"folder_token":"fld_1","name":"copy","type":"file"}',
+            "--yes",
             "--app-id",
             "cli_app",
             "--app-secret",

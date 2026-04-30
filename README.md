@@ -27,6 +27,21 @@
 - 自适应限流器（按接口返回动态收敛/恢复）
 - 同步 / 异步两套 API
 
+## lark-cli 对齐状态
+
+当前 CLI 以 `third_party_service/lark-cli` commit `b37adfd`（2026-04-29 20:04:06 +0800，v1.0.22）为对齐基线。`feishu` 已注册 217 个 `+shortcut`，其中 210 个与该基线的生产 shortcut 同名对齐，另保留 7 个 SDK 兼容扩展。
+
+| 能力域 | Shortcut 数 | 说明 |
+| --- | ---: | --- |
+| Base / 多维表格新版 | 75 | 表、字段、视图、记录、角色、高级权限、工作流、表单、仪表盘 |
+| Sheets / Slides | 41 | 表格读写、样式、筛选、下拉、图片、演示文稿创建与替换 |
+| Mail | 18 | 邮件读取、批量获取、triage、watch、回复/转发/发送、回执、签名、模板 |
+| Task | 18 | 任务创建/更新/搜索、关联任务、事件订阅、任务清单 |
+| Drive / Docs / Docx / Whiteboard / Wiki | 30 | 上传下载、权限申请、文档 AI、媒体、白板、Wiki 节点 |
+| IM / Calendar / Contact / Minutes / VC / Event / OKR | 35 | 消息/群组、日历、通讯录、妙记、会议、事件订阅、OKR |
+
+兼容扩展：`bitable +create-from-csv`、`calendar +attach-material`、`docx +convert-content`、`docx +insert-content`、`drive +requester-upload`、`mail +send-markdown`、`task +delete`。完整对齐报告见 [`docs/lark-cli-parity-report.md`](./docs/lark-cli-parity-report.md)，CLI 命令形态见 [`docs/cli-command-mapping.md`](./docs/cli-command-mapping.md)。
+
 ## 安装
 
 ```bash
@@ -215,6 +230,7 @@ cat ./msg.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --fo
 - FeishuBotServer 长连接服务：[`docs/zh/08-bot-server.md`](./docs/zh/08-bot-server.md)
 - 类型、异常与限流：[`docs/zh/09-types-errors-rate-limit.md`](./docs/zh/09-types-errors-rate-limit.md)
 - CLI 命令行工具：[`docs/zh/10-cli.md`](./docs/zh/10-cli.md)
+- lark-cli 对齐 Shortcut 域：[`docs/zh/16-lark-cli-parity-domains.md`](./docs/zh/16-lark-cli-parity-domains.md)
 - 日历（Calendar）：[`docs/zh/11-calendar.md`](./docs/zh/11-calendar.md)
 - 通讯录（Contact）：[`docs/zh/12-contact.md`](./docs/zh/12-contact.md)
 - 搜索（Search）：[`docs/zh/13-search.md`](./docs/zh/13-search.md)

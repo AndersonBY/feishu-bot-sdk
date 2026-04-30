@@ -9,6 +9,7 @@ from urllib.parse import unquote
 
 import httpx
 
+from ...exceptions import SDKError
 from ...minutes import MinutesService
 from ..runtime import _build_client
 
@@ -123,6 +124,10 @@ def _cmd_minutes_download(args: argparse.Namespace) -> Mapping[str, Any]:
                 )
                 item["saved_path"] = str(output_path)
                 item["size_bytes"] = size_bytes
+        except SDKError as exc:
+            if single:
+                raise
+            item["error"] = str(exc)
         except Exception as exc:
             item["error"] = str(exc)
         downloads.append(item)

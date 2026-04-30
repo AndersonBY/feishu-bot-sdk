@@ -16,6 +16,7 @@ This directory contains module-based SDK documentation. Each module has a standa
 - [08 FeishuBotServer (Long Connection Service)](./en/08-bot-server.md)
 - [09 Types, Errors, and Rate Limit](./en/09-types-errors-rate-limit.md)
 - [10 CLI Tool](./en/10-cli.md)
+- [16 lark-cli Parity Shortcut Domains](./en/16-lark-cli-parity-domains.md)
 - [CLI Framework Decision](./cli-framework-decision.md)
 - [CLI Command Mapping](./cli-command-mapping.md)
 - [11 Calendar](./en/11-calendar.md)
@@ -23,6 +24,7 @@ This directory contains module-based SDK documentation. Each module has a standa
 - [13 Search](./en/13-search.md)
 - [14 Cloud Doc Workflows](./en/14-cloud-doc-workflows.md)
 - [15 Mail](./en/15-mail.md)
+- [lark-cli Parity Report](./lark-cli-parity-report.md)
 
 ## Suggested Reading Path
 
@@ -34,3 +36,4 @@ This directory contains module-based SDK documentation. Each module has a standa
 - For org-structure and user lookup workflows, focus on [12 Contact](./en/12-contact.md).
 - For app/message/doc discovery workflows, focus on [13 Search](./en/13-search.md).
 - For user mailbox, mail group, or public mailbox management, focus on [15 Mail](./en/15-mail.md).
+- To confirm whether a `lark-cli` shortcut is covered, start with [16 lark-cli Parity Shortcut Domains](./en/16-lark-cli-parity-domains.md) and the [parity report](./lark-cli-parity-report.md).

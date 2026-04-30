@@ -1,0 +1,80 @@
+{
+  "source": "lark-cli/internal/event/schemas",
+  "source_commit": "b37adfd",
+  "source_commit_time": "2026-04-29 20:04:06 +0800",
+  "helpers": [
+    "envelope.go",
+    "fromtype.go",
+    "overlay.go",
+    "pointer.go"
+  ],
+  "v2_envelope": {
+    "type": "object",
+    "description": "Feishu event envelope",
+    "properties": {
+      "schema": {
+        "type": "string",
+        "enum": [
+          "2.0"
+        ],
+        "description": "Feishu event protocol version"
+      },
+      "header": {
+        "type": "object",
+        "description": "Shared event header",
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "description": "Unique event id"
+          },
+          "event_type": {
+            "type": "string",
+            "description": "Event type used for routing"
+          },
+          "create_time": {
+            "type": "string",
+            "description": "Event creation time in milliseconds"
+          },
+          "token": {
+            "type": "string",
+            "description": "Callback verification token"
+          },
+          "tenant_key": {
+            "type": "string",
+            "description": "Tenant key"
+          },
+          "app_id": {
+            "type": "string",
+            "description": "Receiving application id"
+          }
+        }
+      }
+    }
+  },
+  "overlay": {
+    "field_meta_keys": [
+      "description",
+      "enum",
+      "format"
+    ],
+    "pointer_behavior": "RFC 6901 JSON pointer with /* support for array item schemas",
+    "orphan_behavior": "unresolved overlay paths are reported in sorted order"
+  },
+  "from_type": {
+    "scalar_mapping": {
+      "string": "string",
+      "bool": "boolean",
+      "integer": "integer",
+      "float": "number",
+      "slice": "array",
+      "map": "object",
+      "struct": "object"
+    },
+    "json_tag_behavior": "JSON field names are derived from json tags; '-' fields and unexported fields are skipped",
+    "annotation_tags": [
+      "desc",
+      "enum",
+      "kind"
+    ]
+  }
+}

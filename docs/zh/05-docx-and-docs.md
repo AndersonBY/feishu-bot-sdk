@@ -101,3 +101,18 @@ print(created["url"] or document_id)
 - 要做局部替换、插入几行、删一段，优先组合 `list_children` / `update_block` / `delete_children_range`
 - 要替换图片或附件，先创建空块，再用 `replace_image` / `replace_file`
 - 要导出成 Markdown 或 HTML，走 `DocContentService`，不要混用写接口
+
+## lark-cli Shortcut 示例
+
+```bash
+feishu docs +search --query "周报" --format json
+feishu docs +create --content '<doc><block type="heading1">日报</block></doc>' --format json
+feishu docs +fetch --doc doccn_xxx --doc-format markdown --format json
+feishu docs +update --doc doccn_xxx --command append --content '<text>完成</text>' --format json
+feishu docs +media-upload --file ./image.png --parent-type docx_image --parent-node doccn_xxx --format json
+feishu docs +media-download --token file_xxx --output ./asset.bin --format json
+feishu docs +whiteboard-update --whiteboard-token wb_xxx --source ./diagram.mmd --input-format mermaid --format json
+feishu whiteboard +query --whiteboard-token wb_xxx --output-as image --output ./board.png --format json
+```
+
+兼容 shortcut：`docx +convert-content` 和 `docx +insert-content` 继续用于 SDK Markdown/HTML 转换与写入流程。

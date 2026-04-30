@@ -39,3 +39,11 @@ print(results.items)
 ## 异步版
 
 - `AsyncWikiService` 方法名一致，异步遍历接口返回 `AsyncIterator`。
+
+## lark-cli Shortcut 示例
+
+```bash
+feishu wiki +node-create --space-id spc_xxx --parent-node-token wiki_xxx --title "Runbook" --format json
+feishu wiki +move --node-token wiki_xxx --source-space-id spc_xxx --target-space-id spc_xxx --target-parent-token wiki_parent --format json
+feishu wiki +delete-space --space-id spc_xxx --format json
+```

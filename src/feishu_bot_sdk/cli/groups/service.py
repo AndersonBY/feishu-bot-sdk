@@ -9,9 +9,10 @@ from typing import Any
 import click
 
 from ..context import build_cli_context, with_runtime_options, with_service_io_options
-from ..runtime import _build_client, _parse_json_object
+from ..runtime import _build_client, _parse_json_object, build_multipart_file
 from ..runtime.identity import identity_to_auth_mode, resolve_identity
 from ..runtime.registry import MethodSpec, ServiceSpec, list_services
+from ..runtime.risk import assert_risk_allowed, risk_metadata
 from ..shortcuts import attach_shortcuts
 
 
@@ -85,11 +86,24 @@ def _build_method_command(method: MethodSpec) -> click.Command:
         page_limit = int(params.pop("page_limit", 10))
         page_delay = int(params.pop("page_delay", 200))
         dry_run = bool(params.pop("dry_run", False))
+        yes = bool(params.pop("yes", False))
+        file_upload = params.pop("file_upload", None)
         output_path = params.pop("output", None)
+        risk = _method_risk(method)
+        if output_path and page_all:
+            raise ValueError("--output and --page-all are mutually exclusive")
         effective_params = dict(raw_params or {})
         if page_size is not None and "page_size" not in effective_params:
             effective_params["page_size"] = page_size
         resolved_path, query_params = _render_path(method, effective_params)
+        file_field: str | None = None
+        file_payload: tuple[str, bytes, str] | None = None
+        file_meta: dict[str, str] | None = None
+        if file_upload:
+            file_field, file_payload, file_meta = build_multipart_file(
+                str(file_upload),
+                default_field=_default_file_field(method),
+            )
         if dry_run:
             cli_ctx.emit(
                 {
@@ -103,16 +117,26 @@ def _build_method_command(method: MethodSpec) -> click.Command:
                         "path": resolved_path,
                         "params": query_params or None,
                         "data": raw_data or None,
+                        "file": file_meta,
                         "output": output_path,
                     },
-                    "risk": "high-risk-write" if method.danger else ("write" if method.http_method != "GET" else "read"),
+                    "risk": risk_metadata(risk),
                 }
             )
             return
+        assert_risk_allowed(risk, yes=yes, command=method.cli_path)
         args = cli_ctx.build_args(group=method.service, auth_mode=identity_to_auth_mode(resolution.identity))
         client = _build_client(args)
         if page_all:
             result = _paginate(client, method, resolved_path, query_params, raw_data, page_limit=page_limit, page_delay=page_delay)
+        elif file_field is not None and file_payload is not None:
+            result = client.request_multipart(
+                method.http_method,
+                resolved_path,
+                params=query_params or None,
+                data=raw_data or None,
+                files={file_field: file_payload},
+            )
         else:
             result = client.request_json(method.http_method, resolved_path, params=query_params or None, payload=raw_data or None)
         if output_path:
@@ -124,6 +148,35 @@ def _build_method_command(method: MethodSpec) -> click.Command:
         cli_ctx.emit(result, cli_args=args)
 
     return _command
+
+
+def _method_risk(method: MethodSpec) -> str:
+    if method.danger:
+        return "high-risk-write"
+    if method.http_method != "GET":
+        return "write"
+    return "read"
+
+
+def _default_file_field(method: MethodSpec) -> str:
+    fields = _detect_file_fields(method.request_body)
+    if len(fields) == 1:
+        return fields[0]
+    return "file"
+
+
+def _detect_file_fields(fields: dict[str, Any], *, prefix: str = "") -> list[str]:
+    result: list[str] = []
+    for name, raw in fields.items():
+        if not isinstance(raw, dict):
+            continue
+        field_name = f"{prefix}.{name}" if prefix else str(name)
+        if raw.get("type") == "file":
+            result.append(field_name)
+        properties = raw.get("properties")
+        if isinstance(properties, dict):
+            result.extend(_detect_file_fields(properties, prefix=field_name))
+    return result
 
 
 def _render_path(method: MethodSpec, params: dict[str, Any]) -> tuple[str, dict[str, Any]]:

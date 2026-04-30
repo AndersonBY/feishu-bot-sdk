@@ -42,18 +42,31 @@ description: >
 
 CLI 按用途分为三层，从高到低：
 
+当前 CLI 对齐 `third_party_service/lark-cli` commit `b37adfd`（2026-04-29 20:04:06 +0800，v1.0.22）。基线 210 个生产 `+shortcut` 已同名覆盖；本 SDK 另外保留 7 个兼容扩展：`bitable +create-from-csv`、`calendar +attach-material`、`docx +convert-content`、`docx +insert-content`、`drive +requester-upload`、`mail +send-markdown`、`task +delete`。
+
 ### Layer 1: Shortcut（+前缀）— 高层工作流
 
 把多个 API 调用封装成一步操作，面向人类和 Agent 最友好的入口。命名带 `+` 前缀。
 
 ```bash
 feishu bitable +create-from-csv data.csv --app-name "Sales" --table-name "Q1" --format json
+feishu base +record-upsert --base-token app_xxx --table-id tbl_xxx --json '{"fields":{"Task":"Done"}}' --format json
 feishu docx create --title "日报" --folder-token fld_xxx --as user --format json
 feishu docx +insert-content --document-id doccn_xxx --content-file report.md --format json
-feishu calendar +attach-material --calendar-id cal_xxx --event-id evt_xxx ./agenda.md --format json
+feishu docs +fetch --doc doccn_xxx --doc-format markdown --format json
+feishu whiteboard +query --whiteboard-token wb_xxx --output-as image --output ./board.png --format json
+feishu calendar +attach-material ./agenda.md --calendar-id cal_xxx --event-id evt_xxx --format json
 feishu drive +requester-upload ./report.pdf --as user --format json
+feishu drive +upload --file ./report.pdf --folder-token fld_xxx --format json
+feishu im +messages-send --chat-id oc_xxx --text "hello" --format json
+feishu sheets +write --spreadsheet-token sht_xxx --range Sheet1!A1:B2 --values '[[1,2],[3,4]]' --format json
+feishu slides +create --title "季度复盘" --slides '[{"title":"开场"}]' --format json
 feishu task +delete --task-id task_xxx --as user --format json
+feishu task +tasklist-create --name "上线任务" --format json
+feishu okr +cycle-list --user-id ou_xxx --format json
+feishu event +subscribe --event-types im.message.receive_v1 --output-dir ./events --dry-run --format json
 feishu mail +send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
+feishu mail +send --mailbox me --to user@example.com --subject "日报" --body-file ./report.html --confirm-send --format json
 feishu docx +convert-content --content-file draft.md --content-type markdown --format json
 ```
 
@@ -71,9 +84,11 @@ feishu task tasks list --format json
 **不确定接口怎么调？先查 schema：**
 
 ```bash
-feishu schema list                        # 列出所有 service
-feishu schema list drive                  # 列出 drive 下的 resource/method
-feishu schema show drive.files.list       # 查看参数、scopes、文档链接
+feishu schema                             # lark-style 列出所有 service
+feishu schema drive                       # lark-style 查看 drive service schema
+feishu schema drive.files.copy            # lark-style 查看方法 schema
+feishu schema list drive                  # 兼容旧形态：列出 drive 下的 resource/method
+feishu schema show drive.files.list       # 兼容旧形态：查看参数、scopes、文档链接
 ```
 
 注意：`schema list <service>` 主要覆盖 metadata service command 和 `+shortcut`，不保证列出所有手写命令；例如创建原生云文档时，还要看 `feishu docx --help` 里的 `docx create`。
@@ -216,6 +231,18 @@ export FEISHU_NO_STORE="1"                # 禁用本地 token 存储
 
 ## 常用场景速查
 
+### Profile / Config / Schema
+
+```bash
+feishu profile list --format json
+feishu profile add --name ops --app-id cli_xxx --app-secret-stdin --use --format json
+feishu profile use ops --format json
+feishu config bind --source openclaw --identity user-default --format json
+feishu config strict-mode true --format json
+feishu schema drive.files.copy --format pretty
+feishu update --check --format json
+```
+
 ### 发消息
 
 ```bash
@@ -228,6 +255,8 @@ cat report.md | feishu im send-markdown --receive-id ou_xxx --markdown-stdin --f
 
 ```bash
 feishu bitable +create-from-csv data.csv --app-name "Sales" --table-name "Q1" --format json
+feishu base +table-list --base-token app_xxx --format json
+feishu base +record-search --base-token app_xxx --table-id tbl_xxx --json '{"filter":{"conjunction":"and","conditions":[]}}' --format json
 feishu bitable app_table_record records list --params '{"app_token":"app_xxx","table_id":"tbl_xxx"}' --page-all --format json
 ```
 
@@ -237,19 +266,25 @@ feishu bitable app_table_record records list --params '{"app_token":"app_xxx","t
 feishu docx create --title "日报" --folder-token fld_xxx --as user --format json
 feishu docx +insert-content --document-id doccn_xxx --content-file report.md --as user --format json
 feishu docx get-content --doc-token doccn_xxx --doc-type docx --content-type markdown --output ./report.md
+feishu docs +fetch --doc doccn_xxx --doc-format markdown --format json
+feishu whiteboard +query --whiteboard-token wb_xxx --output-as image --output ./board.png --format json
 ```
 
 ### 云盘
 
 ```bash
 feishu drive +requester-upload ./report.pdf --as user --format json
+feishu drive +upload --file ./report.pdf --folder-token fld_xxx --format json
+feishu drive +download --file-token file_xxx --output ./report.pdf --format json
+feishu drive +apply-permission --token doc_xxx --type docx --perm view --remark "需要访问" --format json
 feishu drive files list --params '{"folder_token":"fld_xxx"}' --as user --format json
 ```
 
 ### 日历
 
 ```bash
-feishu calendar +attach-material --calendar-id cal_xxx --event-id evt_xxx ./agenda.md --format json
+feishu calendar +attach-material ./agenda.md --calendar-id cal_xxx --event-id evt_xxx --format json
+feishu calendar +agenda --calendar-id primary --start 1735700400 --end 1735786800 --format json
 feishu calendar events list --params '{"calendar_id":"primary"}' --page-all --as user --format json
 ```
 
@@ -257,8 +292,21 @@ feishu calendar events list --params '{"calendar_id":"primary"}' --page-all --as
 
 ```bash
 feishu task +create --summary "跟进合同" --assignee ou_xxx --due +2d --as user --format json
+feishu task +update --task-id task_xxx --summary "更新后的任务" --as user --format json
+feishu task +tasklist-create --name "上线任务" --as user --format json
 feishu task +delete --task-id task_xxx --as user --format json
 feishu task +get-my-tasks --query "合同" --page-all --as user --format json
+```
+
+### Sheets / Slides / OKR
+
+```bash
+feishu sheets +read --spreadsheet-token sht_xxx --range Sheet1!A1:B10 --format json
+feishu sheets +write --spreadsheet-token sht_xxx --range Sheet1!A1:B2 --values '[[1,2],[3,4]]' --format json
+feishu sheets +set-dropdown --spreadsheet-token sht_xxx --range Sheet1!A:A --options '["待办","完成"]' --format json
+feishu slides +create --title "季度复盘" --slides '[{"title":"开场"}]' --format json
+feishu okr +cycle-list --user-id ou_xxx --format json
+feishu okr +progress-create --target-id obj_xxx --target-type objective --content "进展正常" --progress-percent 80 --format json
 ```
 
 ### 搜索
@@ -272,6 +320,8 @@ feishu search message --query "incident" --as auto --format json
 
 ```bash
 feishu mail +send-markdown --user-mailbox-id me --to-email user@example.com --subject "日报" --markdown-file ./report.md --format json
+feishu mail +send --mailbox me --to user@example.com --subject "日报" --body-file ./report.html --confirm-send --format json
+feishu mail +triage --mailbox me --folder-id INBOX --query urgent --format json
 ```
 
 ### 通讯录
@@ -322,6 +372,17 @@ task.delete_task("task_xxx")
 ---
 
 ## 事件处理
+
+### CLI 事件
+
+```bash
+feishu event list --format json
+feishu event schema im.message.receive_v1 --format json
+cat ./event.json | feishu event consume im.message.receive_v1 --stdin --format json
+feishu event +subscribe --event-types im.message.receive_v1 --output-dir ./events --dry-run --format json
+```
+
+`event schema` 会带上从 `lark-cli/internal/event/schemas` commit `b37adfd` 同步来的本地 schema 快照。
 
 ```python
 from feishu_bot_sdk import FeishuBotServer

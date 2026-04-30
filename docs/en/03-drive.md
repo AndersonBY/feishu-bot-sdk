@@ -89,3 +89,18 @@ print(stats)
 - For template-copy workflows, call file APIs first, then apply permission APIs
 - Keep document version workflows on `create_version`, `list_versions`, `get_version`, and `delete_version`
 - `upload_file` / `upload_media` only send `checksum` when you explicitly provide it
+
+## lark-cli Shortcut Examples
+
+```bash
+feishu drive +upload --file ./final.csv --folder-token fld_xxx --format json
+feishu drive +download --file-token file_xxx --output ./downloads/final.csv --format json
+feishu drive +delete --file-token file_xxx --type file --yes --format json
+feishu drive +create-folder --folder-token fld_parent --name "Reports" --format json
+feishu drive +create-shortcut --file-token doc_xxx --type docx --folder-token fld_parent --format json
+feishu drive +add-comment --doc doc_xxx --type docx --content "LGTM" --format json
+feishu drive +apply-permission --token doc_xxx --type docx --perm view --remark "Need access" --format json
+feishu drive +search --query "weekly report" --format json
+```
+
+Compatibility shortcut: `drive +requester-upload` remains available for requester-owned uploads.

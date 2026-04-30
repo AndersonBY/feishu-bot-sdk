@@ -122,12 +122,23 @@ feishu mail public-mailbox remove-to-recycle-bin --public-mailbox-id support@exa
 
 # 批量添加公共邮箱成员
 feishu mail public-mailbox member batch-create --public-mailbox-id support@example.com --items-file ./members.json --format json
+
+# lark-cli shortcuts
+feishu mail +message --mailbox me --message-id msg_xxx --format json
+feishu mail +messages --mailbox me --message-ids msg_a,msg_b --format json
+feishu mail +triage --mailbox me --folder-id INBOX --query urgent --format json
+feishu mail +send --mailbox me --to user@example.com --subject "日报" --body-file ./report.html --confirm-send --format json
+feishu mail +reply --mailbox me --message-id msg_xxx --body "谢谢" --format json
+feishu mail +forward --mailbox me --message-id msg_xxx --to user@example.com --format json
+feishu mail +signature --mailbox me --format json
+feishu mail +template-create --mailbox me --name "日报" --template-content-file ./template.html --format json
 ```
 
 ## 注意事项
 
 - `mailbox alias create`、`group alias create`、`public-mailbox alias create` 底层请求字段都是 `email_alias`。CLI 已提供直接参数 `--email-alias`。
 - `mail message send-markdown` 会自动生成 `body_html` 和 `body_plain_text`，并把 Markdown 里的本地图片路径或远程图片 URL 抓取后转成内联 CID 附件。
+- `mail +send-markdown` 作为兼容 shortcut 保留；当前 lark-cli parity 的发送流程主要是 `mail +send`、`mail +reply`、`mail +reply-all` 和 `mail +forward`。
 - `mail message send-markdown` 可直接用 `--to-email` / `--cc-email` / `--bcc-email`，也支持 `--to-json` / `--cc-json` / `--bcc-json` 传完整收件人对象（字段名用 `mail_address`）。
 - `mail message send-markdown` 若使用 `--markdown-file`，相对图片路径默认相对该 Markdown 文件目录解析；也可手动用 `--base-dir` 覆盖。
 - SDK `MailMessageService.send_markdown()` 与 `AsyncMailMessageService.send_markdown()` 同样支持直接传字符串收件人列表，内部会规范化成 `mail_address` 对象。

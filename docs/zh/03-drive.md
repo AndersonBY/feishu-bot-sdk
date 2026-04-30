@@ -89,3 +89,18 @@ print(stats)
 - 做“复制模板 -> 移动 -> 授权”这类流程时，先调用文件接口，再补权限接口
 - 版本管理场景统一走 `create_version` / `list_versions` / `get_version` / `delete_version`
 - `upload_file` / `upload_media` 只有在显式传入 `checksum` 时才会提交校验值
+
+## lark-cli Shortcut 示例
+
+```bash
+feishu drive +upload --file ./final.csv --folder-token fld_xxx --format json
+feishu drive +download --file-token file_xxx --output ./downloads/final.csv --format json
+feishu drive +delete --file-token file_xxx --type file --yes --format json
+feishu drive +create-folder --folder-token fld_parent --name "Reports" --format json
+feishu drive +create-shortcut --file-token doc_xxx --type docx --folder-token fld_parent --format json
+feishu drive +add-comment --doc doc_xxx --type docx --content "LGTM" --format json
+feishu drive +apply-permission --token doc_xxx --type docx --perm view --remark "需要访问" --format json
+feishu drive +search --query "周报" --format json
+```
+
+兼容 shortcut：`drive +requester-upload` 继续用于 requester-owned 上传。

@@ -16,6 +16,7 @@
 - [08 FeishuBotServer 长连接服务](./zh/08-bot-server.md)
 - [09 类型、异常与限流](./zh/09-types-errors-rate-limit.md)
 - [10 CLI 命令行工具](./zh/10-cli.md)
+- [16 lark-cli 对齐 Shortcut 域](./zh/16-lark-cli-parity-domains.md)
 - [CLI 框架决策](./cli-framework-decision.md)
 - [CLI 命令映射](./cli-command-mapping.md)
 - [11 日历（Calendar）](./zh/11-calendar.md)
@@ -23,6 +24,7 @@
 - [13 搜索（Search）](./zh/13-search.md)
 - [14 云文档工作流速查](./zh/14-cloud-doc-workflows.md)
 - [15 邮箱（Mail）](./zh/15-mail.md)
+- [lark-cli 对齐报告](./lark-cli-parity-report.md)
 
 ## 阅读建议
 
@@ -34,3 +36,4 @@
 - 如果你做组织架构或成员查询，重点看 [12 通讯录（Contact）](./zh/12-contact.md)。
 - 如果你要做应用/消息/文档检索，重点看 [13 搜索（Search）](./zh/13-search.md)。
 - 如果你要做用户邮箱、邮件组或公共邮箱管理，重点看 [15 邮箱（Mail）](./zh/15-mail.md)。
+- 如果你要确认某个 `lark-cli` shortcut 是否已覆盖，先看 [16 lark-cli 对齐 Shortcut 域](./zh/16-lark-cli-parity-domains.md) 和 [对齐报告](./lark-cli-parity-report.md)。

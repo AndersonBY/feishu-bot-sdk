@@ -301,6 +301,11 @@ def test_format_feishu_error_message_token_hints() -> None:
     assert "refresh token is invalid" in invalid_refresh
     assert "clear FEISHU_USER_REFRESH_TOKEN" in invalid_refresh
 
+    missing_object_token = _format_feishu_error_message(
+        "feishu api failed: {'code': 20026, 'msg': 'refresh token not found'}"
+    )
+    assert "clear FEISHU_USER_REFRESH_TOKEN" not in missing_object_token
+
 
 def test_format_configuration_error_message_user_mode_hint() -> None:
     message = _format_configuration_error_message(
@@ -467,5 +472,4 @@ def test_auth_logout_clears_profile(
     assert payload["deleted"] is True
     data = json.loads(store_path.read_text(encoding="utf-8"))
     assert data["profiles"] == {}
-
 

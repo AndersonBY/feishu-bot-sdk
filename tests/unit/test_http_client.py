@@ -3,6 +3,8 @@ from typing import Any, cast
 
 import httpx
 
+import pytest
+from feishu_bot_sdk.exceptions import HTTPRequestError
 from feishu_bot_sdk.http_client import AsyncJsonHttpClient, JsonHttpClient
 
 
@@ -35,6 +37,18 @@ class _AsyncSession:
         return _Response()
 
 
+class _TimeoutSyncSession:
+    def request(self, method: str, url: str, **kwargs: Any) -> _Response:
+        request = httpx.Request(method, url)
+        raise httpx.ConnectTimeout("timed out", request=request)
+
+
+class _TimeoutAsyncSession:
+    async def request(self, method: str, url: str, **kwargs: Any) -> _Response:
+        request = httpx.Request(method, url)
+        raise httpx.ReadTimeout("timed out", request=request)
+
+
 def test_json_http_client_omits_json_body_when_payload_is_none() -> None:
     session = _SyncSession()
     client = JsonHttpClient(session=cast(httpx.Client, session))
@@ -57,6 +71,31 @@ def test_json_http_client_includes_json_body_when_payload_is_present() -> None:
     assert len(session.calls) == 1
     call = session.calls[0]
     assert call["json"] == {"status": "done"}
+
+
+def test_json_http_client_sends_multipart_files_and_form_data() -> None:
+    session = _SyncSession()
+    client = JsonHttpClient(session=cast(httpx.Client, session))
+
+    client.request_json(
+        "POST",
+        "https://example.com/images",
+        data={"image_type": "message"},
+        files={"image": ("avatar.png", b"png-bytes", "image/png")},
+    )
+
+    assert len(session.calls) == 1
+    call = session.calls[0]
+    assert call["data"] == {"image_type": "message"}
+    assert call["files"] == {"image": ("avatar.png", b"png-bytes", "image/png")}
+    assert "json" not in call
+
+
+def test_json_http_client_wraps_httpx_timeout_as_request_error() -> None:
+    client = JsonHttpClient(session=cast(httpx.Client, _TimeoutSyncSession()))
+
+    with pytest.raises(HTTPRequestError, match="http request timed out"):
+        client.request_json("GET", "https://example.com/slow")
 
 
 def test_async_json_http_client_omits_json_body_when_payload_is_none() -> None:
@@ -86,3 +125,13 @@ def test_async_json_http_client_includes_json_body_when_payload_is_present() -> 
     assert len(session.calls) == 1
     call = session.calls[0]
     assert call["json"] == {"summary": "demo"}
+
+
+def test_async_json_http_client_wraps_httpx_timeout_as_request_error() -> None:
+    client = AsyncJsonHttpClient(client=cast(httpx.AsyncClient, _TimeoutAsyncSession()))
+
+    async def run() -> None:
+        with pytest.raises(HTTPRequestError, match="http request timed out"):
+            await client.request_json("GET", "https://example.com/slow")
+
+    asyncio.run(run())

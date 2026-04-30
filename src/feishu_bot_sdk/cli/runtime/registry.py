@@ -177,6 +177,8 @@ class ServiceSpec:
 @dataclass(frozen=True)
 class MetadataSnapshot:
     version: str
+    source: str
+    source_commit: str
     services: tuple[ServiceSpec, ...]
 
 
@@ -203,7 +205,12 @@ def load_metadata_snapshot() -> MetadataSnapshot:
                 )
             )
     meta_version = _load_json(metadata_root() / "meta_version.json")
-    return MetadataSnapshot(version=str(meta_version.get("version") or ""), services=tuple(services))
+    return MetadataSnapshot(
+        version=str(meta_version.get("version") or ""),
+        source=str(meta_version.get("source") or ""),
+        source_commit=str(meta_version.get("source_commit") or ""),
+        services=tuple(services),
+    )
 
 
 def list_services() -> tuple[ServiceSpec, ...]:
@@ -216,6 +223,24 @@ def get_service(name: str) -> ServiceSpec | None:
         if service.name == normalized:
             return service
     return None
+
+
+@lru_cache(maxsize=1)
+def load_service_descriptions() -> dict[str, Any]:
+    return _load_json(metadata_root() / "service_descriptions.json")
+
+
+def get_service_description(name: str, locale: str = "en") -> str:
+    descriptions = load_service_descriptions()
+    service = descriptions.get(str(name).strip())
+    if not isinstance(service, dict):
+        return ""
+    localized = service.get(str(locale).strip() or "en")
+    if not isinstance(localized, dict):
+        localized = service.get("en")
+    if not isinstance(localized, dict):
+        return ""
+    return str(localized.get("description") or localized.get("title") or "")
 
 
 def iter_methods(service_names: Iterable[str] | None = None) -> Iterable[MethodSpec]:

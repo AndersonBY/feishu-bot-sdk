@@ -77,3 +77,16 @@ feishu bitable list-views --app-token app_xxx --format json
 
 - `AsyncBitableService` 方法名与同步版一致。
 - `iter_*` 返回异步迭代器（`async for`）。
+
+## lark-cli Base Shortcut 桥接
+
+lark-cli 基线使用 `base` 域承载新版多维表格/Base 工作流。`bitable +create-from-csv` 作为 SDK 兼容扩展保留，`base` 提供 parity shortcut：
+
+```bash
+feishu base +table-list --base-token app_xxx --format json
+feishu base +field-create --base-token app_xxx --table-id tbl_xxx --json '{"field_name":"状态","type":1}' --format json
+feishu base +record-search --base-token app_xxx --table-id tbl_xxx --json '{"filter":{"conjunction":"and","conditions":[]}}' --format json
+feishu base +record-upsert --base-token app_xxx --table-id tbl_xxx --json '{"fields":{"任务":"完成"}}' --format json
+feishu base +workflow-list --base-token app_xxx --format json
+feishu base +dashboard-list --base-token app_xxx --format json
+```

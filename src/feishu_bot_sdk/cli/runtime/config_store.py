@@ -39,10 +39,14 @@ class CLIProfile:
     name: str
     app_id: str | None = None
     app_secret_ref: SecretReference | None = None
+    brand: str | None = None
+    lang: str | None = None
     auth_mode: str | None = None
     base_url: str | None = None
     timeout_seconds: float | None = None
     default_as: str | None = None
+    strict_mode: str | None = None
+    binding: Mapping[str, Any] | None = None
     token_store_path: str | None = None
     updated_at: float | None = None
 
@@ -56,11 +60,15 @@ class CLIProfile:
         return {
             "app_id": self.app_id,
             "app_secret_ref": self.app_secret_ref.to_dict() if self.app_secret_ref else None,
+            "brand": self.brand,
+            "lang": self.lang,
             "auth_mode": self.auth_mode,
             "base_url": self.base_url,
             "timeout_seconds": self.timeout_seconds,
             "default_as": self.default_as,
             "default_identity": self.default_as,
+            "strict_mode": self.strict_mode,
+            "binding": dict(self.binding) if isinstance(self.binding, Mapping) else None,
             "token_store_path": self.token_store_path,
             "updated_at": self.updated_at,
         }
@@ -88,6 +96,8 @@ class CLIProfile:
             name=name,
             app_id=_optional_str(value.get("app_id")),
             app_secret_ref=SecretReference.from_mapping(value.get("app_secret_ref")),
+            brand=_optional_str(value.get("brand")),
+            lang=_optional_str(value.get("lang")),
             auth_mode=_optional_str(value.get("auth_mode")),
             base_url=_optional_str(value.get("base_url")),
             timeout_seconds=normalized_timeout,
@@ -95,6 +105,8 @@ class CLIProfile:
                 _optional_str(value.get("default_as"))
                 or _optional_str(value.get("default_identity"))
             ),
+            strict_mode=_normalize_strict_mode(value.get("strict_mode")),
+            binding=_optional_mapping(value.get("binding")),
             token_store_path=_optional_str(value.get("token_store_path")),
             updated_at=normalized_updated_at,
         )
@@ -104,18 +116,28 @@ class CLIProfile:
 class CLIConfig:
     version: int = _CONFIG_VERSION
     default_profile: str = _DEFAULT_PROFILE
+    previous_profile: str | None = None
+    strict_mode: str | None = None
     profiles: dict[str, CLIProfile] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "version": self.version,
             "default_profile": self.default_profile,
+            "previous_profile": self.previous_profile,
+            "strict_mode": self.strict_mode,
             "profiles": {name: profile.to_dict() for name, profile in sorted(self.profiles.items())},
         }
 
     @classmethod
     def empty(cls) -> CLIConfig:
-        return cls(version=_CONFIG_VERSION, default_profile=_DEFAULT_PROFILE, profiles={})
+        return cls(
+            version=_CONFIG_VERSION,
+            default_profile=_DEFAULT_PROFILE,
+            previous_profile=None,
+            strict_mode=None,
+            profiles={},
+        )
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any] | None) -> CLIConfig:
@@ -134,7 +156,13 @@ class CLIConfig:
         version = value.get("version")
         if not isinstance(version, int):
             version = _CONFIG_VERSION
-        return cls(version=version, default_profile=default_profile, profiles=profiles)
+        return cls(
+            version=version,
+            default_profile=default_profile,
+            previous_profile=_optional_str(value.get("previous_profile")),
+            strict_mode=_normalize_strict_mode(value.get("strict_mode")),
+            profiles=profiles,
+        )
 
     def profile(self, name: str) -> CLIProfile | None:
         return self.profiles.get(name)
@@ -145,7 +173,13 @@ class CLIConfig:
         default_profile = self.default_profile
         if set_default or not default_profile or default_profile not in profiles:
             default_profile = profile.name
-        return CLIConfig(version=_CONFIG_VERSION, default_profile=default_profile, profiles=profiles)
+        return CLIConfig(
+            version=_CONFIG_VERSION,
+            default_profile=default_profile,
+            previous_profile=self.previous_profile,
+            strict_mode=self.strict_mode,
+            profiles=profiles,
+        )
 
     def without_profile(self, name: str) -> CLIConfig:
         profiles = dict(self.profiles)
@@ -153,12 +187,39 @@ class CLIConfig:
         default_profile = self.default_profile
         if default_profile == name:
             default_profile = sorted(profiles)[0] if profiles else _DEFAULT_PROFILE
-        return CLIConfig(version=_CONFIG_VERSION, default_profile=default_profile, profiles=profiles)
+        previous_profile = self.previous_profile
+        if previous_profile == name:
+            previous_profile = None
+        return CLIConfig(
+            version=_CONFIG_VERSION,
+            default_profile=default_profile,
+            previous_profile=previous_profile,
+            strict_mode=self.strict_mode,
+            profiles=profiles,
+        )
 
-    def with_default_profile(self, name: str) -> CLIConfig:
+    def with_default_profile(self, name: str, *, remember_previous: bool = False) -> CLIConfig:
         if name not in self.profiles:
             raise KeyError(name)
-        return CLIConfig(version=_CONFIG_VERSION, default_profile=name, profiles=dict(self.profiles))
+        previous_profile = self.previous_profile
+        if remember_previous and self.default_profile != name and self.default_profile in self.profiles:
+            previous_profile = self.default_profile
+        return CLIConfig(
+            version=_CONFIG_VERSION,
+            default_profile=name,
+            previous_profile=previous_profile,
+            strict_mode=self.strict_mode,
+            profiles=dict(self.profiles),
+        )
+
+    def with_global_strict_mode(self, strict_mode: str | None) -> CLIConfig:
+        return CLIConfig(
+            version=_CONFIG_VERSION,
+            default_profile=self.default_profile,
+            previous_profile=self.previous_profile,
+            strict_mode=_normalize_strict_mode(strict_mode),
+            profiles=dict(self.profiles),
+        )
 
 
 def default_cli_config_root() -> Path:
@@ -222,20 +283,28 @@ def make_profile(
     *,
     app_id: str | None,
     app_secret_ref: SecretReference | None,
+    brand: str | None = None,
+    lang: str | None = None,
     auth_mode: str | None,
     base_url: str | None,
     timeout_seconds: float | None,
     default_as: str | None,
+    strict_mode: str | None = None,
+    binding: Mapping[str, Any] | None = None,
     token_store_path: str | None,
 ) -> CLIProfile:
     return CLIProfile(
         name=name,
         app_id=_optional_str(app_id),
         app_secret_ref=app_secret_ref,
+        brand=_optional_str(brand),
+        lang=_optional_str(lang),
         auth_mode=_optional_str(auth_mode),
         base_url=_optional_str(base_url),
         timeout_seconds=float(timeout_seconds) if timeout_seconds is not None else None,
         default_as=_optional_str(default_as),
+        strict_mode=_normalize_strict_mode(strict_mode),
+        binding=dict(binding) if isinstance(binding, Mapping) else None,
         token_store_path=_optional_str(token_store_path),
         updated_at=time.time(),
     )
@@ -248,6 +317,22 @@ def _optional_str(value: Any) -> str | None:
         text = value.strip()
         return text or None
     return str(value)
+
+
+def _normalize_strict_mode(value: Any) -> str | None:
+    text = _optional_str(value)
+    if text is None:
+        return None
+    normalized = text.lower()
+    if normalized in {"bot", "user", "off"}:
+        return normalized
+    return None
+
+
+def _optional_mapping(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, Mapping):
+        return None
+    return {str(key): item for key, item in value.items()}
 
 
 def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:

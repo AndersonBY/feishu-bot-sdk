@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import base64
 import dataclasses
 import csv
+import hashlib
 import io
 import json
 import re
@@ -10,6 +12,7 @@ from pathlib import Path
 from typing import Any, Mapping, Optional, cast
 
 from ...exceptions import HTTPRequestError
+from .jq import apply_jq_filter
 
 _DEFAULT_MAX_OUTPUT_CHARS = 25000
 _PREVIEW_LIST_ITEM_OPTIONS = (20, 10, 5, 2, 1)
@@ -17,7 +20,9 @@ _PREVIEW_MAPPING_ITEM_OPTIONS = (40, 20, 10, 5)
 _PREVIEW_STRING_CHAR_OPTIONS = (4000, 2000, 1000, 500, 200, 80)
 _PREVIEW_MAX_DEPTH = 6
 _MAX_TRUNCATION_NOTES = 8
+_BINARY_PREVIEW_BYTES = 64
 _ERROR_CODE_PATTERN = re.compile(r"""["']code["']\s*[:=]\s*["']?(\d+)["']?""")
+PendingNotice = None
 
 
 def _print_result(
@@ -29,8 +34,12 @@ def _print_result(
     full_output: bool = False,
     save_output: Any = None,
     cli_args: Any = None,
+    jq_expr: str | None = None,
 ) -> None:
     normalized = _to_jsonable(result)
+    normalized = _inject_notice(normalized)
+    if jq_expr:
+        normalized = _to_jsonable(apply_jq_filter(normalized, jq_expr))
     output_format = _normalize_output_format(output_format)
     max_output_chars_value = _normalize_output_char_limit(max_output_chars)
     output_offset_value = _normalize_output_offset(output_offset)
@@ -251,16 +260,15 @@ def _print_error(
 ) -> int:
     detail = _coerce_error_detail(error, exit_code=exit_code, error_type=error_type)
     if output_format == "json":
-        print(
-            json.dumps(
-                {
-                    "ok": False,
-                    "error": detail,
-                    "exit_code": exit_code,
-                },
-                ensure_ascii=False,
-            )
-        )
+        payload: dict[str, Any] = {
+            "ok": False,
+            "error": detail,
+            "exit_code": exit_code,
+        }
+        notice = GetNotice()
+        if notice is not None:
+            payload["_notice"] = notice
+        print(json.dumps(payload, ensure_ascii=False))
     else:
         print(f"Error: {_render_error_message(detail)}", file=sys.stderr)
     return exit_code
@@ -366,7 +374,12 @@ def _build_feishu_error_detail(message: str) -> dict[str, Any]:
             "user access token is invalid or expired; re-login with:\n"
             "feishu auth login --scope \"offline_access search:app search:message search:docs:read\" --format json"
         )
-    elif "code': 20026" in lower or '"code": 20026' in lower or "refresh token is invalid" in lower:
+    elif (
+        "refresh token is invalid" in lower
+        or "refresh token expired" in lower
+        or "invalid refresh token" in lower
+        or "expired refresh token" in lower
+    ):
         hint = (
             "refresh token is invalid/rotated; run `feishu auth login` again, "
             "or clear FEISHU_USER_REFRESH_TOKEN to use static user access token only."
@@ -585,8 +598,16 @@ def _to_jsonable(value: Any) -> Any:
     if isinstance(value, tuple):
         return [_to_jsonable(item) for item in value]
     if isinstance(value, bytes):
-        return value.decode("utf-8", errors="replace")
+        return _binary_summary(value)
     return value
+
+
+def GetNotice() -> Mapping[str, Any] | None:
+    provider = PendingNotice
+    if not callable(provider):
+        return None
+    notice = provider()
+    return notice if isinstance(notice, Mapping) else None
 
 
 def _prepare_regular_output(
@@ -819,6 +840,9 @@ def _finalize_cli_output_meta(
     meta = {str(key): value for key, value in base_meta.items() if value is not None}
     if notes:
         meta["notes"] = notes[:_MAX_TRUNCATION_NOTES]
+    risk = _extract_risk_info(cli_args)
+    if risk is not None:
+        meta["risk"] = risk
     meta["hints"] = _build_output_hints(meta, cli_args)
     return meta
 
@@ -853,13 +877,13 @@ def _build_output_hints(meta: Mapping[str, Any], cli_args: Any) -> list[str]:
 def _extract_paging_info(normalized: Any, cli_args: Any) -> Mapping[str, Any] | None:
     has_page_size = hasattr(cli_args, "page_size")
     has_page_token = hasattr(cli_args, "page_token")
-    has_all = hasattr(cli_args, "all")
+    has_all = hasattr(cli_args, "all") or hasattr(cli_args, "page_all")
     if not (has_page_size or has_page_token or has_all):
         return None
     paging: dict[str, Any] = {
         "supports_page_size": has_page_size,
         "supports_page_token": has_page_token,
-        "all": bool(getattr(cli_args, "all", False)) if has_all else False,
+        "all": bool(getattr(cli_args, "all", False) or getattr(cli_args, "page_all", False)) if has_all else False,
     }
     if has_page_size:
         paging["page_size"] = getattr(cli_args, "page_size", None)
@@ -873,6 +897,42 @@ def _extract_paging_info(normalized: Any, cli_args: Any) -> Mapping[str, Any] | 
         if isinstance(next_page_token, str) and next_page_token:
             paging["next_page_token"] = next_page_token
     return paging
+
+
+def _inject_notice(normalized: Any) -> Any:
+    notice = GetNotice()
+    if notice is None or not isinstance(normalized, Mapping):
+        return normalized
+    if "ok" not in normalized:
+        return normalized
+    payload = {str(key): value for key, value in normalized.items()}
+    payload["_notice"] = dict(notice)
+    return payload
+
+
+def _binary_summary(content: bytes) -> Mapping[str, Any]:
+    preview = content[:_BINARY_PREVIEW_BYTES]
+    return {
+        "_binary": {
+            "size_bytes": len(content),
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "preview_base64": base64.b64encode(preview).decode("ascii"),
+            "preview_truncated": len(content) > len(preview),
+        }
+    }
+
+
+def _extract_risk_info(cli_args: Any) -> Mapping[str, Any] | None:
+    if not hasattr(cli_args, "risk"):
+        return None
+    risk = getattr(cli_args, "risk", None)
+    if not risk:
+        return None
+    try:
+        from .risk import risk_metadata
+    except ImportError:
+        return {"risk": str(risk), "requires_confirmation": False}
+    return risk_metadata(str(risk))
 
 
 def _serialize_json(value: Any) -> str:

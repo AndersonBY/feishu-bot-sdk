@@ -6,12 +6,14 @@ import click
 
 from ..commands.config import (
     _cmd_config_init,
+    _cmd_config_bind,
     _cmd_config_list_profiles,
     _cmd_config_migrate_token_store,
     _cmd_config_remove_profile,
     _cmd_config_set_default_as,
     _cmd_config_set_default_profile,
     _cmd_config_show,
+    _cmd_config_strict_mode,
 )
 from ..context import build_cli_context, with_runtime_options
 
@@ -88,6 +90,29 @@ def config_migrate_token_store(**kwargs: Any) -> None:
     cli_ctx, params = build_cli_context(kwargs)
     args = cli_ctx.build_args(group="config", **params)
     cli_ctx.emit(_cmd_config_migrate_token_store(args), cli_args=args)
+
+
+@config_group.command("strict-mode")
+@click.argument("value", required=False)
+@click.option("--global", "global_scope", is_flag=True)
+@click.option("--reset", is_flag=True)
+@with_runtime_options
+def config_strict_mode(**kwargs: Any) -> None:
+    cli_ctx, params = build_cli_context(kwargs)
+    args = cli_ctx.build_args(group="config", **params)
+    cli_ctx.emit(_cmd_config_strict_mode(args), cli_args=args)
+
+
+@config_group.command("bind")
+@click.option("--source", type=click.Choice(["openclaw", "hermes"]))
+@click.option("--identity", type=click.Choice(["bot-only", "user-default"]))
+@click.option("--force", is_flag=True)
+@click.option("--lang", default="zh", show_default=True, type=click.Choice(["zh", "en"]))
+@with_runtime_options
+def config_bind(**kwargs: Any) -> None:
+    cli_ctx, params = build_cli_context(kwargs)
+    args = cli_ctx.build_args(group="config", **params)
+    cli_ctx.emit(_cmd_config_bind(args), cli_args=args)
 
 
 __all__ = ["config_group"]
