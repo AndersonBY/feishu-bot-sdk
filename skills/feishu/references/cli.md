@@ -354,13 +354,13 @@ feishu server stop --pid-file /tmp/feishu.pid
 
 ```bash
 # 先落盘再分析
-feishu search app --query "calendar" --save-output ./search-full.json --format json
+feishu docs +search --query "calendar" --save-output ./search-full.json --format json
 
 # 查看后续 JSON 片段（_cli_output.next_output_offset 指示）
-feishu search app --query "calendar" --output-offset 25000 --format json
+feishu docs +search --query "calendar" --output-offset 25000 --format json
 
 # 关闭裁剪
-feishu search app --query "calendar" --full-output --format json
+feishu docs +search --query "calendar" --full-output --format json
 ```
 
 Agent 规则：

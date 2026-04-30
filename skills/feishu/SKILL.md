@@ -309,8 +309,9 @@ feishu okr +progress-create --target-id obj_xxx --target-type objective --conten
 ### 搜索
 
 ```bash
-feishu search doc-wiki --query "weekly report" --as auto --format json
-feishu search message --query "incident" --as auto --format json
+feishu docs +search --query "weekly report" --as auto --format json
+feishu drive +search --query "incident" --as auto --format json
+feishu im +messages-search --query "incident" --as auto --format json
 ```
 
 ### 邮件
